@@ -370,35 +370,167 @@ const LB = {
 
 const FRAMEWORKS = {
   "NIST CSF 2.0": [
-    { id: "GV", name: "Govern",   color: "#1E6FD9", light: "rgba(30,111,217,0.15)", description: "Organisational context, risk strategy, roles & supply chain", domains: [
-      { id: "GV.OC", name: "Organisational Context",   questions: ["Mission and stakeholder expectations are understood and inform cybersecurity objectives","Legal, regulatory and contractual requirements are understood","Critical outcomes and dependencies are identified and prioritised"] },
-      { id: "GV.RM", name: "Risk Management Strategy", questions: ["Risk management objectives are established and communicated","Risk appetite and tolerance statements exist and are used in decisions","Risk management roles and responsibilities are assigned"] },
-      { id: "GV.SC", name: "Supply Chain Risk",        questions: ["A supply chain risk management programme exists","Suppliers are assessed for cybersecurity risk before engagement","Supplier security requirements are included in contracts"] },
-      { id: "GV.PO", name: "Policy",                   questions: ["Cybersecurity policy is established, approved and communicated","Policy is reviewed and updated on a defined cycle","Policy exceptions are managed through a formal process"] }
+    { id:"GV", name:"Govern", color:"#1E6FD9", light:"rgba(30,111,217,0.15)", description:"Organisational context, risk strategy, roles, policy & supply chain", domains:[
+      { id:"GV.OC", name:"Organizational Context", questions:[
+        "GV.OC-01 — The organizational mission is understood and informs cybersecurity risk management",
+        "GV.OC-02 — Internal and external stakeholders are understood and their needs regarding cybersecurity risk management are considered",
+        "GV.OC-03 — Legal, regulatory, and contractual requirements regarding cybersecurity are understood and managed",
+        "GV.OC-04 — Critical objectives, capabilities, and services that external stakeholders depend on are understood and communicated",
+        "GV.OC-05 — Outcomes, capabilities, and services that the organization depends on are understood and communicated"
+      ]},
+      { id:"GV.RM", name:"Risk Management Strategy", questions:[
+        "GV.RM-01 — Risk management objectives are established and agreed to by organizational stakeholders",
+        "GV.RM-02 — Risk appetite and risk tolerance statements are established, communicated, and maintained",
+        "GV.RM-03 — Organizational risk tolerance is determined, communicated, and reviewed",
+        "GV.RM-04 — Strategic direction that describes appropriate risk response options is established and communicated",
+        "GV.RM-05 — Lines of communication across the organization are established for cybersecurity risks",
+        "GV.RM-06 — A standardized method for calculating, documenting, categorizing, and prioritizing cybersecurity risks is established",
+        "GV.RM-07 — Strategic opportunities (positive risks) are characterized and included in cybersecurity risk discussions"
+      ]},
+      { id:"GV.RR", name:"Roles, Responsibilities & Authorities", questions:[
+        "GV.RR-01 — Organizational leadership is responsible and accountable for cybersecurity risk and fosters a risk-aware culture",
+        "GV.RR-02 — Roles, responsibilities, and authorities related to cybersecurity risk management are established, communicated, understood, and enforced",
+        "GV.RR-03 — Adequate resources are allocated commensurate with the cybersecurity risk strategy, roles, and policies",
+        "GV.RR-04 — Cybersecurity is included in human resources practices"
+      ]},
+      { id:"GV.PO", name:"Policy", questions:[
+        "GV.PO-01 — Policy for managing cybersecurity risks is established, communicated, and enforced",
+        "GV.PO-02 — Policy for managing cybersecurity risks is reviewed, updated, and enforced to reflect changes in requirements and threats"
+      ]},
+      { id:"GV.OV", name:"Oversight", questions:[
+        "GV.OV-01 — Cybersecurity risk management strategy outcomes are reviewed to inform and adjust strategy and direction",
+        "GV.OV-02 — The cybersecurity risk management strategy is reviewed and adjusted to ensure coverage of organizational requirements and risks",
+        "GV.OV-03 — Organizational cybersecurity risk management performance is evaluated and reviewed for adjustments needed"
+      ]},
+      { id:"GV.SC", name:"Supply Chain Risk Management", questions:[
+        "GV.SC-01 — A cybersecurity supply chain risk management program, strategy, objectives, policies, and processes are established",
+        "GV.SC-02 — Cybersecurity roles and responsibilities for suppliers, customers, and partners are established and coordinated",
+        "GV.SC-03 — Cybersecurity supply chain risk management is integrated into cybersecurity and enterprise risk management processes",
+        "GV.SC-04 — Suppliers are known and prioritized by criticality",
+        "GV.SC-05 — Requirements to address cybersecurity risks in supply chains are integrated into contracts with suppliers",
+        "GV.SC-06 — Planning and due diligence are performed to reduce risks before entering formal supplier relationships",
+        "GV.SC-07 — The risks posed by suppliers are understood, recorded, assessed, responded to, and monitored over the course of the relationship",
+        "GV.SC-08 — Relevant suppliers are included in incident planning, response, and recovery activities",
+        "GV.SC-09 — Supply chain security practices are integrated into cybersecurity and enterprise risk management programs",
+        "GV.SC-10 — Cybersecurity supply chain risk management plans include provisions for activities after the conclusion of a partnership"
+      ]}
     ]},
-    { id: "ID", name: "Identify", color: "#00BFFF", light: "rgba(0,191,255,0.12)", description: "Asset management, risk assessment, improvement", domains: [
-      { id: "ID.AM", name: "Asset Management", questions: ["Hardware assets are inventoried and maintained","Software assets including licences are inventoried","Network topology and data flows are documented","External systems and services are catalogued"] },
-      { id: "ID.RA", name: "Risk Assessment",  questions: ["Asset vulnerabilities are identified and documented","Threat intelligence is received and integrated into risk assessments","A risk register is maintained with owners and treatment plans","Risks are prioritised using a consistent methodology"] },
-      { id: "ID.IM", name: "Improvement",      questions: ["Lessons learned from incidents are incorporated into practice","Assessment results drive improvements to the security programme","Performance against security objectives is measured"] }
+    { id:"ID", name:"Identify", color:"#00BFFF", light:"rgba(0,191,255,0.12)", description:"Asset management, risk assessment & improvement", domains:[
+      { id:"ID.AM", name:"Asset Management", questions:[
+        "ID.AM-01 — Inventories of hardware managed by the organization are maintained",
+        "ID.AM-02 — Inventories of software, services, and systems managed by the organization are maintained",
+        "ID.AM-03 — Representations of the organization's authorized network communication and internal and external data flows are maintained",
+        "ID.AM-04 — Inventories of services provided by suppliers are maintained",
+        "ID.AM-05 — Assets are prioritized based on classification, criticality, resources, and impact on the mission",
+        "ID.AM-06 — Cybersecurity roles and responsibilities for the entire workforce and third parties are established, communicated, and enforced",
+        "ID.AM-07 — Inventories of data and corresponding metadata for designated data types are maintained",
+        "ID.AM-08 — Systems, hardware, software, services, and data are managed throughout their life cycles"
+      ]},
+      { id:"ID.RA", name:"Risk Assessment", questions:[
+        "ID.RA-01 — Vulnerabilities in assets are identified, validated, and recorded",
+        "ID.RA-02 — Cyber threat intelligence is received from information sharing forums and sources",
+        "ID.RA-03 — Internal and external threats to the organization are identified and recorded",
+        "ID.RA-04 — Potential impacts and likelihoods of threats exploiting vulnerabilities are identified and recorded",
+        "ID.RA-05 — Threats, vulnerabilities, likelihoods, and impacts are used to understand inherent risk and inform risk response prioritization",
+        "ID.RA-06 — Risk responses are chosen, prioritized, planned, tracked, and communicated",
+        "ID.RA-07 — Changes and exceptions are managed, assessed for risk impact, recorded, and tracked",
+        "ID.RA-08 — Processes for receiving, analyzing, and responding to vulnerability disclosures are established",
+        "ID.RA-09 — The authenticity and integrity of hardware and software are assessed prior to acquisition and use",
+        "ID.RA-10 — Critical suppliers are assessed prior to acquisition"
+      ]},
+      { id:"ID.IM", name:"Improvement", questions:[
+        "ID.IM-01 — Improvements are identified from security program evaluations",
+        "ID.IM-02 — Improvements are identified from security tests and exercises, including those done in coordination with suppliers",
+        "ID.IM-03 — Improvements are identified from execution of operational processes, procedures, and activities"
+      ]}
     ]},
-    { id: "PR", name: "Protect",  color: "#C8F135", light: "rgba(200,241,53,0.12)", description: "Identity, awareness, data security, platform & resilience", domains: [
-      { id: "PR.AA", name: "Identity & Access",    questions: ["Identities are managed through a defined lifecycle process","Multi-factor authentication is enforced for privileged and remote access","Access rights follow least privilege and are reviewed regularly","Service accounts and non-human identities are managed"] },
-      { id: "PR.AT", name: "Awareness & Training", questions: ["All staff receive security awareness training on joining and annually","Privileged users receive role-specific security training","Phishing simulation or similar testing is conducted"] },
-      { id: "PR.DS", name: "Data Security",        questions: ["Data is classified according to a defined scheme","Data at rest is protected with appropriate encryption","Data in transit is protected with appropriate encryption","Data retention and disposal procedures exist and are followed"] },
-      { id: "PR.PS", name: "Platform Security",    questions: ["Systems are configured against a security baseline or hardening standard","Patch management is performed on a defined and risk-based schedule","Change management controls govern modifications to production systems"] }
+    { id:"PR", name:"Protect", color:"#C8F135", light:"rgba(200,241,53,0.12)", description:"Identity, awareness, data security, platform security & resilience", domains:[
+      { id:"PR.AA", name:"Identity Management, Authentication & Access Control", questions:[
+        "PR.AA-01 — Identities and credentials for authorized users, services, and hardware are managed by the organization",
+        "PR.AA-02 — Identities are proofed and bound to credentials based on the context of interactions",
+        "PR.AA-03 — Users, services, and hardware are authenticated",
+        "PR.AA-04 — Identity assertions are protected, conveyed, and verified",
+        "PR.AA-05 — Access permissions, entitlements, and authorizations are defined in policy, managed, enforced, and reviewed",
+        "PR.AA-06 — Physical access to assets is managed, monitored, and enforced commensurate with risk"
+      ]},
+      { id:"PR.AT", name:"Awareness & Training", questions:[
+        "PR.AT-01 — Personnel are provided with awareness and training so that they possess the knowledge and skills to perform general tasks with cybersecurity risks in mind",
+        "PR.AT-02 — Individuals in specialized roles are provided with awareness and training so that they possess the knowledge and skills to perform relevant tasks with cybersecurity risks in mind"
+      ]},
+      { id:"PR.DS", name:"Data Security", questions:[
+        "PR.DS-01 — The confidentiality, integrity, and availability of data-at-rest are protected",
+        "PR.DS-02 — The confidentiality, integrity, and availability of data-in-transit are protected",
+        "PR.DS-03 — Data leakage and exfiltration activities are anticipated, resisted, detected, and mitigated",
+        "PR.DS-04 — Adequate capacity to ensure availability is maintained",
+        "PR.DS-05 — Protections against data leaks are implemented",
+        "PR.DS-06 — Integrity checking mechanisms are used to verify software, firmware, and information integrity",
+        "PR.DS-07 — The development and testing environment(s) are separate from the production environment",
+        "PR.DS-08 — Integrity checking mechanisms are used to verify hardware integrity",
+        "PR.DS-09 — Data is managed throughout its life cycle",
+        "PR.DS-10 — Data is destroyed according to policy when no longer needed"
+      ]},
+      { id:"PR.PS", name:"Platform Security", questions:[
+        "PR.PS-01 — Configuration management practices are established and applied",
+        "PR.PS-02 — Software is maintained, replaced, and removed commensurate with risk"
+      ]},
+      { id:"PR.IR", name:"Technology Infrastructure Resilience", questions:[
+        "PR.IR-01 — Networks and environments are protected from unauthorized logical access and usage",
+        "PR.IR-02 — The organization's technology assets are protected from environmental threats"
+      ]}
     ]},
-    { id: "DE", name: "Detect",   color: "#F59E0B", light: "rgba(245,158,11,0.12)", description: "Continuous monitoring and anomaly detection", domains: [
-      { id: "DE.CM", name: "Continuous Monitoring",   questions: ["Network traffic is monitored for anomalies and threats","Endpoint activity is monitored through EDR or equivalent","Log data is collected centrally and retained for investigation","User and entity behaviour is monitored for anomalies"] },
-      { id: "DE.AE", name: "Adverse Event Analysis",  questions: ["Security alerts are triaged and investigated in a timely manner","Thresholds and baselines exist to distinguish normal from anomalous activity","Correlation rules exist to identify multi-stage attacks"] }
+    { id:"DE", name:"Detect", color:"#F59E0B", light:"rgba(245,158,11,0.12)", description:"Continuous monitoring and adverse event analysis", domains:[
+      { id:"DE.CM", name:"Continuous Monitoring", questions:[
+        "DE.CM-01 — Networks and network services are monitored to find potentially adverse events",
+        "DE.CM-02 — The physical environment is monitored to find potentially adverse events",
+        "DE.CM-03 — Personnel activity and technology usage are monitored to find potentially adverse events",
+        "DE.CM-04 — External service provider activities and services are monitored to find potentially adverse events",
+        "DE.CM-05 — Vulnerability scans are performed regularly and patch status is assessed",
+        "DE.CM-06 — Authorized users and systems are distinguished from unauthorized users and systems"
+      ]},
+      { id:"DE.AE", name:"Adverse Event Analysis", questions:[
+        "DE.AE-01 — A baseline of network operations and expected data flows for users and systems is established and managed",
+        "DE.AE-02 — Potentially adverse events are analyzed to better understand associated activities",
+        "DE.AE-03 — Information is correlated from multiple sources to achieve integrated identification of adverse events",
+        "DE.AE-04 — The estimated impact and scope of adverse events are understood",
+        "DE.AE-05 — Alerts are generated and communicated by cybersecurity technologies to the appropriate personnel"
+      ]}
     ]},
-    { id: "RS", name: "Respond",  color: "#F87171", light: "rgba(248,113,113,0.12)", description: "Incident management, analysis, communication & mitigation", domains: [
-      { id: "RS.MA", name: "Incident Management",   questions: ["An incident response plan exists and is maintained","Incidents are categorised and prioritised by severity","IR roles and responsibilities are clearly assigned"] },
-      { id: "RS.AN", name: "Incident Analysis",     questions: ["Root cause analysis is performed for significant incidents","Forensic evidence is preserved appropriately during investigations","Threat intelligence is used to contextualise incidents"] },
-      { id: "RS.CO", name: "Incident Communication",questions: ["Internal escalation paths are defined and tested","Regulatory notification obligations are understood and met","External communication (customers, press) is coordinated"] }
+    { id:"RS", name:"Respond", color:"#F87171", light:"rgba(248,113,113,0.12)", description:"Incident management, analysis, communication & mitigation", domains:[
+      { id:"RS.MA", name:"Incident Management", questions:[
+        "RS.MA-01 — The incident response plan is executed in coordination with relevant third parties once an incident is declared",
+        "RS.MA-02 — Incident reports are triaged and validated, and security alerts are triaged appropriately",
+        "RS.MA-03 — Incidents are categorized and prioritized"
+      ]},
+      { id:"RS.AN", name:"Incident Analysis", questions:[
+        "RS.AN-01 — Notifications from detection systems are investigated to understand the nature of the incident",
+        "RS.AN-02 — The impact of the incident is understood",
+        "RS.AN-03 — Forensics are performed to better understand the incident and support evidence preservation",
+        "RS.AN-04 — Incidents are categorized consistent with response plans",
+        "RS.AN-05 — Processes are established to receive, analyze, and respond to vulnerabilities disclosed to the organization"
+      ]},
+      { id:"RS.CO", name:"Incident Response Reporting & Communication", questions:[
+        "RS.CO-01 — Personnel know their roles and order of operations when a response is needed",
+        "RS.CO-02 — Incidents are reported consistent with established criteria",
+        "RS.CO-03 — Information is shared consistent with response plans"
+      ]},
+      { id:"RS.MI", name:"Incident Mitigation", questions:[
+        "RS.MI-01 — Incidents are contained",
+        "RS.MI-02 — Incidents are eradicated"
+      ]}
     ]},
-    { id: "RC", name: "Recover",  color: "#A78BFA", light: "rgba(167,139,250,0.12)", description: "Restoration, communications and lessons learned", domains: [
-      { id: "RC.RP", name: "Incident Recovery",     questions: ["Recovery plans exist for critical systems and services","Backup and restoration procedures are tested regularly","Recovery time and point objectives are defined for critical assets"] },
-      { id: "RC.CO", name: "Recovery Communication",questions: ["Stakeholders are kept informed during and after recovery","Post-incident reviews are conducted and documented","Lessons learned are tracked and acted upon"] }
+    { id:"RC", name:"Recover", color:"#A78BFA", light:"rgba(167,139,250,0.12)", description:"Incident recovery planning and communications", domains:[
+      { id:"RC.RP", name:"Incident Recovery Plan Execution", questions:[
+        "RC.RP-01 — The recovery portion of the incident response plan is executed once initiated",
+        "RC.RP-02 — Recovery actions are selected, scoped, prioritized, and performed",
+        "RC.RP-03 — The integrity of backups and other restoration assets is verified before using them for restoration",
+        "RC.RP-04 — Critical mission functions and cybersecurity capabilities are re-established",
+        "RC.RP-05 — The integrity of restored assets is verified, systems and services are restored, and normal operating status is confirmed"
+      ]},
+      { id:"RC.CO", name:"Incident Recovery Communication", questions:[
+        "RC.CO-01 — Public relations are managed during and following cybersecurity incidents",
+        "RC.CO-02 — Reputation of the organization is repaired following an incident",
+        "RC.CO-03 — Recovery activities and progress in restoring normal operations are communicated to designated internal and external stakeholders"
+      ]}
     ]}
   ],
   "CIS Controls v8": [
@@ -429,24 +561,31 @@ const FRAMEWORKS = {
   ]
 };
 
+// NIST CSF 2.0 Tiers: 0=Not Present, 1=Partial, 2=Risk-Informed, 3=Repeatable, 4=Adaptive
+// N/A is stored as -1 and excluded from all score averages
 const ML = [
-  { value: 0, label: "N/A",        color: "#4A6A8A",  bg: "rgba(74,106,138,0.15)"  },
-  { value: 1, label: "Initial",    color: "#F87171",  bg: "rgba(248,113,113,0.15)" },
-  { value: 2, label: "Developing", color: "#FB923C",  bg: "rgba(251,146,60,0.15)"  },
-  { value: 3, label: "Defined",    color: "#FCD34D",  bg: "rgba(252,211,77,0.15)"  },
-  { value: 4, label: "Managed",    color: "#C8F135",  bg: "rgba(200,241,53,0.15)"  },
-  { value: 5, label: "Optimising", color: "#00BFFF",  bg: "rgba(0,191,255,0.15)"   }
+  { value: 0, label: "Not Present",   color: "#F87171", bg: "rgba(248,113,113,0.18)" },
+  { value: 1, label: "Partial",       color: "#FB923C", bg: "rgba(251,146,60,0.18)"  },
+  { value: 2, label: "Risk-Informed", color: "#FCD34D", bg: "rgba(252,211,77,0.18)"  },
+  { value: 3, label: "Repeatable",    color: "#C8F135", bg: "rgba(200,241,53,0.18)"  },
+  { value: 4, label: "Adaptive",      color: "#00BFFF", bg: "rgba(0,191,255,0.18)"   }
 ];
-const ML_DESC = ["","Ad hoc, undocumented, reactive","Developing, partially documented","Defined, documented, consistently applied","Measured, monitored, risk-based","Continuously improving, industry-leading"];
+const ML_DESC = [
+  "Not Present — cybersecurity risk management is not applied or does not exist",
+  "Partial — risk management is ad hoc and reactive; limited awareness",
+  "Risk-Informed — practices exist but are not consistently applied organisation-wide",
+  "Repeatable — formally approved, consistently applied, risk-informed practices",
+  "Adaptive — continuously improved, organisation-wide, anticipates evolving threats"
+];
 const EFFORT_CFG = { Low: { color: "#C8F135", bg: "rgba(200,241,53,0.15)" }, Medium: { color: "#FCD34D", bg: "rgba(252,211,77,0.15)" }, High: { color: "#F87171", bg: "rgba(248,113,113,0.15)" } };
 const PRI_CFG   = { Critical: { color: "#F87171", bg: "rgba(248,113,113,0.15)" }, High: { color: "#FCD34D", bg: "rgba(252,211,77,0.15)" }, Medium: { color: "#00BFFF", bg: "rgba(0,191,255,0.15)" } };
 
 function BarChart({ data, height = 150 }) {
-  const max = Math.max(...data.map(d => d.value), 5);
+  const max = Math.max(...data.map(d => d.value), 4);
   const w = 100 / data.length;
   return (
     <svg width="100%" height={height} viewBox={`0 0 100 ${height}`} preserveAspectRatio="none">
-      {[1,2,3,4,5].map(v => { const y = height - (v/max)*(height-20)-4; return <line key={v} x1="0" y1={y} x2="100" y2={y} stroke="#1B3A6B" strokeWidth="0.5"/>; })}
+      {[1,2,3,4].map(v => { const y = height - (v/max)*(height-20)-4; return <line key={v} x1="0" y1={y} x2="100" y2={y} stroke="#1B3A6B" strokeWidth="0.5"/>; })}
       {data.map((d, i) => {
         const bh = d.value ? (d.value/max)*(height-20) : 0;
         const x = i*w + w*0.15; const bw = w*0.7; const y = height-bh-4;
@@ -460,14 +599,41 @@ function BarChart({ data, height = 150 }) {
   );
 }
 
+// ── Horizontal Bar Chart — reliable across all screen sizes ─────────────────
+function HBarChart({ data, maxVal }) {
+  const max = maxVal || Math.max(...data.map(d => d.value), 1);
+  return (
+    <div style={{ display:"flex", flexDirection:"column", gap:"10px", width:"100%" }}>
+      {data.map((d, i) => (
+        <div key={i} style={{ display:"flex", alignItems:"center", gap:"10px" }}>
+          <div style={{ width:"42px", fontSize:"11px", fontWeight:"700", color:"#8BAAC8", textAlign:"right", flexShrink:0, fontFamily:"Outfit,sans-serif" }}>{d.label}</div>
+          <div style={{ flex:1, height:"22px", background:"#0A1932", borderRadius:"4px", overflow:"hidden", position:"relative" }}>
+            <div style={{
+              width: d.value > 0 ? `${(d.value/max)*100}%` : "0%",
+              height:"100%",
+              background: d.color,
+              borderRadius:"4px",
+              transition:"width 0.5s ease",
+              minWidth: d.value > 0 ? "4px" : "0"
+            }}/>
+          </div>
+          <div style={{ width:"36px", fontSize:"13px", fontWeight:"800", color: d.value > 0 ? d.color : "#4A6A8A", textAlign:"left", flexShrink:0, fontFamily:"Outfit,sans-serif" }}>
+            {d.value > 0 ? (Number.isInteger(d.value) ? d.value : d.value.toFixed(1)) : "—"}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function RadarChart({ scores, framework }) {
   const cats = FRAMEWORKS[framework]; const n = cats.length;
   const cx=150, cy=150, r=110; const step=(2*Math.PI)/n;
-  const pt=(i,v)=>{ const a=i*step-Math.PI/2; const d=(v/5)*r; return {x:cx+d*Math.cos(a),y:cy+d*Math.sin(a)}; };
+  const pt=(i,v)=>{ const a=i*step-Math.PI/2; const d=(v/4)*r; return {x:cx+d*Math.cos(a),y:cy+d*Math.sin(a)}; };
   const lp=(i)=>{ const a=i*step-Math.PI/2; return {x:cx+(r+22)*Math.cos(a),y:cy+(r+22)*Math.sin(a)}; };
   return (
     <svg width="300" height="300" viewBox="0 0 300 300">
-      {[1,2,3,4,5].map(lv=>{ const pts=cats.map((_,i)=>pt(i,lv)); const d=pts.map((p,i)=>`${i===0?"M":"L"}${p.x},${p.y}`).join(" ")+"Z"; return <path key={lv} d={d} fill="none" stroke="#1B3A6B" strokeWidth="0.8"/>; })}
+      {[1,2,3,4].map(lv=>{ const pts=cats.map((_,i)=>pt(i,lv)); const d=pts.map((p,i)=>`${i===0?"M":"L"}${p.x},${p.y}`).join(" ")+"Z"; return <path key={lv} d={d} fill="none" stroke="#1B3A6B" strokeWidth="0.8"/>; })}
       {cats.map((_,i)=>{ const o=pt(i,5); return <line key={i} x1={cx} y1={cy} x2={o.x} y2={o.y} stroke="#1B3A6B" strokeWidth="0.8"/>; })}
       {(()=>{ const pts=cats.map((c,i)=>pt(i,scores[c.id]||0)); const d=pts.map((p,i)=>`${i===0?"M":"L"}${p.x},${p.y}`).join(" ")+"Z"; return (<><path d={d} fill="rgba(0,191,255,0.12)" stroke="#00BFFF" strokeWidth="1.5"/>{pts.map((p,i)=><circle key={i} cx={p.x} cy={p.y} r="3.5" fill="#00BFFF"/>)}</>); })()}
       {cats.map((c,i)=>{ const l=lp(i); return <text key={i} x={l.x} y={l.y} textAnchor="middle" dominantBaseline="middle" fontSize="9.5" fontWeight="700" fill="#8BAAC8" fontFamily="Outfit,sans-serif">{c.id}</text>; })}
@@ -508,22 +674,25 @@ export default function MaturityScorecard() {
   const [resultsTab, setResultsTab] = useState("overview");
   const [statusMsg, setStatusMsg] = useState("");
   const [showWorkshop, setShowWorkshop] = useState({}); // keyed by domain id
+  const [generatingReport, setGeneratingReport] = useState(false);
   const fileInputRef = useRef();
 
   const fw = FRAMEWORKS[framework];
-  const flash = (msg) => { setStatusMsg(msg); setTimeout(()=>setStatusMsg(""),2500); };
+  const isNIST = framework === "NIST CSF 2.0";
+  const flash = (msg) => { setStatusMsg(msg); setTimeout(()=>setStatusMsg(""),3000); };
 
-  const getMC = (s) => { if(!s) return "#4A6A8A"; const v=parseFloat(s); if(v<1.5) return "#F87171"; if(v<2.5) return "#FB923C"; if(v<3.5) return "#FCD34D"; if(v<4.5) return "#C8F135"; return "#00BFFF"; };
-  const getML = (s) => { if(!s) return "Not assessed"; const v=parseFloat(s); if(v<1.5) return "Initial"; if(v<2.5) return "Developing"; if(v<3.5) return "Defined"; if(v<4.5) return "Managed"; return "Optimising"; };
-  const domainScore = (d) => { const vals=d.questions.map((_,qi)=>scores[`${d.id}_q${qi}`]).filter(v=>v!==undefined&&v!==0); return vals.length?(vals.reduce((a,b)=>a+b,0)/vals.length).toFixed(1):null; };
-  const catScore = (cat) => { const ds=cat.domains.map(d=>domainScore(d)).filter(v=>v!==null); return ds.length?(ds.reduce((a,b)=>a+parseFloat(b),0)/ds.length).toFixed(1):null; };
-  const overall = (()=>{ const cs=fw.map(c=>catScore(c)).filter(v=>v!==null); return cs.length?(cs.reduce((a,b)=>a+parseFloat(b),0)/cs.length).toFixed(1):null; })();
+  const getMC = (s) => { if(!s && s!==0) return "#4A6A8A"; const v=parseFloat(s); if(v<0.5) return "#F87171"; if(v<1.5) return "#FB923C"; if(v<2.5) return "#FCD34D"; if(v<3.5) return "#C8F135"; return "#00BFFF"; };
+  const getML = (s) => { if(!s && s!==0) return "Not assessed"; const v=parseFloat(s); if(v<0.5) return "Not Present"; if(v<1.5) return "Partial"; if(v<2.5) return "Risk-Informed"; if(v<3.5) return "Repeatable"; return "Adaptive"; };
+  // N/A stored as -1, excluded from averages. Gaps = scored below 3 (Repeatable)
+  const domainScore = (d) => { const vals=d.questions.map((_,qi)=>scores[`${d.id}_q${qi}`]).filter(v=>v!==undefined&&v!==-1); return vals.length?(vals.reduce((a,b)=>a+b,0)/vals.length).toFixed(2):null; };
+  const catScore = (cat) => { const ds=cat.domains.map(d=>domainScore(d)).filter(v=>v!==null); return ds.length?(ds.reduce((a,b)=>a+parseFloat(b),0)/ds.length).toFixed(2):null; };
+  const overall = (()=>{ const cs=fw.map(c=>catScore(c)).filter(v=>v!==null); return cs.length?(cs.reduce((a,b)=>a+parseFloat(b),0)/cs.length).toFixed(2):null; })();
   const completion = (()=>{ const total=fw.flatMap(c=>c.domains.flatMap(d=>d.questions)).length; const done=Object.values(scores).filter(v=>v!==undefined).length; return Math.round((done/total)*100); })();
   const radarScores = {}; fw.forEach(cat=>{ const sc=catScore(cat); radarScores[cat.id]=sc?parseFloat(sc):0; });
 
   const getAllGaps = useCallback(()=>{
     const gaps=[];
-    fw.forEach(cat=>{ cat.domains.forEach(domain=>{ domain.questions.forEach((q,qi)=>{ const key=`${domain.id}_q${qi}`; const sc=scores[key]; if(sc!==undefined&&sc>0&&sc<3) gaps.push({cat,domain,q,sc,key,rec:RECS[key]}); }); }); });
+    fw.forEach(cat=>{ cat.domains.forEach(domain=>{ domain.questions.forEach((q,qi)=>{ const key=`${domain.id}_q${qi}`; const sc=scores[key]; if(sc!==undefined&&sc!==-1&&sc<3) gaps.push({cat,domain,q,sc,key,rec:RECS[key]}); }); }); });
     return gaps.sort((a,b)=>a.sc-b.sc);
   },[fw,scores]);
 
@@ -636,9 +805,268 @@ export default function MaturityScorecard() {
     flash("Excel exported ✓");
   }
 
+  // ── PPTX Report Generator ─────────────────────────────────────────────────
+  // Requires: npm install pptxgenjs  (run once in your Vite project root)
+  async function exportPPTXReport() {
+    if (!isNIST) { flash("PPTX report is for NIST CSF 2.0 only"); return; }
+    setGeneratingReport(true);
+    try {
+      const PptxGenJS = (await import("pptxgenjs")).default;
+      const prs = new PptxGenJS();
+      prs.layout = "LAYOUT_WIDE"; // 13.33" × 7.5"
+
+      const N = "08111F", CARD = "0D1F3C", CARD2 = "0A1932";
+      const BL = "1E6FD9", CY = "00BFFF", LI = "C8F135";
+      const WH = "FFFFFF", TM = "8BAAC8", TD = "4A6A8A", BD = "1B3A6B";
+      const client = clientName || "CLIENT NAME";
+      const asses  = assessor  || "LevelBlue";
+      const date   = new Date().toLocaleDateString("en-GB", { month:"long", year:"numeric" });
+
+      const bg    = s => { s.background = { color: N }; };
+      const hline = (s, col=BL) => s.addShape(prs.ShapeType.rect, { x:0.5, y:0.07, w:12.33, h:0.04, fill:{ color:col }, line:{ color:col, width:0 } });
+      const foot  = (s) => s.addText(`${asses}  ·  NIST CSF 2.0  ·  ${date}  ·  CONFIDENTIAL`, { x:0.5, y:7.2, w:12.33, h:0.22, fontSize:8, color:TD, fontFace:"Calibri" });
+
+      // Helper: colour a score value
+      const scoreCol = (sc) => {
+        if(sc===null||sc===undefined) return TM;
+        const v=parseFloat(sc);
+        if(v<0.5) return "F87171"; if(v<1.5) return "FB923C";
+        if(v<2.5) return "FCD34D"; if(v<3.5) return "C8F135";
+        return "00BFFF";
+      };
+      const tierLabel = (sc) => {
+        if(sc===null||sc===undefined) return "Not assessed";
+        const v=parseFloat(sc);
+        if(v<0.5) return "Not Present"; if(v<1.5) return "Partial";
+        if(v<2.5) return "Risk-Informed"; if(v<3.5) return "Repeatable";
+        return "Adaptive";
+      };
+
+      // ── SLIDE 1 — Cover ────────────────────────────────────────────────
+      const s1 = prs.addSlide(); bg(s1);
+      s1.addShape(prs.ShapeType.rect, { x:0, y:0, w:0.38, h:7.5, fill:{ color:BL }, line:{ color:BL, width:0 } });
+      s1.addShape(prs.ShapeType.rect, { x:0, y:6.85, w:13.33, h:0.65, fill:{ color:CARD }, line:{ color:CARD, width:0 } });
+      // Logo stripes
+      ["1E6FD9","00BFFF","C8F135"].forEach((c,i) => {
+        s1.addShape(prs.ShapeType.rect, { x:0.65+i*0.17, y:0.5, w:0.12, h:0.55, fill:{ color:c }, line:{ color:c, width:0 } });
+      });
+      s1.addText("LevelBlue", { x:0.6, y:1.2, w:10, h:0.45, fontSize:13, color:TM, fontFace:"Calibri", bold:true });
+      s1.addText("Cyber Risk Maturity Assessment", { x:0.6, y:1.7, w:11, h:1.0, fontSize:34, color:WH, fontFace:"Calibri", bold:true });
+      s1.addText("Final Report", { x:0.6, y:2.7, w:9, h:0.7, fontSize:28, color:CY, fontFace:"Calibri", bold:true });
+      s1.addShape(prs.ShapeType.rect, { x:0.6, y:3.55, w:8, h:0.04, fill:{ color:BD }, line:{ color:BD, width:0 } });
+      s1.addText(date, { x:0.6, y:3.75, w:6, h:0.35, fontSize:14, color:TM, fontFace:"Calibri" });
+      s1.addText(`Prepared for ${client} by ${asses}`, { x:0.6, y:4.15, w:9, h:0.35, fontSize:13, color:TM, fontFace:"Calibri", italic:true });
+      if(overall) {
+        s1.addText(`Current Score: ${parseFloat(overall).toFixed(2)} / 4.0  —  ${tierLabel(overall)}`, {
+          x:0.6, y:5.1, w:9, h:0.5, fontSize:18, color:scoreCol(overall), fontFace:"Calibri", bold:true
+        });
+      }
+      s1.addText("CONFIDENTIAL — NOT FOR DISTRIBUTION", { x:0.6, y:7.05, w:10, h:0.28, fontSize:9, color:TD, fontFace:"Calibri" });
+
+      // ── SLIDE 2 — Executive Summary ───────────────────────────────────
+      const s2 = prs.addSlide(); bg(s2); hline(s2, CY); foot(s2);
+      s2.addText("EXECUTIVE SUMMARY", { x:0.5, y:0.22, w:10, h:0.28, fontSize:9, color:CY, fontFace:"Calibri", bold:true, charSpacing:4 });
+      s2.addText(`${client} — NIST CSF 2.0 Current Profile`, { x:0.5, y:0.52, w:12, h:0.6, fontSize:24, color:WH, fontFace:"Calibri", bold:true });
+
+      // Function score table
+      const hdrRow = [
+        { text:"Function", options:{ fill:{ color:"1E3A6B" }, color:WH, bold:true, fontSize:11, fontFace:"Calibri", valign:"middle", margin:8 } },
+        { text:"Current Score", options:{ fill:{ color:"1E3A6B" }, color:WH, bold:true, fontSize:11, fontFace:"Calibri", valign:"middle", margin:8 } },
+        { text:"Tier", options:{ fill:{ color:"1E3A6B" }, color:WH, bold:true, fontSize:11, fontFace:"Calibri", valign:"middle", margin:8 } },
+        { text:"Gap Status", options:{ fill:{ color:"1E3A6B" }, color:WH, bold:true, fontSize:11, fontFace:"Calibri", valign:"middle", margin:8 } },
+      ];
+      const funcRows = fw.map((cat, ri) => {
+        const sc = catScore(cat);
+        const col = sc ? scoreCol(sc) : TM;
+        const fill = ri%2===0 ? CARD : CARD2;
+        const gap = sc && parseFloat(sc)<2 ? "⚠ Action Required" : sc && parseFloat(sc)<3 ? "↑ Improvement Needed" : sc ? "✓ On Track" : "—";
+        return [
+          { text:`${cat.id} — ${cat.name}`, options:{ fill:{ color:fill }, color:WH, fontSize:12, fontFace:"Calibri", valign:"middle", margin:8 } },
+          { text:sc ? parseFloat(sc).toFixed(2) : "—", options:{ fill:{ color:fill }, color:col, bold:true, fontSize:13, fontFace:"Calibri", valign:"middle", margin:8 } },
+          { text:tierLabel(sc), options:{ fill:{ color:fill }, color:col, fontSize:11, fontFace:"Calibri", valign:"middle", margin:8 } },
+          { text:gap, options:{ fill:{ color:fill }, color:sc&&parseFloat(sc)<2?"F87171":sc&&parseFloat(sc)<3?"FCD34D":"4ADE80", fontSize:11, fontFace:"Calibri", valign:"middle", margin:8 } },
+        ];
+      });
+      const overallRow = [
+        { text:"OVERALL", options:{ fill:{ color:"1E3A6B" }, color:WH, bold:true, fontSize:12, fontFace:"Calibri", valign:"middle", margin:8 } },
+        { text:overall ? parseFloat(overall).toFixed(2) : "TBC", options:{ fill:{ color:"1E3A6B" }, color:overall?scoreCol(overall):TM, bold:true, fontSize:14, fontFace:"Calibri", valign:"middle", margin:8 } },
+        { text:tierLabel(overall), options:{ fill:{ color:"1E3A6B" }, color:overall?scoreCol(overall):TM, bold:true, fontSize:12, fontFace:"Calibri", valign:"middle", margin:8 } },
+        { text:"", options:{ fill:{ color:"1E3A6B" }, color:WH, fontSize:11, fontFace:"Calibri", valign:"middle", margin:8 } },
+      ];
+      s2.addTable([hdrRow, ...funcRows, overallRow], {
+        x:0.5, y:1.25, w:12.33, colW:[4.2,2.0,2.5,3.63],
+        border:{ pt:0.5, color:BD }
+      });
+
+      // ── SLIDE 3 — Key Findings & Introduction ─────────────────────────
+      const s3 = prs.addSlide(); bg(s3); hline(s3, BL); foot(s3);
+      s3.addText("INTRODUCTION", { x:0.5, y:0.22, w:10, h:0.28, fontSize:9, color:CY, fontFace:"Calibri", bold:true, charSpacing:4 });
+      s3.addText("Key Findings and Recommendations", { x:0.5, y:0.52, w:12, h:0.6, fontSize:24, color:WH, fontFace:"Calibri", bold:true });
+
+      const gaps = getAllGaps();
+      const critCount = gaps.filter(g=>g.rec?.priority==="Critical").length;
+      const highCount = gaps.filter(g=>g.rec?.priority==="High").length;
+      const medCount  = gaps.filter(g=>g.rec?.priority==="Medium").length;
+
+      const introText = `${asses} was engaged by ${client} to provide a view of cyber security maturity in line with the NIST Cybersecurity Framework (CSF) 2.0. NIST CSF is a framework widely adopted across industries and accepted by regulatory bodies. ${asses} has created a comprehensive NIST CSF 2.0 assessment report which details our findings and recommendations.\n\nNIST CSF maturity scores range from 0–4. An overall score is calculated by aggregating scores across the six NIST CSF function areas: Govern, Identify, Protect, Detect, Respond and Recover. Most organisations target scores between 2 and 3, with 4 (Adaptive) typically applicable only to the most highly regulated institutions.\n\n${client} achieved a current profile score of ${overall?parseFloat(overall).toFixed(2):"TBC"} (${tierLabel(overall)}).`;
+      s3.addText(introText, { x:0.5, y:1.25, w:8.0, h:3.2, fontSize:11, color:TM, fontFace:"Calibri", valign:"top" });
+
+      // Priority callout boxes
+      [
+        { label:"Critical", count:critCount, color:"F87171" },
+        { label:"High",     count:highCount, color:"FCD34D" },
+        { label:"Medium",   count:medCount,  color:"00BFFF" },
+      ].forEach(({label,count,color},i) => {
+        const bx = 8.8, by = 1.25 + i*1.55;
+        s3.addShape(prs.ShapeType.rect, { x:bx, y:by, w:4.0, h:1.35, fill:{ color:CARD }, line:{ color, width:1.5 } });
+        s3.addShape(prs.ShapeType.rect, { x:bx, y:by, w:4.0, h:0.06, fill:{ color }, line:{ color, width:0 } });
+        s3.addText(String(count), { x:bx+0.2, y:by+0.12, w:3.6, h:0.75, fontSize:40, color, fontFace:"Calibri", bold:true });
+        s3.addText(`${label} Priority Gap${count!==1?"s":""}`, { x:bx+0.2, y:by+0.88, w:3.6, h:0.35, fontSize:12, color:TM, fontFace:"Calibri" });
+      });
+
+      s3.addText(`LevelBlue recommends ${critCount+highCount} high/critical and ${medCount} medium priority workstreams to improve ${client}'s cybersecurity maturity posture to the agreed target profile.`, {
+        x:0.5, y:4.6, w:12.33, h:0.7, fontSize:11, color:TM, fontFace:"Calibri", italic:true
+      });
+
+      // ── SLIDE 4 — NIST CSF Analysis ───────────────────────────────────
+      const s4 = prs.addSlide(); bg(s4); hline(s4, LI); foot(s4);
+      s4.addText("NIST CSF ANALYSIS", { x:0.5, y:0.22, w:10, h:0.28, fontSize:9, color:LI, fontFace:"Calibri", bold:true, charSpacing:4 });
+      s4.addText("Category Scores — Current Profile (0–4 scale)", { x:0.5, y:0.52, w:12, h:0.55, fontSize:22, color:WH, fontFace:"Calibri", bold:true });
+
+      const catHdr = [
+        { text:"Category ID",   options:{ fill:{ color:"1E3A6B" }, color:WH, bold:true, fontSize:10, fontFace:"Calibri", valign:"middle", margin:6 } },
+        { text:"Category Name", options:{ fill:{ color:"1E3A6B" }, color:WH, bold:true, fontSize:10, fontFace:"Calibri", valign:"middle", margin:6 } },
+        { text:"Score",         options:{ fill:{ color:"1E3A6B" }, color:WH, bold:true, fontSize:10, fontFace:"Calibri", valign:"middle", margin:6 } },
+        { text:"Tier",          options:{ fill:{ color:"1E3A6B" }, color:WH, bold:true, fontSize:10, fontFace:"Calibri", valign:"middle", margin:6 } },
+        { text:"Gaps (<3)",     options:{ fill:{ color:"1E3A6B" }, color:WH, bold:true, fontSize:10, fontFace:"Calibri", valign:"middle", margin:6 } },
+      ];
+      let catTableRows = [catHdr];
+      let ri2 = 0;
+      fw.forEach(cat => {
+        cat.domains.forEach(domain => {
+          const ds = domainScore(domain);
+          const domGaps = gaps.filter(g=>g.domain.id===domain.id).length;
+          const fill = ri2%2===0 ? CARD : CARD2;
+          catTableRows.push([
+            { text:domain.id,   options:{ fill:{ color:fill }, color:cat.color.replace("#",""), bold:true, fontSize:10, fontFace:"Calibri", valign:"middle", margin:6 } },
+            { text:domain.name, options:{ fill:{ color:fill }, color:WH, fontSize:10, fontFace:"Calibri", valign:"middle", margin:6 } },
+            { text:ds?parseFloat(ds).toFixed(2):"—", options:{ fill:{ color:fill }, color:ds?scoreCol(ds):TD, bold:true, fontSize:11, fontFace:"Calibri", valign:"middle", margin:6 } },
+            { text:tierLabel(ds), options:{ fill:{ color:fill }, color:ds?scoreCol(ds):TD, fontSize:10, fontFace:"Calibri", valign:"middle", margin:6 } },
+            { text:domGaps>0?String(domGaps):"—", options:{ fill:{ color:fill }, color:domGaps>0?"F87171":TM, fontSize:10, fontFace:"Calibri", valign:"middle", margin:6 } },
+          ]);
+          ri2++;
+        });
+      });
+      s4.addTable(catTableRows, {
+        x:0.5, y:1.15, w:12.33, colW:[1.6,4.8,1.4,2.4,2.13],
+        border:{ pt:0.5, color:BD }
+      });
+
+      // ── SLIDE 5 — Recommendations ─────────────────────────────────────
+      const s5 = prs.addSlide(); bg(s5); hline(s5, "F87171"); foot(s5);
+      s5.addText("DETAILED RECOMMENDATIONS", { x:0.5, y:0.22, w:10, h:0.28, fontSize:9, color:"F87171", fontFace:"Calibri", bold:true, charSpacing:4 });
+      s5.addText(`${gaps.length} Gap${gaps.length!==1?"s":""} Identified — Prioritised Remediation Actions`, { x:0.5, y:0.52, w:12, h:0.55, fontSize:22, color:WH, fontFace:"Calibri", bold:true });
+
+      const recHdr = [
+        { text:"Ref",       options:{ fill:{ color:"1E3A6B" }, color:WH, bold:true, fontSize:9, fontFace:"Calibri", valign:"middle", margin:5 } },
+        { text:"Priority",  options:{ fill:{ color:"1E3A6B" }, color:WH, bold:true, fontSize:9, fontFace:"Calibri", valign:"middle", margin:5 } },
+        { text:"Category",  options:{ fill:{ color:"1E3A6B" }, color:WH, bold:true, fontSize:9, fontFace:"Calibri", valign:"middle", margin:5 } },
+        { text:"Recommended Action", options:{ fill:{ color:"1E3A6B" }, color:WH, bold:true, fontSize:9, fontFace:"Calibri", valign:"middle", margin:5 } },
+        { text:"Effort",    options:{ fill:{ color:"1E3A6B" }, color:WH, bold:true, fontSize:9, fontFace:"Calibri", valign:"middle", margin:5 } },
+        { text:"Reference", options:{ fill:{ color:"1E3A6B" }, color:WH, bold:true, fontSize:9, fontFace:"Calibri", valign:"middle", margin:5 } },
+      ];
+      let recRows = [recHdr];
+      let recRef = 1;
+      const priOrder = ["Critical","High","Medium"];
+      priOrder.forEach(pri => {
+        gaps.filter(g=>g.rec?.priority===pri).forEach(({cat,domain,rec},idx) => {
+          const fill = recRef%2===0 ? CARD : CARD2;
+          const priColor = pri==="Critical"?"F87171":pri==="High"?"FCD34D":"00BFFF";
+          recRows.push([
+            { text:`R-${String(recRef).padStart(2,"0")}`, options:{ fill:{ color:fill }, color:CY, bold:true, fontSize:9, fontFace:"Calibri", valign:"middle", margin:5 } },
+            { text:pri, options:{ fill:{ color:fill }, color:priColor, bold:true, fontSize:9, fontFace:"Calibri", valign:"middle", margin:5 } },
+            { text:domain.id, options:{ fill:{ color:fill }, color:cat.color.replace("#",""), bold:true, fontSize:9, fontFace:"Calibri", valign:"middle", margin:5 } },
+            { text:rec?.action||"—", options:{ fill:{ color:fill }, color:WH, fontSize:9, fontFace:"Calibri", valign:"middle", margin:5 } },
+            { text:rec?.effort||"—", options:{ fill:{ color:fill }, color:TM, fontSize:9, fontFace:"Calibri", valign:"middle", margin:5 } },
+            { text:rec?.ref||"—", options:{ fill:{ color:fill }, color:TD, fontSize:8, fontFace:"Calibri", valign:"middle", margin:5 } },
+          ]);
+          recRef++;
+        });
+      });
+      s5.addTable(recRows, {
+        x:0.5, y:1.1, w:12.33, colW:[0.7,1.1,1.1,5.5,1.0,2.93],
+        border:{ pt:0.5, color:BD }
+      });
+
+      // ── SLIDE 6 — Conclusion ──────────────────────────────────────────
+      const s6 = prs.addSlide(); bg(s6);
+      s6.addShape(prs.ShapeType.rect, { x:0, y:0, w:0.38, h:7.5, fill:{ color:CY }, line:{ color:CY, width:0 } });
+      s6.addText("CONCLUSION", { x:0.6, y:0.4, w:8, h:0.28, fontSize:9, color:CY, fontFace:"Calibri", bold:true, charSpacing:4 });
+      s6.addText(client, { x:0.6, y:0.72, w:11, h:0.65, fontSize:26, color:WH, fontFace:"Calibri", bold:true });
+      s6.addText("Following a detailed assessment against the NIST CSF 2.0, LevelBlue have provided the findings and recommendations in this report.", { x:0.6, y:1.45, w:11, h:0.5, fontSize:12, color:TM, fontFace:"Calibri" });
+
+      s6.addText(`Current Score: ${overall?parseFloat(overall).toFixed(2):"TBC"}  (${tierLabel(overall)})`, {
+        x:0.6, y:2.1, w:9, h:0.5, fontSize:18, color:overall?scoreCol(overall):TM, fontFace:"Calibri", bold:true
+      });
+
+      const topGaps = gaps.filter(g=>g.rec?.priority==="Critical"||g.rec?.priority==="High").slice(0,5);
+      if(topGaps.length>0) {
+        s6.addText("Key Areas for Improvement:", { x:0.6, y:2.75, w:10, h:0.35, fontSize:12, color:CY, fontFace:"Calibri", bold:true });
+        topGaps.forEach((g,i) => {
+          s6.addText(`• ${g.rec?.action||g.q.slice(0,80)}`, { x:0.6, y:3.15+i*0.44, w:12.1, h:0.4, fontSize:11, color:WH, fontFace:"Calibri" });
+        });
+      }
+      const workstreamCount = critCount+highCount+medCount;
+      s6.addText(`LevelBlue recommends ${workstreamCount} workstream${workstreamCount!==1?"s":""} (${critCount} Critical · ${highCount} High · ${medCount} Medium) to move ${client} towards the agreed target profile.`, {
+        x:0.6, y:5.6, w:12.1, h:0.65, fontSize:11, color:TM, fontFace:"Calibri", italic:true
+      });
+      foot(s6);
+
+      // ── SLIDE 7 — NIST CSF Overview (Appendix) ───────────────────────
+      const s7 = prs.addSlide(); bg(s7); hline(s7, TD); foot(s7);
+      s7.addText("APPENDIX — NIST CSF 2.0 OVERVIEW", { x:0.5, y:0.22, w:10, h:0.28, fontSize:9, color:TM, fontFace:"Calibri", bold:true, charSpacing:4 });
+      s7.addText("Framework Structure & Tier Scoring Criteria", { x:0.5, y:0.52, w:12, h:0.55, fontSize:20, color:WH, fontFace:"Calibri", bold:true });
+      s7.addText("The NIST 2.0 framework scores across 6 Function Areas, 22 Categories and 106 Subcategories. Each subcategory is assessed against the 0–4 tier scale:", { x:0.5, y:1.18, w:12.33, h:0.45, fontSize:11, color:TM, fontFace:"Calibri" });
+
+      const tierTableHdr = [
+        { text:"Tier", options:{ fill:{ color:"1E3A6B" }, color:WH, bold:true, fontSize:10, fontFace:"Calibri", valign:"middle", margin:8 } },
+        { text:"Label",  options:{ fill:{ color:"1E3A6B" }, color:WH, bold:true, fontSize:10, fontFace:"Calibri", valign:"middle", margin:8 } },
+        { text:"Description", options:{ fill:{ color:"1E3A6B" }, color:WH, bold:true, fontSize:10, fontFace:"Calibri", valign:"middle", margin:8 } },
+      ];
+      const tierRows = [
+        [0,"Not Present","Cybersecurity risk management is not applied. No practices, processes or policies exist.","F87171"],
+        [1,"Partial","Risk management is ad hoc and reactive. Limited awareness of cybersecurity risk at organisational level.","FB923C"],
+        [2,"Risk-Informed","Risk management practices are approved by management but may not be implemented organisation-wide.","FCD34D"],
+        [3,"Repeatable","Formally approved risk management practices are consistently implemented across the organisation.","C8F135"],
+        [4,"Adaptive","Cybersecurity practices are continuously improved based on lessons learned and predictive indicators.","00BFFF"],
+      ].map(([v,label,desc,col],i) => [
+        { text:String(v), options:{ fill:{ color:i%2===0?CARD:CARD2 }, color:col, bold:true, fontSize:14, fontFace:"Calibri", valign:"middle", margin:8 } },
+        { text:label,     options:{ fill:{ color:i%2===0?CARD:CARD2 }, color:col, bold:true, fontSize:11, fontFace:"Calibri", valign:"middle", margin:8 } },
+        { text:desc,      options:{ fill:{ color:i%2===0?CARD:CARD2 }, color:WH, fontSize:10, fontFace:"Calibri", valign:"middle", margin:8 } },
+      ]);
+      s7.addTable([tierTableHdr, ...tierRows], {
+        x:0.5, y:1.7, w:12.33, colW:[0.7,2.2,9.43],
+        border:{ pt:0.5, color:BD }
+      });
+
+      const funcSummary = fw.map(cat=>({ id:cat.id, name:cat.name, cats:cat.domains.length, subs:cat.domains.reduce((a,d)=>a+d.questions.length,0) }));
+      s7.addText("Function breakdown:", { x:0.5, y:5.8, w:4, h:0.3, fontSize:10, color:TM, fontFace:"Calibri", bold:true });
+      funcSummary.forEach((f,i) => {
+        s7.addText(`${f.id}: ${f.cats} categories, ${f.subs} subcategories`, { x:0.5+i*2.1, y:6.15, w:2.05, h:0.28, fontSize:9, color:TM, fontFace:"Calibri" });
+      });
+
+      await prs.writeFile({ fileName:`${client.replace(/\s+/g,"-")}-NIST-Assessment-Report-${new Date().toISOString().slice(0,10)}.pptx` });
+      flash("Report downloaded ✓");
+    } catch(e) {
+      console.error(e);
+      flash("Error: ensure pptxgenjs is installed (npm install pptxgenjs)");
+    }
+    setGeneratingReport(false);
+  }
+
   // Insight data
   const effortBreakdown = ["Low","Medium","High"].map(e=>({ label:e, value:getAllGaps().filter(g=>g.rec?.effort===e).length, color:EFFORT_CFG[e].color }));
-  const scoreDist = [1,2,3,4,5].map(v=>({ label:String(v), value:Object.values(scores).filter(sc=>sc===v).length, color:ML.find(m=>m.value===v)?.color||"#9CA3AF" }));
+  const scoreDist = [0,1,2,3,4].map(v=>({ label:String(v), value:Object.values(scores).filter(sc=>sc===v).length, color:ML.find(m=>m.value===v)?.color||"#9CA3AF" }));
   const gapsByCat = fw.map(cat=>({ label:cat.id, value:getAllGaps().filter(g=>g.cat.id===cat.id).length, color:cat.color }));
   const priSegments = ["Critical","High","Medium"].map(p=>({ label:p, value:getAllGaps().filter(g=>g.rec?.priority===p).length, color:PRI_CFG[p].color }));
   const totalGaps = priSegments.reduce((a,s)=>a+s.value,0);
@@ -684,6 +1112,11 @@ export default function MaturityScorecard() {
           <button onClick={exportExcel} style={{ padding:"5px 12px", borderRadius:"5px", border:"1px solid rgba(200,241,53,0.4)", background:"rgba(200,241,53,0.1)", color:"#C8F135", fontSize:"11px", fontWeight:"700", cursor:"pointer", fontFamily:"inherit" }}>
             Excel ↓
           </button>
+          {isNIST && (
+            <button onClick={exportPPTXReport} disabled={generatingReport} style={{ padding:"5px 12px", borderRadius:"5px", border:"1px solid rgba(0,191,255,0.4)", background:"rgba(0,191,255,0.1)", color:"#00BFFF", fontSize:"11px", fontWeight:"700", cursor:"pointer", fontFamily:"inherit", opacity:generatingReport?0.6:1 }}>
+              {generatingReport ? "Building…" : "Report ↓"}
+            </button>
+          )}
           {statusMsg && <span style={{ fontSize:"11px", color:"#C8F135", fontWeight:"600" }}>{statusMsg}</span>}
         </div>
       </div>
@@ -711,17 +1144,17 @@ export default function MaturityScorecard() {
               {Object.keys(FRAMEWORKS).map(f=>(
                 <button key={f} onClick={()=>{ setFramework(f); setScores({}); setNotes({}); setWorkshopNotes({}); }} style={{ width:"100%", padding:"14px 16px", borderRadius:"9px", border:`2px solid ${framework===f?"#1E6FD9":"#1B3A6B"}`, background:framework===f?"rgba(30,111,217,0.15)":"#0A1932", marginBottom:"10px", textAlign:"left", cursor:"pointer", fontFamily:"inherit" }}>
                   <div style={{ fontWeight:"700", fontSize:"14px", color:framework===f?"#00BFFF":"#E2EAF4" }}>{f}</div>
-                  <div style={{ fontSize:"12px", color:"#4A6A8A", marginTop:"3px" }}>{f==="NIST CSF 2.0"?"6 functions · 20 domains · 38 controls":"3 groups · 18 controls · Implementation groups"}</div>
+                  <div style={{ fontSize:"12px", color:"#4A6A8A", marginTop:"3px" }}>{f==="NIST CSF 2.0"?"6 functions · 22 categories · 106 subcategories · 0–4 NIST tiers":"3 groups · 18 controls · Implementation groups"}</div>
                 </button>
               ))}
               <button onClick={()=>setView("assess")} style={{ width:"100%", padding:"13px", borderRadius:"9px", background:"linear-gradient(135deg,#1E6FD9,#0EA5E9)", color:"white", border:"none", fontWeight:"700", fontSize:"13px", cursor:"pointer", fontFamily:"inherit", marginTop:"4px" }}>Begin Assessment →</button>
             </div>
             <div style={{ ...card, gridColumn:"1 / -1" }}>
-              <div style={{ fontSize:"11px", fontWeight:"700", color:"#4A6A8A", letterSpacing:"0.1em", textTransform:"uppercase", marginBottom:"14px" }}>Maturity Scale Reference</div>
+              <div style={{ fontSize:"11px", fontWeight:"700", color:"#4A6A8A", letterSpacing:"0.1em", textTransform:"uppercase", marginBottom:"14px" }}>NIST CSF 2.0 — Scoring Tiers (0–4)</div>
               <div style={{ display:"grid", gridTemplateColumns:"repeat(5,1fr)", gap:"10px" }}>
-                {ML.filter(m=>m.value>0).map(m=>(
+                {ML.map(m=>(
                   <div key={m.value} style={{ padding:"12px", borderRadius:"8px", background:m.bg, border:`1px solid ${m.color}40` }}>
-                    <div style={{ fontWeight:"800", fontSize:"20px", color:m.color }}>{m.value}</div>
+                    <div style={{ fontWeight:"800", fontSize:"24px", color:m.color }}>{m.value}</div>
                     <div style={{ fontWeight:"700", fontSize:"12px", color:"#E2EAF4", marginTop:"3px" }}>{m.label}</div>
                     <div style={{ fontSize:"11px", color:"#8BAAC8", marginTop:"3px", lineHeight:"1.4" }}>{ML_DESC[m.value]}</div>
                   </div>
@@ -838,12 +1271,14 @@ export default function MaturityScorecard() {
                                   <div key={qi} style={{ marginBottom:"16px", paddingBottom:"16px", borderBottom:qi<domain.questions.length-1?"1px solid #0D1F3C":"none" }}>
                                     <div style={{ fontSize:"13px", color:"#E2EAF4", marginBottom:"8px", lineHeight:"1.5", fontWeight:"500" }}>{q}</div>
                                     <div style={{ display:"flex", gap:"5px", flexWrap:"wrap", marginBottom:"7px" }}>
+                                      <button onClick={()=>setScores(p=>({...p,[key]:-1}))} style={{ padding:"5px 11px", borderRadius:"6px", border:`2px solid ${cur===-1?"#4A6A8A":"#1B3A6B"}`, background:cur===-1?"rgba(74,106,138,0.3)":"#0A1932", color:cur===-1?"#8BAAC8":"#4A6A8A", fontSize:"12px", fontWeight:"700", cursor:"pointer", fontFamily:"inherit" }}>N/A</button>
                                       {ML.map(m=>(
                                         <button key={m.value} onClick={()=>setScores(p=>({...p,[key]:m.value}))} style={{ padding:"5px 11px", borderRadius:"6px", border:`2px solid ${cur===m.value?m.color:"#1B3A6B"}`, background:cur===m.value?m.bg:"#0A1932", color:cur===m.value?m.color:"#4A6A8A", fontSize:"12px", fontWeight:"700", cursor:"pointer", fontFamily:"inherit" }}>
-                                          {m.value===0?"N/A":m.value}
+                                          {m.value}
                                         </button>
                                       ))}
-                                      {cur!==undefined&&<span style={{ fontSize:"11px", color:"#8BAAC8", alignSelf:"center", marginLeft:"4px" }}>{ML.find(m=>m.value===cur)?.label}{cur>0&&` — ${ML_DESC[cur]}`}</span>}
+                                      {cur!==-1&&cur!==undefined&&<span style={{ fontSize:"11px", color:"#8BAAC8", alignSelf:"center", marginLeft:"4px" }}>{ML.find(m=>m.value===cur)?.label}</span>}
+                                      {cur===-1&&<span style={{ fontSize:"11px", color:"#4A6A8A", alignSelf:"center", marginLeft:"4px" }}>N/A — excluded from scoring</span>}
                                     </div>
                                     <input placeholder="Evidence note (optional)" value={notes[key]||""} onChange={e=>setNotes(p=>({...p,[key]:e.target.value}))} style={{ width:"100%", padding:"7px 10px", borderRadius:"6px", border:"1px solid #1B3A6B", fontSize:"12px", fontFamily:"inherit", outline:"none", background:"#0A1932", color:"#E2EAF4", boxSizing:"border-box" }}/>
                                   </div>
@@ -867,9 +1302,12 @@ export default function MaturityScorecard() {
             <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"18px" }}>
               <div>
                 <div style={{ fontSize:"18px", fontWeight:"800", color:"#FFFFFF" }}>{clientName||"Client"} — Maturity Results</div>
-                <div style={{ fontSize:"12px", color:"#4A6A8A", marginTop:"2px" }}>{framework} · {assessor||"Assessor"} · {new Date().toLocaleDateString("en-GB")}</div>
+                <div style={{ fontSize:"12px", color:"#4A6A8A", marginTop:"2px" }}>{framework} · {assessor||"Assessor"} · {new Date().toLocaleDateString("en-GB")}{isNIST?" · Scale: 0–4 NIST Tiers":""}</div>
               </div>
-              <button onClick={exportExcel} style={{ padding:"9px 18px", borderRadius:"8px", border:"1px solid rgba(200,241,53,0.4)", background:"rgba(200,241,53,0.1)", fontSize:"12px", fontWeight:"700", cursor:"pointer", fontFamily:"inherit", color:"#C8F135" }}>Export Excel ↓</button>
+              <div style={{ display:"flex", gap:"8px" }}>
+                <button onClick={exportExcel} style={{ padding:"9px 18px", borderRadius:"8px", border:"1px solid rgba(200,241,53,0.4)", background:"rgba(200,241,53,0.1)", fontSize:"12px", fontWeight:"700", cursor:"pointer", fontFamily:"inherit", color:"#C8F135" }}>Export Excel ↓</button>
+                {isNIST && <button onClick={exportPPTXReport} disabled={generatingReport} style={{ padding:"9px 18px", borderRadius:"8px", border:"1px solid rgba(0,191,255,0.4)", background:"rgba(0,191,255,0.1)", fontSize:"12px", fontWeight:"700", cursor:"pointer", fontFamily:"inherit", color:"#00BFFF", opacity:generatingReport?0.6:1 }}>{generatingReport?"Building…":"Generate Report ↓"}</button>}
+              </div>
             </div>
 
             <div style={{ display:"flex", gap:"3px", marginBottom:"18px", background:"#0A1932", padding:"4px", borderRadius:"8px", width:"fit-content", border:"1px solid #1B3A6B" }}>
@@ -887,10 +1325,10 @@ export default function MaturityScorecard() {
                   <div style={card}>
                     <div style={{ fontSize:"11px", fontWeight:"700", color:"#4A6A8A", letterSpacing:"0.1em", textTransform:"uppercase", marginBottom:"14px" }}>Overall Maturity</div>
                     <div style={{ display:"flex", alignItems:"center", gap:"18px" }}>
-                      <div style={{ width:"92px", height:"92px", borderRadius:"50%", background:`conic-gradient(${getMC(overall)} ${(parseFloat(overall||0)/5)*360}deg, #1B3A6B 0deg)`, display:"flex", alignItems:"center", justifyContent:"center" }}>
+                      <div style={{ width:"92px", height:"92px", borderRadius:"50%", background:`conic-gradient(${getMC(overall)} ${(parseFloat(overall||0)/4)*360}deg, #1B3A6B 0deg)`, display:"flex", alignItems:"center", justifyContent:"center" }}>
                         <div style={{ width:"68px", height:"68px", borderRadius:"50%", background:"#0D1F3C", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center" }}>
                           <div style={{ fontSize:"22px", fontWeight:"800", color:getMC(overall), lineHeight:1 }}>{overall||"—"}</div>
-                          <div style={{ fontSize:"9px", color:"#4A6A8A", fontWeight:"600" }}>/ 5.0</div>
+                          <div style={{ fontSize:"9px", color:"#4A6A8A", fontWeight:"600" }}>/ 4.0</div>
                         </div>
                       </div>
                       <div>
@@ -900,7 +1338,7 @@ export default function MaturityScorecard() {
                       </div>
                     </div>
                     <div style={{ marginTop:"14px", display:"flex", flexDirection:"column", gap:"6px" }}>
-                      {fw.map(cat=>{ const sc=catScore(cat); const pct=sc?(parseFloat(sc)/5)*100:0; return (
+                      {fw.map(cat=>{ const sc=catScore(cat); const pct=sc?(parseFloat(sc)/4)*100:0; return (
                         <div key={cat.id}>
                           <div style={{ display:"flex", justifyContent:"space-between", marginBottom:"2px" }}><span style={{ fontSize:"11px", fontWeight:"600", color:"#8BAAC8" }}>{cat.id} — {cat.name}</span><span style={{ fontSize:"11px", fontWeight:"800", color:getMC(sc) }}>{sc||"—"}</span></div>
                           <div style={{ height:"5px", background:"#1B3A6B", borderRadius:"3px", overflow:"hidden" }}><div style={{ width:`${pct}%`, height:"100%", background:getMC(sc), borderRadius:"3px", transition:"width 0.5s" }}/></div>
@@ -944,66 +1382,106 @@ export default function MaturityScorecard() {
                 </div>
               ):(
                 <div>
+                  {/* Row 1 — Score distribution + Avg by function */}
                   <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"14px", marginBottom:"14px" }}>
                     <div style={card}>
-                      <div style={{ fontSize:"11px", fontWeight:"700", color:"#4A6A8A", letterSpacing:"0.1em", textTransform:"uppercase", marginBottom:"3px" }}>Score Distribution</div>
-                      <div style={{ fontSize:"11px", color:"#4A6A8A", marginBottom:"12px" }}>How scored controls are spread across maturity levels</div>
-                      <BarChart data={scoreDist} height={130}/>
-                    </div>
-                    <div style={card}>
-                      <div style={{ fontSize:"11px", fontWeight:"700", color:"#4A6A8A", letterSpacing:"0.1em", textTransform:"uppercase", marginBottom:"3px" }}>Average Score by Function</div>
-                      <div style={{ fontSize:"11px", color:"#4A6A8A", marginBottom:"12px" }}>Comparative maturity across framework functions — lowest shows greatest need</div>
-                      <BarChart data={avgByCat} height={130}/>
-                    </div>
-                  </div>
-                  <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"14px", marginBottom:"14px" }}>
-                    <div style={card}>
-                      <div style={{ fontSize:"11px", fontWeight:"700", color:"#4A6A8A", letterSpacing:"0.1em", textTransform:"uppercase", marginBottom:"3px" }}>Gaps by Function</div>
-                      <div style={{ fontSize:"11px", color:"#4A6A8A", marginBottom:"12px" }}>Controls scoring below 3 per function — useful for scoping remediation workstreams</div>
-                      <BarChart data={gapsByCat} height={130}/>
-                    </div>
-                    <div style={card}>
-                      <div style={{ fontSize:"11px", fontWeight:"700", color:"#4A6A8A", letterSpacing:"0.1em", textTransform:"uppercase", marginBottom:"3px" }}>Gap Priority Breakdown</div>
-                      <div style={{ fontSize:"11px", color:"#4A6A8A", marginBottom:"12px" }}>Urgency profile across all identified gaps</div>
-                      <div style={{ display:"flex", alignItems:"center", gap:"22px" }}>
-                        <div style={{ position:"relative", width:"110px", height:"110px", flexShrink:0 }}>
-                          <DonutChart segments={priSegments} size={110} thickness={24}/>
-                          <div style={{ position:"absolute", top:"50%", left:"50%", transform:"translate(-50%,-50%)", textAlign:"center" }}>
-                            <div style={{ fontSize:"20px", fontWeight:"800", color:"#FFFFFF" }}>{totalGaps}</div>
-                            <div style={{ fontSize:"10px", color:"#4A6A8A", fontWeight:"600" }}>gaps</div>
+                      <div style={{ fontSize:"13px", fontWeight:"700", color:"#E2EAF4", marginBottom:"3px" }}>Score Distribution</div>
+                      <div style={{ fontSize:"11px", color:"#4A6A8A", marginBottom:"16px" }}>Number of controls at each maturity level</div>
+                      <HBarChart data={[1,2,3,4,5].map(v=>({ label:ML.find(m=>m.value===v)?.label||String(v), value:Object.values(scores).filter(sc=>sc===v).length, color:ML.find(m=>m.value===v)?.color||"#9CA3AF" }))} />
+                      <div style={{ display:"flex", flexWrap:"wrap", gap:"8px", marginTop:"14px", paddingTop:"12px", borderTop:"1px solid #1B3A6B" }}>
+                        {[1,2,3,4,5].map(v=>{ const m=ML.find(x=>x.value===v); return (
+                          <div key={v} style={{ display:"flex", alignItems:"center", gap:"5px" }}>
+                            <div style={{ width:"8px", height:"8px", borderRadius:"2px", background:m?.color, flexShrink:0 }}/>
+                            <span style={{ fontSize:"10px", color:"#8BAAC8" }}>{v} — {m?.label}</span>
                           </div>
-                        </div>
-                        <div style={{ display:"flex", flexDirection:"column", gap:"9px" }}>
-                          {priSegments.map(seg=>(
-                            <div key={seg.label} style={{ display:"flex", alignItems:"center", gap:"9px" }}>
-                              <div style={{ width:"9px", height:"9px", borderRadius:"50%", background:seg.color, flexShrink:0 }}/>
-                              <span style={{ fontSize:"12px", color:"#E2EAF4", fontWeight:"600", minWidth:"58px" }}>{seg.label}</span>
-                              <span style={{ fontSize:"17px", fontWeight:"800", color:seg.color }}>{seg.value}</span>
-                              <span style={{ fontSize:"11px", color:"#4A6A8A" }}>{totalGaps?Math.round((seg.value/totalGaps)*100):0}%</span>
-                            </div>
-                          ))}
-                        </div>
+                        );})}
+                      </div>
+                    </div>
+                    <div style={card}>
+                      <div style={{ fontSize:"13px", fontWeight:"700", color:"#E2EAF4", marginBottom:"3px" }}>Average Score by Function</div>
+                      <div style={{ fontSize:"11px", color:"#4A6A8A", marginBottom:"16px" }}>Maturity across each function — lower values indicate greatest need (max 5.0)</div>
+                      <HBarChart data={fw.map(cat=>({ label:cat.id, value:catScore(cat)?parseFloat(catScore(cat)):0, color:getMC(catScore(cat)) }))} maxVal={5} />
+                      <div style={{ display:"flex", flexWrap:"wrap", gap:"8px", marginTop:"14px", paddingTop:"12px", borderTop:"1px solid #1B3A6B" }}>
+                        {fw.map(cat=>(
+                          <div key={cat.id} style={{ display:"flex", alignItems:"center", gap:"5px" }}>
+                            <div style={{ width:"8px", height:"8px", borderRadius:"2px", background:cat.color, flexShrink:0 }}/>
+                            <span style={{ fontSize:"10px", color:"#8BAAC8" }}>{cat.id} — {cat.name}</span>
+                          </div>
+                        ))}
                       </div>
                     </div>
                   </div>
+
+                  {/* Row 2 — Gaps by function + Priority breakdown */}
+                  <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"14px", marginBottom:"14px" }}>
+                    <div style={card}>
+                      <div style={{ fontSize:"13px", fontWeight:"700", color:"#E2EAF4", marginBottom:"3px" }}>Gaps by Function</div>
+                      <div style={{ fontSize:"11px", color:"#4A6A8A", marginBottom:"16px" }}>Controls scoring below 3 per function — guides remediation workstream scoping</div>
+                      <HBarChart data={fw.map(cat=>({ label:cat.id, value:getAllGaps().filter(g=>g.cat.id===cat.id).length, color:cat.color }))} />
+                      {(()=>{ const worst=fw.map(cat=>({id:cat.id,name:cat.name,color:cat.color,n:getAllGaps().filter(g=>g.cat.id===cat.id).length})).sort((a,b)=>b.n-a.n)[0]; return worst?.n>0?(
+                        <div style={{ marginTop:"12px", padding:"9px 12px", borderRadius:"6px", background:"rgba(0,0,0,0.2)", border:"1px solid #1B3A6B", fontSize:"11px", color:"#8BAAC8" }}>
+                          <span style={{ fontWeight:"700", color:worst.color }}>{worst.id} — {worst.name}</span>{" "}has the most gaps ({worst.n} controls below threshold)
+                        </div>
+                      ):null; })()}
+                    </div>
+                    <div style={card}>
+                      <div style={{ fontSize:"13px", fontWeight:"700", color:"#E2EAF4", marginBottom:"3px" }}>Gap Priority Breakdown</div>
+                      <div style={{ fontSize:"11px", color:"#4A6A8A", marginBottom:"16px" }}>Urgency profile across all identified gaps</div>
+                      {totalGaps===0?(
+                        <div style={{ color:"#4A6A8A", fontSize:"12px", padding:"20px 0" }}>No gaps identified yet</div>
+                      ):(
+                        <>
+                          <div style={{ display:"flex", alignItems:"center", gap:"20px", marginBottom:"16px" }}>
+                            <div style={{ position:"relative", width:"110px", height:"110px", flexShrink:0 }}>
+                              <DonutChart segments={priSegments} size={110} thickness={24}/>
+                              <div style={{ position:"absolute", top:"50%", left:"50%", transform:"translate(-50%,-50%)", textAlign:"center" }}>
+                                <div style={{ fontSize:"22px", fontWeight:"800", color:"#FFFFFF", lineHeight:1 }}>{totalGaps}</div>
+                                <div style={{ fontSize:"10px", color:"#4A6A8A", fontWeight:"600", marginTop:"2px" }}>total</div>
+                              </div>
+                            </div>
+                            <div style={{ flex:1 }}>
+                              {priSegments.map(seg=>(
+                                <div key={seg.label} style={{ display:"flex", alignItems:"center", gap:"8px", marginBottom:"10px" }}>
+                                  <div style={{ width:"10px", height:"10px", borderRadius:"50%", background:seg.color, flexShrink:0 }}/>
+                                  <span style={{ fontSize:"12px", color:"#E2EAF4", fontWeight:"600", flex:1 }}>{seg.label}</span>
+                                  <span style={{ fontSize:"18px", fontWeight:"800", color:seg.color, minWidth:"26px", textAlign:"right" }}>{seg.value}</span>
+                                  <span style={{ fontSize:"11px", color:"#4A6A8A", minWidth:"34px" }}>{totalGaps?Math.round((seg.value/totalGaps)*100):0}%</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                          <div style={{ height:"8px", borderRadius:"4px", overflow:"hidden", display:"flex", gap:"2px" }}>
+                            {priSegments.filter(s=>s.value>0).map(seg=>(
+                              <div key={seg.label} style={{ flex:seg.value, background:seg.color, borderRadius:"4px" }}/>
+                            ))}
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Row 3 — Effort profile */}
                   <div style={card}>
-                    <div style={{ fontSize:"11px", fontWeight:"700", color:"#4A6A8A", letterSpacing:"0.1em", textTransform:"uppercase", marginBottom:"3px" }}>Remediation Effort Profile</div>
-                    <div style={{ fontSize:"11px", color:"#4A6A8A", marginBottom:"16px" }}>Resource planning view — how much effort is required to close identified gaps</div>
-                    <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:"10px" }}>
+                    <div style={{ fontSize:"13px", fontWeight:"700", color:"#E2EAF4", marginBottom:"3px" }}>Remediation Effort Profile</div>
+                    <div style={{ fontSize:"11px", color:"#4A6A8A", marginBottom:"16px" }}>Distribution of effort required to close all identified gaps — use for resource planning</div>
+                    <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:"10px", marginBottom:"12px" }}>
                       {effortBreakdown.map(e=>{ const cfg=EFFORT_CFG[e.label]; const pct=getAllGaps().length?Math.round((e.value/getAllGaps().length)*100):0; return (
-                        <div key={e.label} style={{ padding:"14px", borderRadius:"9px", background:cfg.bg, border:`1px solid ${cfg.color}40` }}>
-                          <div style={{ fontSize:"11px", fontWeight:"700", color:cfg.color, textTransform:"uppercase", letterSpacing:"0.08em", marginBottom:"5px" }}>{e.label} Effort</div>
-                          <div style={{ fontSize:"26px", fontWeight:"800", color:cfg.color }}>{e.value}</div>
-                          <div style={{ fontSize:"11px", color:"#8BAAC8", marginTop:"2px" }}>{pct}% of all gaps</div>
-                          <div style={{ height:"4px", background:`${cfg.color}25`, borderRadius:"2px", marginTop:"9px", overflow:"hidden" }}>
+                        <div key={e.label} style={{ padding:"16px", borderRadius:"9px", background:"rgba(0,0,0,0.2)", border:`1px solid ${cfg.color}40` }}>
+                          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"8px" }}>
+                            <div style={{ fontSize:"11px", fontWeight:"700", color:cfg.color, textTransform:"uppercase", letterSpacing:"0.08em" }}>{e.label} Effort</div>
+                            <span style={{ fontSize:"11px", color:"#4A6A8A" }}>{pct}%</span>
+                          </div>
+                          <div style={{ fontSize:"30px", fontWeight:"800", color:cfg.color, lineHeight:1, marginBottom:"10px" }}>{e.value}</div>
+                          <div style={{ height:"4px", background:"#1B3A6B", borderRadius:"2px", overflow:"hidden" }}>
                             <div style={{ width:`${pct}%`, height:"100%", background:cfg.color, borderRadius:"2px", transition:"width 0.5s" }}/>
                           </div>
                         </div>
                       );})}
                     </div>
                     {getAllGaps().filter(g=>g.rec?.effort==="Low").length>0&&(
-                      <div style={{ marginTop:"12px", padding:"11px 14px", borderRadius:"8px", background:"rgba(200,241,53,0.1)", border:"1px solid rgba(200,241,53,0.3)", fontSize:"12px", color:"#C8F135" }}>
-                        <span style={{ fontWeight:"700" }}>Quick wins: </span>{getAllGaps().filter(g=>g.rec?.effort==="Low").length} gap{getAllGaps().filter(g=>g.rec?.effort==="Low").length>1?"s":""} can be closed with low effort — recommend prioritising to demonstrate early progress to the client.
+                      <div style={{ padding:"11px 14px", borderRadius:"8px", background:"rgba(200,241,53,0.08)", border:"1px solid rgba(200,241,53,0.25)", fontSize:"12px", display:"flex", gap:"8px", alignItems:"flex-start" }}>
+                        <span style={{ fontWeight:"800", color:"#C8F135", flexShrink:0 }}>Quick wins</span>
+                        <span style={{ color:"#8BAAC8" }}>{getAllGaps().filter(g=>g.rec?.effort==="Low").length} gap{getAllGaps().filter(g=>g.rec?.effort==="Low").length>1?"s":""} can be addressed with low effort. Prioritise these first to demonstrate early progress to the client.</span>
                       </div>
                     )}
                   </div>
