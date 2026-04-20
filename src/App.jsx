@@ -665,15 +665,18 @@ export default function MaturityScorecard() {
   const [framework, setFramework] = useState("NIST CSF 2.0");
   const [clientName, setClientName] = useState("");
   const [assessor, setAssessor] = useState("");
+  const [clientSector, setClientSector] = useState("");
+  const [clientContext, setClientContext] = useState("");
   const [scores, setScores] = useState({});
+  const [targetScores, setTargetScores] = useState({});
   const [notes, setNotes] = useState({});
-  const [workshopNotes, setWorkshopNotes] = useState({}); // keyed by domain id
+  const [workshopNotes, setWorkshopNotes] = useState({});
   const [activeSection, setActiveSection] = useState(null);
   const [view, setView] = useState("setup");
   const [expandedDomains, setExpandedDomains] = useState({});
   const [resultsTab, setResultsTab] = useState("overview");
   const [statusMsg, setStatusMsg] = useState("");
-  const [showWorkshop, setShowWorkshop] = useState({}); // keyed by domain id
+  const [showWorkshop, setShowWorkshop] = useState({});
   const [generatingReport, setGeneratingReport] = useState(false);
   const fileInputRef = useRef();
 
@@ -681,15 +684,33 @@ export default function MaturityScorecard() {
   const isNIST = framework === "NIST CSF 2.0";
   const flash = (msg) => { setStatusMsg(msg); setTimeout(()=>setStatusMsg(""),3000); };
 
-  const getMC = (s) => { if(!s && s!==0) return "#4A6A8A"; const v=parseFloat(s); if(v<0.5) return "#F87171"; if(v<1.5) return "#FB923C"; if(v<2.5) return "#FCD34D"; if(v<3.5) return "#C8F135"; return "#00BFFF"; };
-  const getML = (s) => { if(!s && s!==0) return "Not assessed"; const v=parseFloat(s); if(v<0.5) return "Not Present"; if(v<1.5) return "Partial"; if(v<2.5) return "Risk-Informed"; if(v<3.5) return "Repeatable"; return "Adaptive"; };
-  // N/A stored as -1, excluded from averages. Gaps = scored below 3 (Repeatable)
+  const getMC = (s) => { if(s===null||s===undefined) return "#4A6A8A"; const v=parseFloat(s); if(v<0.5) return "#F87171"; if(v<1.5) return "#FB923C"; if(v<2.5) return "#FCD34D"; if(v<3.5) return "#C8F135"; return "#00BFFF"; };
+  const getML = (s) => { if(s===null||s===undefined) return "Not assessed"; const v=parseFloat(s); if(v<0.5) return "Not Present"; if(v<1.5) return "Partial"; if(v<2.5) return "Risk-Informed"; if(v<3.5) return "Repeatable"; return "Adaptive"; };
+
+  // Current scoring — N/A = -1, excluded from averages
   const domainScore = (d) => { const vals=d.questions.map((_,qi)=>scores[`${d.id}_q${qi}`]).filter(v=>v!==undefined&&v!==-1); return vals.length?(vals.reduce((a,b)=>a+b,0)/vals.length).toFixed(2):null; };
   const catScore = (cat) => { const ds=cat.domains.map(d=>domainScore(d)).filter(v=>v!==null); return ds.length?(ds.reduce((a,b)=>a+parseFloat(b),0)/ds.length).toFixed(2):null; };
   const overall = (()=>{ const cs=fw.map(c=>catScore(c)).filter(v=>v!==null); return cs.length?(cs.reduce((a,b)=>a+parseFloat(b),0)/cs.length).toFixed(2):null; })();
+
+  // Target scoring — defaults to current score if not explicitly set
+  const domainTarget = (d) => {
+    const vals = d.questions.map((_,qi) => {
+      const key = `${d.id}_q${qi}`;
+      const t = targetScores[key];
+      const c = scores[key];
+      // use explicit target if set, else fall back to current, exclude -1
+      const v = t !== undefined ? t : c;
+      return (v !== undefined && v !== -1) ? v : undefined;
+    }).filter(v => v !== undefined);
+    return vals.length ? (vals.reduce((a,b)=>a+b,0)/vals.length).toFixed(2) : null;
+  };
+  const catTarget = (cat) => { const ds=cat.domains.map(d=>domainTarget(d)).filter(v=>v!==null); return ds.length?(ds.reduce((a,b)=>a+parseFloat(b),0)/ds.length).toFixed(2):null; };
+  const overallTarget = (()=>{ const cs=fw.map(c=>catTarget(c)).filter(v=>v!==null); return cs.length?(cs.reduce((a,b)=>a+parseFloat(b),0)/cs.length).toFixed(2):null; })();
+
   const completion = (()=>{ const total=fw.flatMap(c=>c.domains.flatMap(d=>d.questions)).length; const done=Object.values(scores).filter(v=>v!==undefined).length; return Math.round((done/total)*100); })();
   const radarScores = {}; fw.forEach(cat=>{ const sc=catScore(cat); radarScores[cat.id]=sc?parseFloat(sc):0; });
 
+  // Gaps: current score below 3 (Repeatable), excluding N/A
   const getAllGaps = useCallback(()=>{
     const gaps=[];
     fw.forEach(cat=>{ cat.domains.forEach(domain=>{ domain.questions.forEach((q,qi)=>{ const key=`${domain.id}_q${qi}`; const sc=scores[key]; if(sc!==undefined&&sc!==-1&&sc<3) gaps.push({cat,domain,q,sc,key,rec:RECS[key]}); }); }); });
@@ -698,7 +719,7 @@ export default function MaturityScorecard() {
 
   // ── JSON Save / Load ─────────────────────────────────────────────────────
   function saveSession() {
-    const session = { version:1, framework, clientName, assessor, date:new Date().toISOString(), scores, notes, workshopNotes };
+    const session = { version:2, framework, clientName, assessor, clientSector, clientContext, date:new Date().toISOString(), scores, targetScores, notes, workshopNotes };
     const blob = new Blob([JSON.stringify(session, null, 2)], { type:"application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -717,7 +738,10 @@ export default function MaturityScorecard() {
         setFramework(data.framework || "NIST CSF 2.0");
         setClientName(data.clientName || "");
         setAssessor(data.assessor || "");
+        setClientSector(data.clientSector || "");
+        setClientContext(data.clientContext || "");
         setScores(data.scores || {});
+        setTargetScores(data.targetScores || {});
         setNotes(data.notes || {});
         setWorkshopNotes(data.workshopNotes || {});
         flash("Session loaded ✓");
@@ -733,49 +757,56 @@ export default function MaturityScorecard() {
 
     // Sheet 1: Summary
     const summaryRows = [
-      ["CYBER MATURITY SCORECARD"],
+      ["LEVELBLUE CYBER MATURITY SCORECARD — NIST CSF 2.0"],
       [],
       ["Client", clientName || "Not specified"],
+      ["Sector", clientSector || "Not specified"],
       ["Assessor", assessor || "Not specified"],
       ["Framework", framework],
       ["Date", new Date().toLocaleDateString("en-GB")],
-      ["Overall Maturity Score", overall || "Incomplete"],
-      ["Overall Maturity Level", getML(overall)],
-      ["Assessment Completion", `${completion}%`],
+      [],
+      ["OVERALL SCORES"],
+      ["", "Current Score", "Current Tier", "Target Score", "Target Tier", "Gap"],
+      ["Overall", overall||"—", getML(overall), overallTarget||"—", getML(overallTarget),
+        overall&&overallTarget ? (parseFloat(overallTarget)-parseFloat(overall)).toFixed(2) : "—"],
       [],
       ["FUNCTION SCORES"],
-      ["Function", "ID", "Score", "Maturity Level"],
-      ...fw.map(cat => [cat.name, cat.id, catScore(cat) || "—", getML(catScore(cat))]),
+      ["Function", "Current Score", "Current Tier", "Target Score", "Target Tier", "Gap"],
+      ...fw.map(cat => {
+        const cur = catScore(cat); const tgt = catTarget(cat);
+        return [cat.id+" — "+cat.name, cur||"—", getML(cur), tgt||"—", getML(tgt),
+          cur&&tgt?(parseFloat(tgt)-parseFloat(cur)).toFixed(2):"—"];
+      }),
       [],
       ["GAP SUMMARY"],
       ["Priority", "Count"],
       ...["Critical","High","Medium"].map(p => [p, getAllGaps().filter(g=>g.rec?.priority===p).length])
     ];
     const wsSummary = XLSX.utils.aoa_to_sheet(summaryRows);
-    wsSummary["!cols"] = [{wch:28},{wch:16},{wch:16},{wch:22}];
+    wsSummary["!cols"] = [{wch:32},{wch:14},{wch:16},{wch:14},{wch:16},{wch:8}];
     XLSX.utils.book_append_sheet(wb, wsSummary, "Summary");
 
-    // Sheet 2: Full Scorecard
     const scoredRows = [
-      ["Framework","Function","Domain ID","Domain","Control Statement","Score","Maturity Level","Evidence Note","Recommendation","Effort","Priority","Reference"]
+      ["Function","Category ID","Category","Subcategory ID","Subcategory Statement","Current Score","Current Tier","Target Score","Target Tier","Gap","Evidence Note","Priority","Recommended Action","Effort","Reference"]
     ];
     fw.forEach(cat => {
       cat.domains.forEach(domain => {
         domain.questions.forEach((q, qi) => {
           const key = `${domain.id}_q${qi}`;
-          const sc = scores[key];
-          const ml = sc ? ML.find(m=>m.value===sc)?.label||"" : "";
-          const rec = RECS[key];
+          const sc = scores[key]; const tgt = targetScores[key] !== undefined ? targetScores[key] : sc;
+          const [subId,...rest] = q.split(" — ");
           scoredRows.push([
-            framework, cat.name, domain.id, domain.name, q,
-            sc||"", ml, notes[key]||"",
-            rec?.action||"", rec?.effort||"", rec?.priority||"", rec?.ref||""
+            cat.name, domain.id, domain.name, subId||domain.id+"-"+(qi+1), rest.join(" — ")||q,
+            sc!==-1&&sc!==undefined?sc:"", sc!==-1&&sc!==undefined?getML(sc):"",
+            tgt!==-1&&tgt!==undefined?tgt:"", tgt!==-1&&tgt!==undefined?getML(tgt):"",
+            sc!==-1&&sc!==undefined&&tgt!==-1&&tgt!==undefined?(tgt-sc).toFixed(0):"",
+            notes[key]||"", RECS[key]?.priority||"", RECS[key]?.action||"", RECS[key]?.effort||"", RECS[key]?.ref||""
           ]);
         });
       });
     });
     const wsScored = XLSX.utils.aoa_to_sheet(scoredRows);
-    wsScored["!cols"] = [{wch:16},{wch:14},{wch:10},{wch:24},{wch:52},{wch:7},{wch:14},{wch:40},{wch:52},{wch:9},{wch:10},{wch:30}];
+    wsScored["!cols"] = [{wch:12},{wch:10},{wch:30},{wch:12},{wch:60},{wch:8},{wch:14},{wch:8},{wch:14},{wch:5},{wch:40},{wch:10},{wch:50},{wch:9},{wch:30}];
     XLSX.utils.book_append_sheet(wb, wsScored, "Scored Controls");
 
     // Sheet 3: Gaps & Recommendations only
@@ -805,261 +836,230 @@ export default function MaturityScorecard() {
     flash("Excel exported ✓");
   }
 
-  // ── PPTX Report Generator ─────────────────────────────────────────────────
-  // Requires: npm install pptxgenjs  (run once in your Vite project root)
+  // ── PPTX Report Generator — aligned to LevelBlue NIST Assessment Template ──
+  // Requires: npm install pptxgenjs
   async function exportPPTXReport() {
     if (!isNIST) { flash("PPTX report is for NIST CSF 2.0 only"); return; }
     setGeneratingReport(true);
     try {
       const PptxGenJS = (await import("pptxgenjs")).default;
       const prs = new PptxGenJS();
-      prs.layout = "LAYOUT_WIDE"; // 13.33" × 7.5"
+      prs.layout = "LAYOUT_WIDE";
 
-      const N = "08111F", CARD = "0D1F3C", CARD2 = "0A1932";
-      const BL = "1E6FD9", CY = "00BFFF", LI = "C8F135";
-      const WH = "FFFFFF", TM = "8BAAC8", TD = "4A6A8A", BD = "1B3A6B";
-      const client = clientName || "CLIENT NAME";
-      const asses  = assessor  || "LevelBlue";
-      const date   = new Date().toLocaleDateString("en-GB", { month:"long", year:"numeric" });
+      // ── Colour palette ────────────────────────────────────────────────
+      const N="08111F", CARD="0D1F3C", CARD2="0A1932", BD="1B3A6B";
+      const BL="1E6FD9", CY="00BFFF", LI="C8F135";
+      const WH="FFFFFF", TM="8BAAC8", TD="4A6A8A";
+      const client  = clientName   || "CLIENT NAME";
+      const asses   = assessor     || "LevelBlue";
+      const sector  = clientSector || "Not specified";
+      const context = clientContext|| "";
+      const date    = new Date().toLocaleDateString("en-GB", { month:"long", year:"numeric" });
+      const gaps    = getAllGaps();
+      const critN   = gaps.filter(g=>g.rec?.priority==="Critical").length;
+      const highN   = gaps.filter(g=>g.rec?.priority==="High").length;
+      const medN    = gaps.filter(g=>g.rec?.priority==="Medium").length;
+      const lowN    = gaps.filter(g=>g.rec?.priority==="Low").length;
 
-      const bg    = s => { s.background = { color: N }; };
-      const hline = (s, col=BL) => s.addShape(prs.ShapeType.rect, { x:0.5, y:0.07, w:12.33, h:0.04, fill:{ color:col }, line:{ color:col, width:0 } });
-      const foot  = (s) => s.addText(`${asses}  ·  NIST CSF 2.0  ·  ${date}  ·  CONFIDENTIAL`, { x:0.5, y:7.2, w:12.33, h:0.22, fontSize:8, color:TD, fontFace:"Calibri" });
-
-      // Helper: colour a score value
-      const scoreCol = (sc) => {
-        if(sc===null||sc===undefined) return TM;
-        const v=parseFloat(sc);
-        if(v<0.5) return "F87171"; if(v<1.5) return "FB923C";
-        if(v<2.5) return "FCD34D"; if(v<3.5) return "C8F135";
-        return "00BFFF";
+      const bg  = s => { s.background = { color: N }; };
+      const hdr = (s, label, col=CY) => {
+        s.addShape(prs.ShapeType.rect, { x:0.5, y:0.07, w:12.33, h:0.03, fill:{ color:col }, line:{ color:col, width:0 } });
+        s.addText(label, { x:0.5, y:0.22, w:10, h:0.26, fontSize:8, color:col, fontFace:"Calibri", bold:true, charSpacing:5 });
       };
-      const tierLabel = (sc) => {
-        if(sc===null||sc===undefined) return "Not assessed";
-        const v=parseFloat(sc);
-        if(v<0.5) return "Not Present"; if(v<1.5) return "Partial";
-        if(v<2.5) return "Risk-Informed"; if(v<3.5) return "Repeatable";
-        return "Adaptive";
-      };
+      const foot = s => s.addText(`${asses}  ·  ${client}  ·  NIST CSF 2.0  ·  ${date}  ·  CONFIDENTIAL`, { x:0.5, y:7.22, w:12.33, h:0.2, fontSize:7.5, color:TD, fontFace:"Calibri" });
+      const scoreCol = sc => { if(sc===null||sc===undefined) return TM; const v=parseFloat(sc); if(v<0.5) return "F87171"; if(v<1.5) return "FB923C"; if(v<2.5) return "FCD34D"; if(v<3.5) return LI; return CY; };
+      const tierStr  = sc => getML(sc);
+      const mkCell   = (text, fill, color, opts={}) => ({ text, options:{ fill:{ color:fill }, color, fontFace:"Calibri", valign:"middle", margin:7, ...opts } });
 
-      // ── SLIDE 1 — Cover ────────────────────────────────────────────────
+      // ── SLIDE 1 — Cover ───────────────────────────────────────────────
       const s1 = prs.addSlide(); bg(s1);
       s1.addShape(prs.ShapeType.rect, { x:0, y:0, w:0.38, h:7.5, fill:{ color:BL }, line:{ color:BL, width:0 } });
       s1.addShape(prs.ShapeType.rect, { x:0, y:6.85, w:13.33, h:0.65, fill:{ color:CARD }, line:{ color:CARD, width:0 } });
-      // Logo stripes
-      ["1E6FD9","00BFFF","C8F135"].forEach((c,i) => {
-        s1.addShape(prs.ShapeType.rect, { x:0.65+i*0.17, y:0.5, w:0.12, h:0.55, fill:{ color:c }, line:{ color:c, width:0 } });
-      });
-      s1.addText("LevelBlue", { x:0.6, y:1.2, w:10, h:0.45, fontSize:13, color:TM, fontFace:"Calibri", bold:true });
-      s1.addText("Cyber Risk Maturity Assessment", { x:0.6, y:1.7, w:11, h:1.0, fontSize:34, color:WH, fontFace:"Calibri", bold:true });
-      s1.addText("Final Report", { x:0.6, y:2.7, w:9, h:0.7, fontSize:28, color:CY, fontFace:"Calibri", bold:true });
-      s1.addShape(prs.ShapeType.rect, { x:0.6, y:3.55, w:8, h:0.04, fill:{ color:BD }, line:{ color:BD, width:0 } });
-      s1.addText(date, { x:0.6, y:3.75, w:6, h:0.35, fontSize:14, color:TM, fontFace:"Calibri" });
-      s1.addText(`Prepared for ${client} by ${asses}`, { x:0.6, y:4.15, w:9, h:0.35, fontSize:13, color:TM, fontFace:"Calibri", italic:true });
+      ["1E6FD9","00BFFF","C8F135"].forEach((c,i) => s1.addShape(prs.ShapeType.rect, { x:0.68+i*0.16, y:0.5, w:0.11, h:0.5, fill:{ color:c }, line:{ color:c, width:0 } }));
+      s1.addText("LevelBlue", { x:0.6, y:1.25, w:10, h:0.4, fontSize:12, color:TM, fontFace:"Calibri", bold:true });
+      s1.addText("Cyber Risk Maturity Assessment", { x:0.6, y:1.7, w:11, h:0.9, fontSize:32, color:WH, fontFace:"Calibri", bold:true });
+      s1.addText("Final Report", { x:0.6, y:2.65, w:9, h:0.65, fontSize:26, color:CY, fontFace:"Calibri", bold:true });
+      s1.addShape(prs.ShapeType.rect, { x:0.6, y:3.44, w:7.5, h:0.04, fill:{ color:BD }, line:{ color:BD, width:0 } });
+      s1.addText(date, { x:0.6, y:3.6, w:6, h:0.35, fontSize:13, color:TM, fontFace:"Calibri" });
+      s1.addText(`Prepared for ${client} by ${asses}`, { x:0.6, y:4.0, w:9, h:0.35, fontSize:12, color:TM, fontFace:"Calibri", italic:true });
       if(overall) {
-        s1.addText(`Current Score: ${parseFloat(overall).toFixed(2)} / 4.0  —  ${tierLabel(overall)}`, {
-          x:0.6, y:5.1, w:9, h:0.5, fontSize:18, color:scoreCol(overall), fontFace:"Calibri", bold:true
-        });
+        s1.addText(`Current Score: ${parseFloat(overall).toFixed(2)} / 4.0 — ${tierStr(overall)}`, { x:0.6, y:4.9, w:9, h:0.45, fontSize:17, color:scoreCol(overall), fontFace:"Calibri", bold:true });
+        if(overallTarget) s1.addText(`Target Score: ${parseFloat(overallTarget).toFixed(2)} / 4.0 — ${tierStr(overallTarget)}`, { x:0.6, y:5.4, w:9, h:0.4, fontSize:14, color:CY, fontFace:"Calibri" });
       }
-      s1.addText("CONFIDENTIAL — NOT FOR DISTRIBUTION", { x:0.6, y:7.05, w:10, h:0.28, fontSize:9, color:TD, fontFace:"Calibri" });
+      s1.addText("CONFIDENTIAL — NOT FOR DISTRIBUTION", { x:0.6, y:7.0, w:10, h:0.28, fontSize:9, color:TD, fontFace:"Calibri" });
 
-      // ── SLIDE 2 — Executive Summary ───────────────────────────────────
-      const s2 = prs.addSlide(); bg(s2); hline(s2, CY); foot(s2);
-      s2.addText("EXECUTIVE SUMMARY", { x:0.5, y:0.22, w:10, h:0.28, fontSize:9, color:CY, fontFace:"Calibri", bold:true, charSpacing:4 });
-      s2.addText(`${client} — NIST CSF 2.0 Current Profile`, { x:0.5, y:0.52, w:12, h:0.6, fontSize:24, color:WH, fontFace:"Calibri", bold:true });
+      // ── SLIDE 2 — Executive Summary: Introduction ─────────────────────
+      const s2 = prs.addSlide(); bg(s2); hdr(s2, "EXECUTIVE SUMMARY"); foot(s2);
+      s2.addText("Introduction", { x:0.5, y:0.52, w:12, h:0.55, fontSize:22, color:WH, fontFace:"Calibri", bold:true });
+      const introBody = `${asses} was engaged by ${client} to provide a view of cyber security maturity in line with the NIST Cybersecurity Framework (CSF) 2.0. NIST CSF is widely adopted across industries and accepted by regulatory bodies.\n\n${asses} has conducted a comprehensive assessment covering all six NIST CSF function areas: Govern, Identify, Protect, Detect, Respond and Recover — scoring each of the 106 subcategories across 22 categories.\n\nNIST CSF maturity scores range from 0–4 (Not Present → Partial → Risk-Informed → Repeatable → Adaptive). ${client} achieved a current profile score of ${overall?parseFloat(overall).toFixed(2):"TBC"} (${tierStr(overall)}).${overallTarget?" A target of "+parseFloat(overallTarget).toFixed(2)+" ("+tierStr(overallTarget)+") has been identified and agreed as an appropriate balance of investment and security for "+client+".":""}`;
+      s2.addText(introBody, { x:0.5, y:1.18, w:7.7, h:3.5, fontSize:11, color:TM, fontFace:"Calibri", valign:"top" });
 
-      // Function score table
-      const hdrRow = [
-        { text:"Function", options:{ fill:{ color:"1E3A6B" }, color:WH, bold:true, fontSize:11, fontFace:"Calibri", valign:"middle", margin:8 } },
-        { text:"Current Score", options:{ fill:{ color:"1E3A6B" }, color:WH, bold:true, fontSize:11, fontFace:"Calibri", valign:"middle", margin:8 } },
-        { text:"Tier", options:{ fill:{ color:"1E3A6B" }, color:WH, bold:true, fontSize:11, fontFace:"Calibri", valign:"middle", margin:8 } },
-        { text:"Gap Status", options:{ fill:{ color:"1E3A6B" }, color:WH, bold:true, fontSize:11, fontFace:"Calibri", valign:"middle", margin:8 } },
+      // Score callouts right side
+      const scoreItems = [
+        { label:"Current Score", val:overall?parseFloat(overall).toFixed(2):"TBC", col:scoreCol(overall), tier:tierStr(overall) },
+        { label:"Target Score",  val:overallTarget?parseFloat(overallTarget).toFixed(2):"TBC", col:CY, tier:tierStr(overallTarget) },
+        { label:"Gaps Identified", val:String(gaps.length), col:"F87171", tier:`${critN+highN} High/Critical` },
       ];
-      const funcRows = fw.map((cat, ri) => {
-        const sc = catScore(cat);
-        const col = sc ? scoreCol(sc) : TM;
-        const fill = ri%2===0 ? CARD : CARD2;
-        const gap = sc && parseFloat(sc)<2 ? "⚠ Action Required" : sc && parseFloat(sc)<3 ? "↑ Improvement Needed" : sc ? "✓ On Track" : "—";
-        return [
-          { text:`${cat.id} — ${cat.name}`, options:{ fill:{ color:fill }, color:WH, fontSize:12, fontFace:"Calibri", valign:"middle", margin:8 } },
-          { text:sc ? parseFloat(sc).toFixed(2) : "—", options:{ fill:{ color:fill }, color:col, bold:true, fontSize:13, fontFace:"Calibri", valign:"middle", margin:8 } },
-          { text:tierLabel(sc), options:{ fill:{ color:fill }, color:col, fontSize:11, fontFace:"Calibri", valign:"middle", margin:8 } },
-          { text:gap, options:{ fill:{ color:fill }, color:sc&&parseFloat(sc)<2?"F87171":sc&&parseFloat(sc)<3?"FCD34D":"4ADE80", fontSize:11, fontFace:"Calibri", valign:"middle", margin:8 } },
-        ];
-      });
-      const overallRow = [
-        { text:"OVERALL", options:{ fill:{ color:"1E3A6B" }, color:WH, bold:true, fontSize:12, fontFace:"Calibri", valign:"middle", margin:8 } },
-        { text:overall ? parseFloat(overall).toFixed(2) : "TBC", options:{ fill:{ color:"1E3A6B" }, color:overall?scoreCol(overall):TM, bold:true, fontSize:14, fontFace:"Calibri", valign:"middle", margin:8 } },
-        { text:tierLabel(overall), options:{ fill:{ color:"1E3A6B" }, color:overall?scoreCol(overall):TM, bold:true, fontSize:12, fontFace:"Calibri", valign:"middle", margin:8 } },
-        { text:"", options:{ fill:{ color:"1E3A6B" }, color:WH, fontSize:11, fontFace:"Calibri", valign:"middle", margin:8 } },
-      ];
-      s2.addTable([hdrRow, ...funcRows, overallRow], {
-        x:0.5, y:1.25, w:12.33, colW:[4.2,2.0,2.5,3.63],
-        border:{ pt:0.5, color:BD }
+      scoreItems.forEach(({label,val,col,tier},i) => {
+        const bx=8.6, by=1.18+i*1.52;
+        s2.addShape(prs.ShapeType.rect, { x:bx, y:by, w:4.18, h:1.3, fill:{ color:CARD }, line:{ color:col, width:1.5 } });
+        s2.addShape(prs.ShapeType.rect, { x:bx, y:by, w:4.18, h:0.05, fill:{ color:col }, line:{ color:col, width:0 } });
+        s2.addText(val, { x:bx+0.2, y:by+0.1, w:3.8, h:0.7, fontSize:34, color:col, fontFace:"Calibri", bold:true });
+        s2.addText(label, { x:bx+0.2, y:by+0.82, w:3.8, h:0.3, fontSize:10, color:TM, fontFace:"Calibri", bold:true });
+        s2.addText(tier, { x:bx+0.2, y:by+1.08, w:3.8, h:0.2, fontSize:9, color:TD, fontFace:"Calibri" });
       });
 
-      // ── SLIDE 3 — Key Findings & Introduction ─────────────────────────
-      const s3 = prs.addSlide(); bg(s3); hline(s3, BL); foot(s3);
-      s3.addText("INTRODUCTION", { x:0.5, y:0.22, w:10, h:0.28, fontSize:9, color:CY, fontFace:"Calibri", bold:true, charSpacing:4 });
-      s3.addText("Key Findings and Recommendations", { x:0.5, y:0.52, w:12, h:0.6, fontSize:24, color:WH, fontFace:"Calibri", bold:true });
+      // Key findings table
+      s2.addText("Key Findings and Opportunities", { x:0.5, y:4.85, w:8, h:0.3, fontSize:12, color:WH, fontFace:"Calibri", bold:true });
+      const kfRows = [
+        [mkCell("Area","1E3A6B",WH,{bold:true,fontSize:10}), mkCell("Priority","1E3A6B",WH,{bold:true,fontSize:10}), mkCell("Key Finding","1E3A6B",WH,{bold:true,fontSize:10})],
+        ...fw.map((cat,ri) => {
+          const catGaps = gaps.filter(g=>g.cat.id===cat.id);
+          const topGap = catGaps[0];
+          const pri = topGap?.rec?.priority || (catGaps.length>0?"Medium":"—");
+          const finding = topGap?.rec?.action || (catGaps.length>0?`${catGaps.length} subcategories below target threshold`:"No gaps identified");
+          const fill = ri%2===0?CARD:CARD2;
+          return [mkCell(cat.id+" — "+cat.name,fill,WH,{fontSize:9}), mkCell(pri,fill,PRI_CFG[pri]?.color?.replace("#","")||TM,{fontSize:9,bold:true}), mkCell(finding,fill,TM,{fontSize:9})];
+        })
+      ];
+      s2.addTable(kfRows, { x:0.5, y:5.2, w:12.33, colW:[2.8,1.3,8.23], border:{ pt:0.4, color:BD } });
 
-      const gaps = getAllGaps();
-      const critCount = gaps.filter(g=>g.rec?.priority==="Critical").length;
-      const highCount = gaps.filter(g=>g.rec?.priority==="High").length;
-      const medCount  = gaps.filter(g=>g.rec?.priority==="Medium").length;
+      // ── SLIDE 3 — Executive Summary: Background / Journey to Target ───
+      const s3 = prs.addSlide(); bg(s3); hdr(s3, "EXECUTIVE SUMMARY"); foot(s3);
+      s3.addText("Background — Journey to Target Profile", { x:0.5, y:0.52, w:12, h:0.55, fontSize:22, color:WH, fontFace:"Calibri", bold:true });
+      s3.addText(`As a first step to work towards a target profile score of ${overallTarget?parseFloat(overallTarget).toFixed(2):"the agreed target"}, ${asses} recommends that ${client} focus on the priority workstreams identified below. The recommendations have been prioritised to maximise the impact on cybersecurity risk reduction within an achievable implementation timeframe.`, { x:0.5, y:1.18, w:12.33, h:0.65, fontSize:11, color:TM, fontFace:"Calibri" });
 
-      const introText = `${asses} was engaged by ${client} to provide a view of cyber security maturity in line with the NIST Cybersecurity Framework (CSF) 2.0. NIST CSF is a framework widely adopted across industries and accepted by regulatory bodies. ${asses} has created a comprehensive NIST CSF 2.0 assessment report which details our findings and recommendations.\n\nNIST CSF maturity scores range from 0–4. An overall score is calculated by aggregating scores across the six NIST CSF function areas: Govern, Identify, Protect, Detect, Respond and Recover. Most organisations target scores between 2 and 3, with 4 (Adaptive) typically applicable only to the most highly regulated institutions.\n\n${client} achieved a current profile score of ${overall?parseFloat(overall).toFixed(2):"TBC"} (${tierLabel(overall)}).`;
-      s3.addText(introText, { x:0.5, y:1.25, w:8.0, h:3.2, fontSize:11, color:TM, fontFace:"Calibri", valign:"top" });
+      // Current vs target table
+      const cvtHdr = [mkCell("Function","1E3A6B",WH,{bold:true,fontSize:10}), mkCell("Current","1E3A6B",WH,{bold:true,fontSize:10}), mkCell("Current Tier","1E3A6B",WH,{bold:true,fontSize:10}), mkCell("Target","1E3A6B",CY,{bold:true,fontSize:10}), mkCell("Target Tier","1E3A6B",CY,{bold:true,fontSize:10}), mkCell("Gap","1E3A6B",LI,{bold:true,fontSize:10})];
+      const cvtRows = [cvtHdr, ...fw.map((cat,ri)=>{
+        const sc=catScore(cat); const tgt=catTarget(cat);
+        const gap = sc&&tgt?(parseFloat(tgt)-parseFloat(sc)).toFixed(2):"—";
+        const fill=ri%2===0?CARD:CARD2;
+        return [mkCell(cat.id+" — "+cat.name,fill,WH,{fontSize:10}), mkCell(sc||"—",fill,sc?scoreCol(sc):TD,{fontSize:12,bold:true}), mkCell(tierStr(sc),fill,sc?scoreCol(sc):TD,{fontSize:10}), mkCell(tgt||"—",fill,CY,{fontSize:12,bold:true}), mkCell(tierStr(tgt),fill,CY,{fontSize:10}), mkCell(gap,fill,parseFloat(gap)>0?LI:TD,{fontSize:11,bold:true})];
+      }), [mkCell("OVERALL","1E3A6B",WH,{bold:true,fontSize:11}), mkCell(overall||"—","1E3A6B",overall?scoreCol(overall):TD,{fontSize:14,bold:true}), mkCell(tierStr(overall),"1E3A6B",overall?scoreCol(overall):TD,{fontSize:10,bold:true}), mkCell(overallTarget||"—","1E3A6B",CY,{fontSize:14,bold:true}), mkCell(tierStr(overallTarget),"1E3A6B",CY,{fontSize:10,bold:true}), mkCell(overall&&overallTarget?(parseFloat(overallTarget)-parseFloat(overall)).toFixed(2):"—","1E3A6B",LI,{fontSize:12,bold:true})]];
+      s3.addTable(cvtRows, { x:0.5, y:1.95, w:12.33, colW:[3.4,1.3,2.3,1.3,2.3,1.73], border:{ pt:0.4, color:BD } });
 
-      // Priority callout boxes
+      // Workstream summary
+      s3.addText("Summary of Improvement Workstreams", { x:0.5, y:5.35, w:8, h:0.3, fontSize:12, color:WH, fontFace:"Calibri", bold:true });
+      const wsRows = [
+        [mkCell("Priority","1E3A6B",WH,{bold:true,fontSize:10}), mkCell("Count","1E3A6B",WH,{bold:true,fontSize:10}), mkCell("Scope","1E3A6B",WH,{bold:true,fontSize:10})],
+        [mkCell("Critical","F87171"+"22","F87171",{bold:true,fontSize:10}), mkCell(String(critN),"F87171"+"22","F87171",{fontSize:13,bold:true}), mkCell(gaps.filter(g=>g.rec?.priority==="Critical").slice(0,3).map(g=>g.rec?.action||g.domain.id).join(" · "),"F87171"+"22",WH,{fontSize:9})],
+        [mkCell("High","FCD34D"+"22","FCD34D",{bold:true,fontSize:10}), mkCell(String(highN),"FCD34D"+"22","FCD34D",{fontSize:13,bold:true}), mkCell(gaps.filter(g=>g.rec?.priority==="High").slice(0,3).map(g=>g.rec?.action||g.domain.id).join(" · "),"FCD34D"+"22",WH,{fontSize:9})],
+        [mkCell("Medium","00BFFF"+"22","00BFFF",{bold:true,fontSize:10}), mkCell(String(medN),"00BFFF"+"22","00BFFF",{fontSize:13,bold:true}), mkCell(gaps.filter(g=>g.rec?.priority==="Medium").slice(0,3).map(g=>g.rec?.action||g.domain.id).join(" · "),"00BFFF"+"22",WH,{fontSize:9})],
+      ];
+      s3.addTable(wsRows, { x:0.5, y:5.7, w:12.33, colW:[1.5,1.0,9.83], border:{ pt:0.4, color:BD } });
+
+      // ── SLIDE 4 — Introduction: Client Overview ───────────────────────
+      const s4 = prs.addSlide(); bg(s4); hdr(s4,"INTRODUCTION",BL); foot(s4);
+      s4.addText("Client Overview", { x:0.5, y:0.52, w:12, h:0.55, fontSize:22, color:WH, fontFace:"Calibri", bold:true });
+      s4.addShape(prs.ShapeType.rect, { x:0.5, y:1.18, w:5.9, h:5.8, fill:{ color:CARD }, line:{ color:BD, width:1 } });
+      s4.addShape(prs.ShapeType.rect, { x:0.5, y:1.18, w:5.9, h:0.05, fill:{ color:BL }, line:{ color:BL, width:0 } });
+      s4.addText("ENGAGEMENT", { x:0.7, y:1.28, w:5.5, h:0.28, fontSize:9, color:CY, fontFace:"Calibri", bold:true, charSpacing:4 });
+      s4.addText(`${asses} was engaged by ${client} to provide a view of the maturity and appropriateness of policies, processes, and strategies, identifying key strengths, risks, and recommended areas for improvement in line with the NIST Cybersecurity Framework (CSF) 2.0.`, { x:0.7, y:1.62, w:5.5, h:1.2, fontSize:11, color:TM, fontFace:"Calibri" });
+      s4.addText("BUSINESS CONTEXT", { x:0.7, y:2.95, w:5.5, h:0.28, fontSize:9, color:CY, fontFace:"Calibri", bold:true, charSpacing:4 });
+      s4.addText(context||"Business context to be completed by the assessor.", { x:0.7, y:3.28, w:5.5, h:1.5, fontSize:11, color:TM, fontFace:"Calibri" });
+      s4.addText("SECTOR", { x:0.7, y:4.9, w:5.5, h:0.28, fontSize:9, color:CY, fontFace:"Calibri", bold:true, charSpacing:4 });
+      s4.addText(sector, { x:0.7, y:5.22, w:5.5, h:0.4, fontSize:13, color:WH, fontFace:"Calibri", bold:true });
+
+      s4.addShape(prs.ShapeType.rect, { x:6.93, y:1.18, w:5.9, h:5.8, fill:{ color:CARD }, line:{ color:BD, width:1 } });
+      s4.addShape(prs.ShapeType.rect, { x:6.93, y:1.18, w:5.9, h:0.05, fill:{ color:CY }, line:{ color:CY, width:0 } });
+      s4.addText("ASSESSMENT SCOPE", { x:7.13, y:1.28, w:5.5, h:0.28, fontSize:9, color:CY, fontFace:"Calibri", bold:true, charSpacing:4 });
       [
-        { label:"Critical", count:critCount, color:"F87171" },
-        { label:"High",     count:highCount, color:"FCD34D" },
-        { label:"Medium",   count:medCount,  color:"00BFFF" },
-      ].forEach(({label,count,color},i) => {
-        const bx = 8.8, by = 1.25 + i*1.55;
-        s3.addShape(prs.ShapeType.rect, { x:bx, y:by, w:4.0, h:1.35, fill:{ color:CARD }, line:{ color, width:1.5 } });
-        s3.addShape(prs.ShapeType.rect, { x:bx, y:by, w:4.0, h:0.06, fill:{ color }, line:{ color, width:0 } });
-        s3.addText(String(count), { x:bx+0.2, y:by+0.12, w:3.6, h:0.75, fontSize:40, color, fontFace:"Calibri", bold:true });
-        s3.addText(`${label} Priority Gap${count!==1?"s":""}`, { x:bx+0.2, y:by+0.88, w:3.6, h:0.35, fontSize:12, color:TM, fontFace:"Calibri" });
+        { label:"Framework", val:"NIST CSF 2.0" },
+        { label:"Functions", val:"6 (GV, ID, PR, DE, RS, RC)" },
+        { label:"Categories", val:"22" },
+        { label:"Subcategories", val:"106" },
+        { label:"Scoring Scale", val:"0 (Not Present) → 4 (Adaptive)" },
+        { label:"Assessor", val:asses },
+        { label:"Date", val:date },
+        { label:"Overall Score", val:overall?parseFloat(overall).toFixed(2)+" — "+tierStr(overall):"TBC" },
+        { label:"Target Score", val:overallTarget?parseFloat(overallTarget).toFixed(2)+" — "+tierStr(overallTarget):"TBC" },
+      ].forEach(({label,val},i) => {
+        s4.addText(label+":", { x:7.13, y:1.65+i*0.44, w:2.2, h:0.38, fontSize:10, color:TD, fontFace:"Calibri", bold:true });
+        s4.addText(val, { x:9.38, y:1.65+i*0.44, w:3.25, h:0.38, fontSize:10, color:WH, fontFace:"Calibri" });
       });
 
-      s3.addText(`LevelBlue recommends ${critCount+highCount} high/critical and ${medCount} medium priority workstreams to improve ${client}'s cybersecurity maturity posture to the agreed target profile.`, {
-        x:0.5, y:4.6, w:12.33, h:0.7, fontSize:11, color:TM, fontFace:"Calibri", italic:true
-      });
-
-      // ── SLIDE 4 — NIST CSF Analysis ───────────────────────────────────
-      const s4 = prs.addSlide(); bg(s4); hline(s4, LI); foot(s4);
-      s4.addText("NIST CSF ANALYSIS", { x:0.5, y:0.22, w:10, h:0.28, fontSize:9, color:LI, fontFace:"Calibri", bold:true, charSpacing:4 });
-      s4.addText("Category Scores — Current Profile (0–4 scale)", { x:0.5, y:0.52, w:12, h:0.55, fontSize:22, color:WH, fontFace:"Calibri", bold:true });
-
-      const catHdr = [
-        { text:"Category ID",   options:{ fill:{ color:"1E3A6B" }, color:WH, bold:true, fontSize:10, fontFace:"Calibri", valign:"middle", margin:6 } },
-        { text:"Category Name", options:{ fill:{ color:"1E3A6B" }, color:WH, bold:true, fontSize:10, fontFace:"Calibri", valign:"middle", margin:6 } },
-        { text:"Score",         options:{ fill:{ color:"1E3A6B" }, color:WH, bold:true, fontSize:10, fontFace:"Calibri", valign:"middle", margin:6 } },
-        { text:"Tier",          options:{ fill:{ color:"1E3A6B" }, color:WH, bold:true, fontSize:10, fontFace:"Calibri", valign:"middle", margin:6 } },
-        { text:"Gaps (<3)",     options:{ fill:{ color:"1E3A6B" }, color:WH, bold:true, fontSize:10, fontFace:"Calibri", valign:"middle", margin:6 } },
-      ];
-      let catTableRows = [catHdr];
-      let ri2 = 0;
-      fw.forEach(cat => {
-        cat.domains.forEach(domain => {
-          const ds = domainScore(domain);
-          const domGaps = gaps.filter(g=>g.domain.id===domain.id).length;
-          const fill = ri2%2===0 ? CARD : CARD2;
-          catTableRows.push([
-            { text:domain.id,   options:{ fill:{ color:fill }, color:cat.color.replace("#",""), bold:true, fontSize:10, fontFace:"Calibri", valign:"middle", margin:6 } },
-            { text:domain.name, options:{ fill:{ color:fill }, color:WH, fontSize:10, fontFace:"Calibri", valign:"middle", margin:6 } },
-            { text:ds?parseFloat(ds).toFixed(2):"—", options:{ fill:{ color:fill }, color:ds?scoreCol(ds):TD, bold:true, fontSize:11, fontFace:"Calibri", valign:"middle", margin:6 } },
-            { text:tierLabel(ds), options:{ fill:{ color:fill }, color:ds?scoreCol(ds):TD, fontSize:10, fontFace:"Calibri", valign:"middle", margin:6 } },
-            { text:domGaps>0?String(domGaps):"—", options:{ fill:{ color:fill }, color:domGaps>0?"F87171":TM, fontSize:10, fontFace:"Calibri", valign:"middle", margin:6 } },
-          ]);
-          ri2++;
+      // ── SLIDE 5 — NIST Analysis: All Categories ───────────────────────
+      const s5 = prs.addSlide(); bg(s5); hdr(s5,"NIST CYBERSECURITY FRAMEWORK ANALYSIS",LI); foot(s5);
+      s5.addText("Category Scores — Current vs Target", { x:0.5, y:0.52, w:12, h:0.55, fontSize:22, color:WH, fontFace:"Calibri", bold:true });
+      const catHdr = [mkCell("ID","1E3A6B",WH,{bold:true,fontSize:9}), mkCell("Category","1E3A6B",WH,{bold:true,fontSize:9}), mkCell("Current","1E3A6B",WH,{bold:true,fontSize:9}), mkCell("Tier","1E3A6B",WH,{bold:true,fontSize:9}), mkCell("Target","1E3A6B",CY,{bold:true,fontSize:9}), mkCell("Target Tier","1E3A6B",CY,{bold:true,fontSize:9}), mkCell("Gaps","1E3A6B","F87171",{bold:true,fontSize:9})];
+      let catTblRows=[catHdr]; let ri3=0;
+      fw.forEach(cat=>{
+        // Function sub-header
+        catTblRows.push([mkCell(cat.id,"1B3A6B",cat.color.replace("#",""),{bold:true,fontSize:10,colspan:1}), mkCell(cat.name+" — "+cat.description,"1B3A6B",cat.color.replace("#",""),{bold:false,fontSize:9,colspan:6}), mkCell(catScore(cat)||"—","1B3A6B",cat.color.replace("#",""),{bold:true,fontSize:11}), mkCell(tierStr(catScore(cat)),"1B3A6B",TM,{fontSize:9}), mkCell(catTarget(cat)||"—","1B3A6B",CY,{bold:true,fontSize:11}), mkCell(tierStr(catTarget(cat)),"1B3A6B",CY,{fontSize:9}), mkCell(String(gaps.filter(g=>g.cat.id===cat.id).length),"1B3A6B",gaps.filter(g=>g.cat.id===cat.id).length>0?"F87171":TD,{bold:true,fontSize:10})]);
+        cat.domains.forEach(domain=>{
+          const ds=domainScore(domain); const dt=domainTarget(domain); const dg=gaps.filter(g=>g.domain.id===domain.id).length;
+          const fill=ri3%2===0?CARD:CARD2;
+          catTblRows.push([mkCell(domain.id,fill,cat.color.replace("#",""),{fontSize:9,bold:true}), mkCell(domain.name,fill,WH,{fontSize:9}), mkCell(ds||"—",fill,ds?scoreCol(ds):TD,{fontSize:10,bold:true}), mkCell(tierStr(ds),fill,ds?scoreCol(ds):TD,{fontSize:9}), mkCell(dt||"—",fill,CY,{fontSize:10,bold:true}), mkCell(tierStr(dt),fill,CY,{fontSize:9}), mkCell(dg>0?String(dg):"—",fill,dg>0?"F87171":TD,{fontSize:9,bold:dg>0})]);
+          ri3++;
         });
       });
-      s4.addTable(catTableRows, {
-        x:0.5, y:1.15, w:12.33, colW:[1.6,4.8,1.4,2.4,2.13],
-        border:{ pt:0.5, color:BD }
-      });
+      s5.addTable(catTblRows, { x:0.5, y:1.15, w:12.33, colW:[1.35,4.2,1.1,1.75,1.1,1.75,1.08], border:{ pt:0.4, color:BD } });
 
-      // ── SLIDE 5 — Recommendations ─────────────────────────────────────
-      const s5 = prs.addSlide(); bg(s5); hline(s5, "F87171"); foot(s5);
-      s5.addText("DETAILED RECOMMENDATIONS", { x:0.5, y:0.22, w:10, h:0.28, fontSize:9, color:"F87171", fontFace:"Calibri", bold:true, charSpacing:4 });
-      s5.addText(`${gaps.length} Gap${gaps.length!==1?"s":""} Identified — Prioritised Remediation Actions`, { x:0.5, y:0.52, w:12, h:0.55, fontSize:22, color:WH, fontFace:"Calibri", bold:true });
-
-      const recHdr = [
-        { text:"Ref",       options:{ fill:{ color:"1E3A6B" }, color:WH, bold:true, fontSize:9, fontFace:"Calibri", valign:"middle", margin:5 } },
-        { text:"Priority",  options:{ fill:{ color:"1E3A6B" }, color:WH, bold:true, fontSize:9, fontFace:"Calibri", valign:"middle", margin:5 } },
-        { text:"Category",  options:{ fill:{ color:"1E3A6B" }, color:WH, bold:true, fontSize:9, fontFace:"Calibri", valign:"middle", margin:5 } },
-        { text:"Recommended Action", options:{ fill:{ color:"1E3A6B" }, color:WH, bold:true, fontSize:9, fontFace:"Calibri", valign:"middle", margin:5 } },
-        { text:"Effort",    options:{ fill:{ color:"1E3A6B" }, color:WH, bold:true, fontSize:9, fontFace:"Calibri", valign:"middle", margin:5 } },
-        { text:"Reference", options:{ fill:{ color:"1E3A6B" }, color:WH, bold:true, fontSize:9, fontFace:"Calibri", valign:"middle", margin:5 } },
-      ];
-      let recRows = [recHdr];
-      let recRef = 1;
-      const priOrder = ["Critical","High","Medium"];
-      priOrder.forEach(pri => {
-        gaps.filter(g=>g.rec?.priority===pri).forEach(({cat,domain,rec},idx) => {
-          const fill = recRef%2===0 ? CARD : CARD2;
-          const priColor = pri==="Critical"?"F87171":pri==="High"?"FCD34D":"00BFFF";
-          recRows.push([
-            { text:`R-${String(recRef).padStart(2,"0")}`, options:{ fill:{ color:fill }, color:CY, bold:true, fontSize:9, fontFace:"Calibri", valign:"middle", margin:5 } },
-            { text:pri, options:{ fill:{ color:fill }, color:priColor, bold:true, fontSize:9, fontFace:"Calibri", valign:"middle", margin:5 } },
-            { text:domain.id, options:{ fill:{ color:fill }, color:cat.color.replace("#",""), bold:true, fontSize:9, fontFace:"Calibri", valign:"middle", margin:5 } },
-            { text:rec?.action||"—", options:{ fill:{ color:fill }, color:WH, fontSize:9, fontFace:"Calibri", valign:"middle", margin:5 } },
-            { text:rec?.effort||"—", options:{ fill:{ color:fill }, color:TM, fontSize:9, fontFace:"Calibri", valign:"middle", margin:5 } },
-            { text:rec?.ref||"—", options:{ fill:{ color:fill }, color:TD, fontSize:8, fontFace:"Calibri", valign:"middle", margin:5 } },
-          ]);
-          recRef++;
-        });
-      });
-      s5.addTable(recRows, {
-        x:0.5, y:1.1, w:12.33, colW:[0.7,1.1,1.1,5.5,1.0,2.93],
-        border:{ pt:0.5, color:BD }
-      });
-
-      // ── SLIDE 6 — Conclusion ──────────────────────────────────────────
-      const s6 = prs.addSlide(); bg(s6);
-      s6.addShape(prs.ShapeType.rect, { x:0, y:0, w:0.38, h:7.5, fill:{ color:CY }, line:{ color:CY, width:0 } });
-      s6.addText("CONCLUSION", { x:0.6, y:0.4, w:8, h:0.28, fontSize:9, color:CY, fontFace:"Calibri", bold:true, charSpacing:4 });
-      s6.addText(client, { x:0.6, y:0.72, w:11, h:0.65, fontSize:26, color:WH, fontFace:"Calibri", bold:true });
-      s6.addText("Following a detailed assessment against the NIST CSF 2.0, LevelBlue have provided the findings and recommendations in this report.", { x:0.6, y:1.45, w:11, h:0.5, fontSize:12, color:TM, fontFace:"Calibri" });
-
-      s6.addText(`Current Score: ${overall?parseFloat(overall).toFixed(2):"TBC"}  (${tierLabel(overall)})`, {
-        x:0.6, y:2.1, w:9, h:0.5, fontSize:18, color:overall?scoreCol(overall):TM, fontFace:"Calibri", bold:true
-      });
-
-      const topGaps = gaps.filter(g=>g.rec?.priority==="Critical"||g.rec?.priority==="High").slice(0,5);
-      if(topGaps.length>0) {
-        s6.addText("Key Areas for Improvement:", { x:0.6, y:2.75, w:10, h:0.35, fontSize:12, color:CY, fontFace:"Calibri", bold:true });
-        topGaps.forEach((g,i) => {
-          s6.addText(`• ${g.rec?.action||g.q.slice(0,80)}`, { x:0.6, y:3.15+i*0.44, w:12.1, h:0.4, fontSize:11, color:WH, fontFace:"Calibri" });
-        });
+      // ── SLIDE 6 — Detailed Recommendations: Critical & High ───────────
+      const critHighGaps = gaps.filter(g=>g.rec?.priority==="Critical"||g.rec?.priority==="High");
+      if(critHighGaps.length>0) {
+        const s6 = prs.addSlide(); bg(s6); hdr(s6,"DETAILED RECOMMENDATIONS","F87171"); foot(s6);
+        s6.addText("High Priority Workstreams", { x:0.5, y:0.52, w:12, h:0.55, fontSize:22, color:WH, fontFace:"Calibri", bold:true });
+        s6.addText(`The table below shows ${critN} Critical and ${highN} High priority workstreams to improve NIST maturity and protect ${client}.`, { x:0.5, y:1.12, w:12.33, h:0.38, fontSize:11, color:TM, fontFace:"Calibri" });
+        const h6Hdr=[mkCell("Ref","1E3A6B",WH,{bold:true,fontSize:9}),mkCell("Priority","1E3A6B",WH,{bold:true,fontSize:9}),mkCell("Subcategory","1E3A6B",WH,{bold:true,fontSize:9}),mkCell("Recommended Action","1E3A6B",WH,{bold:true,fontSize:9}),mkCell("Detail","1E3A6B",WH,{bold:true,fontSize:9}),mkCell("Effort","1E3A6B",WH,{bold:true,fontSize:9})];
+        const h6Rows=[h6Hdr,...critHighGaps.map(({cat,domain,q,sc,rec},i)=>{
+          const fill=i%2===0?CARD:CARD2;
+          const pc=rec?.priority==="Critical"?"F87171":"FCD34D";
+          return [mkCell(`${rec?.priority==="Critical"?"C":"H"}-${String(i+1).padStart(2,"0")}`,fill,CY,{fontSize:9,bold:true}),mkCell(rec?.priority||"—",fill,pc,{fontSize:9,bold:true}),mkCell(domain.id,fill,cat.color.replace("#",""),{fontSize:9,bold:true}),mkCell(rec?.action||q.slice(0,70),fill,WH,{fontSize:9}),mkCell(rec?.detail||"—",fill,TM,{fontSize:8}),mkCell(rec?.effort||"—",fill,TM,{fontSize:9})];
+        })];
+        s6.addTable(h6Rows,{ x:0.5, y:1.55, w:12.33, colW:[0.65,0.95,1.2,3.5,4.6,1.43], border:{ pt:0.4, color:BD } });
       }
-      const workstreamCount = critCount+highCount+medCount;
-      s6.addText(`LevelBlue recommends ${workstreamCount} workstream${workstreamCount!==1?"s":""} (${critCount} Critical · ${highCount} High · ${medCount} Medium) to move ${client} towards the agreed target profile.`, {
-        x:0.6, y:5.6, w:12.1, h:0.65, fontSize:11, color:TM, fontFace:"Calibri", italic:true
-      });
-      foot(s6);
 
-      // ── SLIDE 7 — NIST CSF Overview (Appendix) ───────────────────────
-      const s7 = prs.addSlide(); bg(s7); hline(s7, TD); foot(s7);
-      s7.addText("APPENDIX — NIST CSF 2.0 OVERVIEW", { x:0.5, y:0.22, w:10, h:0.28, fontSize:9, color:TM, fontFace:"Calibri", bold:true, charSpacing:4 });
-      s7.addText("Framework Structure & Tier Scoring Criteria", { x:0.5, y:0.52, w:12, h:0.55, fontSize:20, color:WH, fontFace:"Calibri", bold:true });
-      s7.addText("The NIST 2.0 framework scores across 6 Function Areas, 22 Categories and 106 Subcategories. Each subcategory is assessed against the 0–4 tier scale:", { x:0.5, y:1.18, w:12.33, h:0.45, fontSize:11, color:TM, fontFace:"Calibri" });
+      // ── SLIDE 7 — Detailed Recommendations: Medium ────────────────────
+      const medGaps = gaps.filter(g=>g.rec?.priority==="Medium");
+      if(medGaps.length>0) {
+        const s7 = prs.addSlide(); bg(s7); hdr(s7,"DETAILED RECOMMENDATIONS","FCD34D"); foot(s7);
+        s7.addText("Medium Priority Workstreams", { x:0.5, y:0.52, w:12, h:0.55, fontSize:22, color:WH, fontFace:"Calibri", bold:true });
+        s7.addText(`The table below shows ${medN} Medium priority workstreams to improve NIST maturity and protect ${client}.`, { x:0.5, y:1.12, w:12.33, h:0.38, fontSize:11, color:TM, fontFace:"Calibri" });
+        const m7Hdr=[mkCell("Ref","1E3A6B",WH,{bold:true,fontSize:9}),mkCell("Subcategory","1E3A6B",WH,{bold:true,fontSize:9}),mkCell("Recommended Action","1E3A6B",WH,{bold:true,fontSize:9}),mkCell("Detail","1E3A6B",WH,{bold:true,fontSize:9}),mkCell("Effort","1E3A6B",WH,{bold:true,fontSize:9})];
+        const m7Rows=[m7Hdr,...medGaps.map(({cat,domain,q,sc,rec},i)=>{
+          const fill=i%2===0?CARD:CARD2;
+          return [mkCell(`M-${String(i+1).padStart(2,"0")}`,fill,CY,{fontSize:9,bold:true}),mkCell(domain.id+" — "+domain.name.slice(0,28),fill,cat.color.replace("#",""),{fontSize:9,bold:true}),mkCell(rec?.action||q.slice(0,70),fill,WH,{fontSize:9}),mkCell(rec?.detail||"—",fill,TM,{fontSize:8}),mkCell(rec?.effort||"—",fill,TM,{fontSize:9})];
+        })];
+        s7.addTable(m7Rows,{ x:0.5, y:1.55, w:12.33, colW:[0.65,2.3,3.5,4.55,1.33], border:{ pt:0.4, color:BD } });
+      }
 
-      const tierTableHdr = [
-        { text:"Tier", options:{ fill:{ color:"1E3A6B" }, color:WH, bold:true, fontSize:10, fontFace:"Calibri", valign:"middle", margin:8 } },
-        { text:"Label",  options:{ fill:{ color:"1E3A6B" }, color:WH, bold:true, fontSize:10, fontFace:"Calibri", valign:"middle", margin:8 } },
-        { text:"Description", options:{ fill:{ color:"1E3A6B" }, color:WH, bold:true, fontSize:10, fontFace:"Calibri", valign:"middle", margin:8 } },
-      ];
-      const tierRows = [
+      // ── SLIDE 8 — Conclusion ──────────────────────────────────────────
+      const s8 = prs.addSlide(); bg(s8);
+      s8.addShape(prs.ShapeType.rect, { x:0, y:0, w:0.38, h:7.5, fill:{ color:CY }, line:{ color:CY, width:0 } });
+      s8.addText("CONCLUSION", { x:0.6, y:0.38, w:8, h:0.26, fontSize:8, color:CY, fontFace:"Calibri", bold:true, charSpacing:5 });
+      s8.addText(client, { x:0.6, y:0.68, w:11, h:0.62, fontSize:24, color:WH, fontFace:"Calibri", bold:true });
+      s8.addText(`Following a detailed assessment of ${client} against the NIST Cybersecurity Framework (CSF) 2.0, ${asses} has identified a current profile score of ${overall?parseFloat(overall).toFixed(2):"TBC"} (${tierStr(overall)}).`, { x:0.6, y:1.38, w:12.1, h:0.5, fontSize:11, color:TM, fontFace:"Calibri" });
+      s8.addText(`Current: ${overall?parseFloat(overall).toFixed(2):"TBC"} (${tierStr(overall)})   →   Target: ${overallTarget?parseFloat(overallTarget).toFixed(2):"TBC"} (${tierStr(overallTarget)})`, { x:0.6, y:2.0, w:10, h:0.45, fontSize:16, color:scoreCol(overall), fontFace:"Calibri", bold:true });
+      const strongAreas = fw.filter(cat=>{ const sc=catScore(cat); return sc&&parseFloat(sc)>=3; }).map(cat=>cat.id+" — "+cat.name).slice(0,3);
+      const improveAreas = fw.filter(cat=>{ const sc=catScore(cat); return sc&&parseFloat(sc)<2; }).map(cat=>cat.id+" — "+cat.name).concat(gaps.filter(g=>g.rec?.priority==="Critical").slice(0,3).map(g=>g.rec?.action||g.domain.name)).slice(0,5);
+      if(strongAreas.length>0) { s8.addText("What "+client+" does well:", { x:0.6, y:2.6, w:5.8, h:0.32, fontSize:11, color:LI, fontFace:"Calibri", bold:true }); strongAreas.forEach((a,i)=>s8.addText("• "+a, { x:0.6, y:2.95+i*0.38, w:5.8, h:0.35, fontSize:10, color:WH, fontFace:"Calibri" })); }
+      if(improveAreas.length>0) { s8.addText("Where "+client+" could improve:", { x:7.0, y:2.6, w:5.8, h:0.32, fontSize:11, color:"F87171", fontFace:"Calibri", bold:true }); improveAreas.forEach((a,i)=>s8.addText("• "+a, { x:7.0, y:2.95+i*0.38, w:5.8, h:0.35, fontSize:10, color:WH, fontFace:"Calibri" })); }
+      s8.addText(`${asses} recommends ${critN+highN} High/Critical and ${medN} Medium priority workstreams. If implemented, ${client} should reach the target profile of ${overallTarget?parseFloat(overallTarget).toFixed(2):"the agreed target"}.`, { x:0.6, y:5.5, w:12.1, h:0.6, fontSize:11, color:TM, fontFace:"Calibri", italic:true });
+      foot(s8);
+
+      // ── SLIDE 9 — Appendix: NIST CSF 2.0 Overview ────────────────────
+      const s9 = prs.addSlide(); bg(s9); hdr(s9,"APPENDIX 4 — NIST CSF OVERVIEW",TD); foot(s9);
+      s9.addText("NIST CSF 2.0 — Explained", { x:0.5, y:0.52, w:12, h:0.55, fontSize:22, color:WH, fontFace:"Calibri", bold:true });
+      s9.addText("The NIST CSF 2.0 framework scores across 6 Function Areas, 22 Categories and 106 Subcategories. Each subcategory is assessed and assigned an implementation tier from 0 to 4.", { x:0.5, y:1.12, w:12.33, h:0.5, fontSize:11, color:TM, fontFace:"Calibri" });
+      const apHdr=[mkCell("Tier","1E3A6B",WH,{bold:true,fontSize:10}),mkCell("Label","1E3A6B",WH,{bold:true,fontSize:10}),mkCell("Description","1E3A6B",WH,{bold:true,fontSize:10})];
+      const apRows=[apHdr,...[
         [0,"Not Present","Cybersecurity risk management is not applied. No practices, processes or policies exist.","F87171"],
-        [1,"Partial","Risk management is ad hoc and reactive. Limited awareness of cybersecurity risk at organisational level.","FB923C"],
-        [2,"Risk-Informed","Risk management practices are approved by management but may not be implemented organisation-wide.","FCD34D"],
-        [3,"Repeatable","Formally approved risk management practices are consistently implemented across the organisation.","C8F135"],
-        [4,"Adaptive","Cybersecurity practices are continuously improved based on lessons learned and predictive indicators.","00BFFF"],
-      ].map(([v,label,desc,col],i) => [
-        { text:String(v), options:{ fill:{ color:i%2===0?CARD:CARD2 }, color:col, bold:true, fontSize:14, fontFace:"Calibri", valign:"middle", margin:8 } },
-        { text:label,     options:{ fill:{ color:i%2===0?CARD:CARD2 }, color:col, bold:true, fontSize:11, fontFace:"Calibri", valign:"middle", margin:8 } },
-        { text:desc,      options:{ fill:{ color:i%2===0?CARD:CARD2 }, color:WH, fontSize:10, fontFace:"Calibri", valign:"middle", margin:8 } },
-      ]);
-      s7.addTable([tierTableHdr, ...tierRows], {
-        x:0.5, y:1.7, w:12.33, colW:[0.7,2.2,9.43],
-        border:{ pt:0.5, color:BD }
-      });
+        [1,"Partial","Risk management is ad hoc and reactive. Limited awareness at organisational level.","FB923C"],
+        [2,"Risk-Informed","Management-approved risk practices exist but may not be implemented organisation-wide.","FCD34D"],
+        [3,"Repeatable","Formally approved practices are consistently implemented across the organisation.","C8F135"],
+        [4,"Adaptive","Continuously improved practices based on lessons learned and predictive indicators.","00BFFF"],
+      ].map(([v,label,desc,col],i)=>[mkCell(String(v),i%2===0?CARD:CARD2,col,{bold:true,fontSize:14}),mkCell(label,i%2===0?CARD:CARD2,col,{bold:true,fontSize:11}),mkCell(desc,i%2===0?CARD:CARD2,WH,{fontSize:10})])];
+      s9.addTable(apRows,{ x:0.5, y:1.7, w:12.33, colW:[0.7,2.2,9.43], border:{ pt:0.4, color:BD } });
+      s9.addText("Function Summary:", { x:0.5, y:5.7, w:4, h:0.28, fontSize:10, color:TM, fontFace:"Calibri", bold:true });
+      fw.forEach((cat,i) => s9.addText(`${cat.id}: ${cat.domains.length} categories, ${cat.domains.reduce((a,d)=>a+d.questions.length,0)} subcategories`, { x:0.5+(i%3)*4.11, y:6.05+Math.floor(i/3)*0.34, w:4.0, h:0.3, fontSize:9, color:TM, fontFace:"Calibri" }));
 
-      const funcSummary = fw.map(cat=>({ id:cat.id, name:cat.name, cats:cat.domains.length, subs:cat.domains.reduce((a,d)=>a+d.questions.length,0) }));
-      s7.addText("Function breakdown:", { x:0.5, y:5.8, w:4, h:0.3, fontSize:10, color:TM, fontFace:"Calibri", bold:true });
-      funcSummary.forEach((f,i) => {
-        s7.addText(`${f.id}: ${f.cats} categories, ${f.subs} subcategories`, { x:0.5+i*2.1, y:6.15, w:2.05, h:0.28, fontSize:9, color:TM, fontFace:"Calibri" });
-      });
-
-      await prs.writeFile({ fileName:`${client.replace(/\s+/g,"-")}-NIST-Assessment-Report-${new Date().toISOString().slice(0,10)}.pptx` });
+      await prs.writeFile({ fileName:`${client.replace(/\s+/g,"-")}-NIST-Assessment-${new Date().toISOString().slice(0,10)}.pptx` });
       flash("Report downloaded ✓");
     } catch(e) {
       console.error(e);
-      flash("Error: ensure pptxgenjs is installed (npm install pptxgenjs)");
+      flash("Error: run npm install pptxgenjs in your project terminal");
     }
     setGeneratingReport(false);
   }
@@ -1128,12 +1128,16 @@ export default function MaturityScorecard() {
           <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"18px" }}>
             <div style={card}>
               <div style={{ fontSize:"11px", fontWeight:"700", color:"#4A6A8A", letterSpacing:"0.1em", textTransform:"uppercase", marginBottom:"16px" }}>Engagement Details</div>
-              {[{label:"Client Name",val:clientName,set:setClientName,ph:"e.g. Acme Pharma Ltd"},{label:"Assessor",val:assessor,set:setAssessor,ph:"Your name"}].map(({label,val,set,ph})=>(
+              {[{label:"Client Name",val:clientName,set:setClientName,ph:"e.g. Acme Pharma Ltd"},{label:"Assessor",val:assessor,set:setAssessor,ph:"Your name"},{label:"Sector",val:clientSector,set:setClientSector,ph:"e.g. Pharmaceuticals, Financial Services"}].map(({label,val,set,ph})=>(
                 <div key={label} style={{ marginBottom:"13px" }}>
                   <label style={{ fontSize:"12px", fontWeight:"600", color:"#8BAAC8", display:"block", marginBottom:"5px" }}>{label}</label>
                   <input value={val} onChange={e=>set(e.target.value)} placeholder={ph} style={{ width:"100%", padding:"9px 12px", borderRadius:"7px", border:"1px solid #1B3A6B", fontSize:"13px", fontFamily:"inherit", outline:"none", boxSizing:"border-box", background:"#0A1932", color:"#E2EAF4" }}/>
                 </div>
               ))}
+              <div style={{ marginBottom:"13px" }}>
+                <label style={{ fontSize:"12px", fontWeight:"600", color:"#8BAAC8", display:"block", marginBottom:"5px" }}>Business Context <span style={{color:"#4A6A8A",fontWeight:"400"}}>(for report)</span></label>
+                <textarea value={clientContext} onChange={e=>setClientContext(e.target.value)} placeholder="Brief description of the organisation, key technology context, engagement background..." style={{ width:"100%", padding:"9px 12px", borderRadius:"7px", border:"1px solid #1B3A6B", fontSize:"12px", fontFamily:"inherit", outline:"none", boxSizing:"border-box", background:"#0A1932", color:"#E2EAF4", minHeight:"70px", resize:"vertical", lineHeight:"1.5" }}/>
+              </div>
               <div style={{ marginTop:"16px", padding:"12px 14px", borderRadius:"8px", background:"rgba(200,241,53,0.08)", border:"1px solid rgba(200,241,53,0.25)" }}>
                 <div style={{ fontSize:"12px", fontWeight:"700", color:"#C8F135", marginBottom:"4px" }}>Session persistence</div>
                 <div style={{ fontSize:"11px", color:"#8BAAC8", lineHeight:"1.5" }}>Use <strong style={{color:"#C8F135"}}>Save JSON</strong> to download your progress at any time. Upload it with <strong style={{color:"#C8F135"}}>Load JSON</strong> in any future session to resume exactly where you left off. Scores, notes and workshop notes all persist.</div>
@@ -1270,16 +1274,32 @@ export default function MaturityScorecard() {
                                 return (
                                   <div key={qi} style={{ marginBottom:"16px", paddingBottom:"16px", borderBottom:qi<domain.questions.length-1?"1px solid #0D1F3C":"none" }}>
                                     <div style={{ fontSize:"13px", color:"#E2EAF4", marginBottom:"8px", lineHeight:"1.5", fontWeight:"500" }}>{q}</div>
-                                    <div style={{ display:"flex", gap:"5px", flexWrap:"wrap", marginBottom:"7px" }}>
-                                      <button onClick={()=>setScores(p=>({...p,[key]:-1}))} style={{ padding:"5px 11px", borderRadius:"6px", border:`2px solid ${cur===-1?"#4A6A8A":"#1B3A6B"}`, background:cur===-1?"rgba(74,106,138,0.3)":"#0A1932", color:cur===-1?"#8BAAC8":"#4A6A8A", fontSize:"12px", fontWeight:"700", cursor:"pointer", fontFamily:"inherit" }}>N/A</button>
-                                      {ML.map(m=>(
-                                        <button key={m.value} onClick={()=>setScores(p=>({...p,[key]:m.value}))} style={{ padding:"5px 11px", borderRadius:"6px", border:`2px solid ${cur===m.value?m.color:"#1B3A6B"}`, background:cur===m.value?m.bg:"#0A1932", color:cur===m.value?m.color:"#4A6A8A", fontSize:"12px", fontWeight:"700", cursor:"pointer", fontFamily:"inherit" }}>
-                                          {m.value}
-                                        </button>
-                                      ))}
-                                      {cur!==-1&&cur!==undefined&&<span style={{ fontSize:"11px", color:"#8BAAC8", alignSelf:"center", marginLeft:"4px" }}>{ML.find(m=>m.value===cur)?.label}</span>}
-                                      {cur===-1&&<span style={{ fontSize:"11px", color:"#4A6A8A", alignSelf:"center", marginLeft:"4px" }}>N/A — excluded from scoring</span>}
+                                    {/* Current score row */}
+                                    <div style={{ marginBottom:"6px" }}>
+                                      <div style={{ fontSize:"10px", fontWeight:"700", color:"#4A6A8A", textTransform:"uppercase", letterSpacing:"0.06em", marginBottom:"5px" }}>Current</div>
+                                      <div style={{ display:"flex", gap:"4px", flexWrap:"wrap", alignItems:"center" }}>
+                                        <button onClick={()=>setScores(p=>({...p,[key]:-1}))} style={{ padding:"4px 9px", borderRadius:"5px", border:`2px solid ${cur===-1?"#4A6A8A":"#1B3A6B"}`, background:cur===-1?"rgba(74,106,138,0.3)":"#0A1932", color:cur===-1?"#8BAAC8":"#4A6A8A", fontSize:"11px", fontWeight:"700", cursor:"pointer", fontFamily:"inherit" }}>N/A</button>
+                                        {ML.map(m=>(
+                                          <button key={m.value} onClick={()=>setScores(p=>({...p,[key]:m.value}))} style={{ padding:"4px 9px", borderRadius:"5px", border:`2px solid ${cur===m.value?m.color:"#1B3A6B"}`, background:cur===m.value?m.bg:"#0A1932", color:cur===m.value?m.color:"#4A6A8A", fontSize:"12px", fontWeight:"700", cursor:"pointer", fontFamily:"inherit" }}>{m.value}</button>
+                                        ))}
+                                        {cur!==-1&&cur!==undefined&&<span style={{ fontSize:"11px", color:"#8BAAC8", marginLeft:"4px" }}>{ML.find(m=>m.value===cur)?.label}</span>}
+                                        {cur===-1&&<span style={{ fontSize:"11px", color:"#4A6A8A", marginLeft:"4px" }}>N/A — excluded</span>}
+                                      </div>
                                     </div>
+                                    {/* Target score row */}
+                                    {isNIST && (
+                                      <div style={{ marginBottom:"7px" }}>
+                                        <div style={{ fontSize:"10px", fontWeight:"700", color:"#00BFFF", textTransform:"uppercase", letterSpacing:"0.06em", marginBottom:"5px" }}>Target</div>
+                                        <div style={{ display:"flex", gap:"4px", flexWrap:"wrap", alignItems:"center" }}>
+                                          <button onClick={()=>setTargetScores(p=>({...p,[key]:-1}))} style={{ padding:"4px 9px", borderRadius:"5px", border:`2px solid ${targetScores[key]===-1?"#4A6A8A":"#1B3A6B"}`, background:targetScores[key]===-1?"rgba(74,106,138,0.2)":"transparent", color:targetScores[key]===-1?"#8BAAC8":"#4A6A8A", fontSize:"11px", fontWeight:"700", cursor:"pointer", fontFamily:"inherit" }}>N/A</button>
+                                          {ML.map(m=>{ const tgt=targetScores[key]; return (
+                                            <button key={m.value} onClick={()=>setTargetScores(p=>({...p,[key]:m.value}))} style={{ padding:"4px 9px", borderRadius:"5px", border:`2px solid ${tgt===m.value?"#00BFFF":"#1B3A6B"}`, background:tgt===m.value?"rgba(0,191,255,0.15)":"transparent", color:tgt===m.value?"#00BFFF":"#4A6A8A", fontSize:"12px", fontWeight:"700", cursor:"pointer", fontFamily:"inherit" }}>{m.value}</button>
+                                          );})}
+                                          {targetScores[key]!==undefined&&targetScores[key]!==-1&&<span style={{ fontSize:"11px", color:"#00BFFF", marginLeft:"4px" }}>{ML.find(m=>m.value===targetScores[key])?.label}</span>}
+                                          {targetScores[key]===undefined&&cur!==undefined&&cur!==-1&&<span style={{ fontSize:"10px", color:"#4A6A8A", marginLeft:"4px", fontStyle:"italic" }}>defaults to current ({cur})</span>}
+                                        </div>
+                                      </div>
+                                    )}
                                     <input placeholder="Evidence note (optional)" value={notes[key]||""} onChange={e=>setNotes(p=>({...p,[key]:e.target.value}))} style={{ width:"100%", padding:"7px 10px", borderRadius:"6px", border:"1px solid #1B3A6B", fontSize:"12px", fontFamily:"inherit", outline:"none", background:"#0A1932", color:"#E2EAF4", boxSizing:"border-box" }}/>
                                   </div>
                                 );
@@ -1323,27 +1343,50 @@ export default function MaturityScorecard() {
               <div>
                 <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"18px", marginBottom:"18px" }}>
                   <div style={card}>
-                    <div style={{ fontSize:"11px", fontWeight:"700", color:"#4A6A8A", letterSpacing:"0.1em", textTransform:"uppercase", marginBottom:"14px" }}>Overall Maturity</div>
-                    <div style={{ display:"flex", alignItems:"center", gap:"18px" }}>
-                      <div style={{ width:"92px", height:"92px", borderRadius:"50%", background:`conic-gradient(${getMC(overall)} ${(parseFloat(overall||0)/4)*360}deg, #1B3A6B 0deg)`, display:"flex", alignItems:"center", justifyContent:"center" }}>
-                        <div style={{ width:"68px", height:"68px", borderRadius:"50%", background:"#0D1F3C", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center" }}>
-                          <div style={{ fontSize:"22px", fontWeight:"800", color:getMC(overall), lineHeight:1 }}>{overall||"—"}</div>
-                          <div style={{ fontSize:"9px", color:"#4A6A8A", fontWeight:"600" }}>/ 4.0</div>
+                    <div style={{ fontSize:"11px", fontWeight:"700", color:"#4A6A8A", letterSpacing:"0.1em", textTransform:"uppercase", marginBottom:"14px" }}>Overall Maturity — Current vs Target</div>
+                    <div style={{ display:"flex", alignItems:"center", gap:"18px", marginBottom:"16px" }}>
+                      <div style={{ textAlign:"center" }}>
+                        <div style={{ fontSize:"11px", color:"#4A6A8A", marginBottom:"4px", fontWeight:"600" }}>CURRENT</div>
+                        <div style={{ width:"88px", height:"88px", borderRadius:"50%", background:`conic-gradient(${getMC(overall)} ${(parseFloat(overall||0)/4)*360}deg, #1B3A6B 0deg)`, display:"flex", alignItems:"center", justifyContent:"center" }}>
+                          <div style={{ width:"64px", height:"64px", borderRadius:"50%", background:"#0D1F3C", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center" }}>
+                            <div style={{ fontSize:"20px", fontWeight:"800", color:getMC(overall), lineHeight:1 }}>{overall||"—"}</div>
+                            <div style={{ fontSize:"9px", color:"#4A6A8A", fontWeight:"600" }}>/4.0</div>
+                          </div>
                         </div>
+                        <div style={{ fontSize:"11px", fontWeight:"700", color:getMC(overall), marginTop:"5px" }}>{getML(overall)}</div>
                       </div>
-                      <div>
-                        <div style={{ fontSize:"17px", fontWeight:"800", color:"#FFFFFF" }}>{getML(overall)}</div>
-                        <div style={{ fontSize:"12px", color:"#8BAAC8", marginTop:"3px" }}>{ML_DESC[Math.round(parseFloat(overall||0))]}</div>
-                        <div style={{ fontSize:"11px", color:"#4A6A8A", marginTop:"5px" }}>{completion}% assessed</div>
+                      <div style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:"4px" }}>
+                        <div style={{ fontSize:"20px", color:"#1B3A6B" }}>→</div>
+                        {overall&&overallTarget&&<div style={{ fontSize:"11px", fontWeight:"800", color:"#C8F135", background:"rgba(200,241,53,0.1)", padding:"2px 8px", borderRadius:"4px" }}>+{(parseFloat(overallTarget)-parseFloat(overall)).toFixed(2)}</div>}
+                      </div>
+                      <div style={{ textAlign:"center" }}>
+                        <div style={{ fontSize:"11px", color:"#00BFFF", marginBottom:"4px", fontWeight:"600" }}>TARGET</div>
+                        <div style={{ width:"88px", height:"88px", borderRadius:"50%", background:`conic-gradient(#00BFFF ${(parseFloat(overallTarget||0)/4)*360}deg, #1B3A6B 0deg)`, display:"flex", alignItems:"center", justifyContent:"center" }}>
+                          <div style={{ width:"64px", height:"64px", borderRadius:"50%", background:"#0D1F3C", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center" }}>
+                            <div style={{ fontSize:"20px", fontWeight:"800", color:"#00BFFF", lineHeight:1 }}>{overallTarget||"—"}</div>
+                            <div style={{ fontSize:"9px", color:"#4A6A8A", fontWeight:"600" }}>/4.0</div>
+                          </div>
+                        </div>
+                        <div style={{ fontSize:"11px", fontWeight:"700", color:"#00BFFF", marginTop:"5px" }}>{getML(overallTarget)}</div>
                       </div>
                     </div>
-                    <div style={{ marginTop:"14px", display:"flex", flexDirection:"column", gap:"6px" }}>
-                      {fw.map(cat=>{ const sc=catScore(cat); const pct=sc?(parseFloat(sc)/4)*100:0; return (
+                    <div style={{ display:"flex", flexDirection:"column", gap:"7px" }}>
+                      {fw.map(cat=>{ const sc=catScore(cat); const tgt=catTarget(cat); const pctC=sc?(parseFloat(sc)/4)*100:0; const pctT=tgt?(parseFloat(tgt)/4)*100:0; return (
                         <div key={cat.id}>
-                          <div style={{ display:"flex", justifyContent:"space-between", marginBottom:"2px" }}><span style={{ fontSize:"11px", fontWeight:"600", color:"#8BAAC8" }}>{cat.id} — {cat.name}</span><span style={{ fontSize:"11px", fontWeight:"800", color:getMC(sc) }}>{sc||"—"}</span></div>
-                          <div style={{ height:"5px", background:"#1B3A6B", borderRadius:"3px", overflow:"hidden" }}><div style={{ width:`${pct}%`, height:"100%", background:getMC(sc), borderRadius:"3px", transition:"width 0.5s" }}/></div>
+                          <div style={{ display:"flex", justifyContent:"space-between", marginBottom:"3px" }}>
+                            <span style={{ fontSize:"11px", fontWeight:"600", color:"#8BAAC8" }}>{cat.id} — {cat.name}</span>
+                            <span style={{ fontSize:"11px", fontWeight:"800", color:getMC(sc) }}>{sc||"—"}{tgt&&tgt!==sc?<span style={{ color:"#00BFFF", marginLeft:"4px" }}>→ {tgt}</span>:null}</span>
+                          </div>
+                          <div style={{ height:"6px", background:"#1B3A6B", borderRadius:"3px", overflow:"hidden", position:"relative" }}>
+                            {pctT>0&&<div style={{ position:"absolute", left:0, width:`${pctT}%`, height:"100%", background:"rgba(0,191,255,0.25)", borderRadius:"3px" }}/>}
+                            <div style={{ position:"absolute", left:0, width:`${pctC}%`, height:"100%", background:getMC(sc), borderRadius:"3px", transition:"width 0.5s" }}/>
+                          </div>
                         </div>
                       );})}
+                    </div>
+                    <div style={{ marginTop:"12px", display:"flex", gap:"12px", fontSize:"10px", color:"#4A6A8A" }}>
+                      <span style={{ display:"flex", alignItems:"center", gap:"4px" }}><span style={{ width:"10px", height:"4px", background:"#1E6FD9", borderRadius:"2px", display:"inline-block" }}/> Current</span>
+                      <span style={{ display:"flex", alignItems:"center", gap:"4px" }}><span style={{ width:"10px", height:"4px", background:"rgba(0,191,255,0.25)", borderRadius:"2px", display:"inline-block" }}/> Target</span>
                     </div>
                   </div>
                   <div style={{ ...card, display:"flex", flexDirection:"column", alignItems:"center" }}>
@@ -1357,13 +1400,16 @@ export default function MaturityScorecard() {
                       <div><span style={{ fontSize:"11px", fontWeight:"800", color:cat.color, letterSpacing:"0.1em" }}>{cat.id}</span><span style={{ fontSize:"14px", fontWeight:"800", color:"#FFFFFF", marginLeft:"9px" }}>{cat.name}</span></div>
                       <div style={{ textAlign:"right" }}><span style={{ fontSize:"19px", fontWeight:"800", color:getMC(catScore(cat)) }}>{catScore(cat)||"—"}</span><div style={{ fontSize:"11px", color:"#8BAAC8" }}>{getML(catScore(cat))}</div></div>
                     </div>
-                    <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(175px,1fr))", gap:"8px" }}>
-                      {cat.domains.map(domain=>{ const ds=domainScore(domain); return (
+                    <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(185px,1fr))", gap:"8px" }}>
+                      {cat.domains.map(domain=>{ const ds=domainScore(domain); const dt=domainTarget(domain); return (
                         <div key={domain.id} style={{ padding:"10px 12px", borderRadius:"8px", background:"#0A1932", border:"1px solid #1B3A6B" }}>
                           <div style={{ fontSize:"10px", fontWeight:"700", color:cat.color, letterSpacing:"0.08em" }}>{domain.id}</div>
-                          <div style={{ fontSize:"12px", fontWeight:"700", color:"#E2EAF4", marginTop:"2px" }}>{domain.name}</div>
-                          <div style={{ fontSize:"19px", fontWeight:"800", color:getMC(ds), marginTop:"4px" }}>{ds||"—"}</div>
-                          <div style={{ fontSize:"11px", color:"#8BAAC8" }}>{getML(ds)}</div>
+                          <div style={{ fontSize:"11px", fontWeight:"700", color:"#E2EAF4", marginTop:"2px" }}>{domain.name}</div>
+                          <div style={{ display:"flex", alignItems:"baseline", gap:"6px", marginTop:"5px" }}>
+                            <span style={{ fontSize:"20px", fontWeight:"800", color:getMC(ds) }}>{ds||"—"}</span>
+                            {dt&&dt!==ds&&<span style={{ fontSize:"12px", color:"#00BFFF" }}>→ {dt}</span>}
+                          </div>
+                          <div style={{ fontSize:"10px", color:"#8BAAC8" }}>{getML(ds)}{dt&&dt!==ds?<span style={{ color:"#00BFFF" }}> · Target: {getML(dt)}</span>:null}</div>
                         </div>
                       );})}
                     </div>
