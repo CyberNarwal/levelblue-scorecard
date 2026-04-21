@@ -1663,7 +1663,7 @@ export default function MaturityScorecard() {
               })()}
             </div>
           </div>
-        )&rbrace;
+        )}
 
         {/* ── RESULTS ── */}
         {view==="results" && (
