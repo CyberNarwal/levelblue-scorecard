@@ -678,11 +678,59 @@ export default function MaturityScorecard() {
   const [statusMsg, setStatusMsg] = useState("");
   const [showWorkshop, setShowWorkshop] = useState({});
   const [generatingReport, setGeneratingReport] = useState(false);
+  const [recoveryAvailable, setRecoveryAvailable] = useState(false);
   const fileInputRef = useRef();
 
   const fw = FRAMEWORKS[framework];
   const isNIST = framework === "NIST CSF 2.0";
   const flash = (msg) => { setStatusMsg(msg); setTimeout(()=>setStatusMsg(""),3000); };
+
+  // ── Autosave to localStorage — crash recovery buffer ─────────────────────
+  // This is NOT the primary save mechanism. It's a recovery net only.
+  // Primary save remains JSON export — no client data persists in the browser
+  // beyond the session. This buffer is cleared when JSON is exported.
+  useEffect(() => {
+    if (!clientName && Object.keys(scores).length === 0) return; // don't save empty sessions
+    const backup = { version:2, framework, clientName, assessor, clientSector, clientContext,
+      date: new Date().toISOString(), scores, targetScores, notes, workshopNotes };
+    try { localStorage.setItem("lb_scorecard_recovery", JSON.stringify(backup)); } catch(e) {}
+  }, [scores, targetScores, notes, workshopNotes, clientName, assessor, clientSector, clientContext, framework]);
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("lb_scorecard_recovery");
+      if (saved) {
+        const data = JSON.parse(saved);
+        if (data.clientName || Object.keys(data.scores||{}).length > 0) {
+          setRecoveryAvailable(true);
+        }
+      }
+    } catch(e) {}
+  }, []);
+
+  function restoreRecovery() {
+    try {
+      const saved = localStorage.getItem("lb_scorecard_recovery");
+      if (!saved) return;
+      const data = JSON.parse(saved);
+      setFramework(data.framework || "NIST CSF 2.0");
+      setClientName(data.clientName || "");
+      setAssessor(data.assessor || "");
+      setClientSector(data.clientSector || "");
+      setClientContext(data.clientContext || "");
+      setScores(data.scores || {});
+      setTargetScores(data.targetScores || {});
+      setNotes(data.notes || {});
+      setWorkshopNotes(data.workshopNotes || {});
+      setRecoveryAvailable(false);
+      flash("Session recovered ✓");
+    } catch(e) { flash("Recovery failed"); }
+  }
+
+  function dismissRecovery() {
+    try { localStorage.removeItem("lb_scorecard_recovery"); } catch(e) {}
+    setRecoveryAvailable(false);
+  }
 
   const getMC = (s) => { if(s===null||s===undefined) return "#4A6A8A"; const v=parseFloat(s); if(v<0.5) return "#F87171"; if(v<1.5) return "#FB923C"; if(v<2.5) return "#FCD34D"; if(v<3.5) return "#C8F135"; return "#00BFFF"; };
   const getML = (s) => { if(s===null||s===undefined) return "Not assessed"; const v=parseFloat(s); if(v<0.5) return "Not Present"; if(v<1.5) return "Partial"; if(v<2.5) return "Risk-Informed"; if(v<3.5) return "Repeatable"; return "Adaptive"; };
@@ -726,6 +774,8 @@ export default function MaturityScorecard() {
     a.href = url;
     a.download = `${(clientName||"session").replace(/\s+/g,"-")}-scorecard-${new Date().toISOString().slice(0,10)}.json`;
     a.click();
+    try { localStorage.removeItem("lb_scorecard_recovery"); } catch(e) {}
+    setRecoveryAvailable(false);
     flash("Session saved ✓");
   }
 
@@ -1094,7 +1144,12 @@ export default function MaturityScorecard() {
           </div>
         </div>
         <div style={{ display:"flex", gap:"3px", background:"rgba(13,31,60,0.8)", padding:"4px", borderRadius:"6px", border:"1px solid #1B3A6B" }}>
-          {["setup","assess","results"].map(v=><button key={v} onClick={()=>setView(v)} style={navBtn(view===v)}>{v==="setup"?"01 Setup":v==="assess"?"02 Assess":"03 Results"}</button>)}
+          {[
+            {v:"setup",    label:"01 Setup"},
+            {v:"workshop", label:"02 Workshop"},
+            {v:"score",    label:"03 Score"},
+            {v:"results",  label:"04 Results"},
+          ].map(({v,label})=><button key={v} onClick={()=>setView(v)} style={navBtn(view===v)}>{label}</button>)}
         </div>
         <div style={{ display:"flex", alignItems:"center", gap:"10px" }}>
           <div style={{ display:"flex", alignItems:"center", gap:"6px" }}>
@@ -1122,6 +1177,20 @@ export default function MaturityScorecard() {
       </div>
 
       <div style={{ maxWidth:"1140px", margin:"0 auto", padding:"26px 22px" }}>
+
+        {/* ── Recovery banner ── */}
+        {recoveryAvailable && (
+          <div style={{ marginBottom:"18px", padding:"14px 18px", borderRadius:"10px", background:"rgba(252,211,77,0.1)", border:"1px solid rgba(252,211,77,0.35)", display:"flex", alignItems:"center", justifyContent:"space-between", gap:"16px" }}>
+            <div>
+              <div style={{ fontSize:"13px", fontWeight:"700", color:"#FCD34D", marginBottom:"3px" }}>⚡ Unsaved session detected</div>
+              <div style={{ fontSize:"12px", color:"#8BAAC8" }}>A previous session was interrupted before a JSON save. You can restore it or dismiss it.</div>
+            </div>
+            <div style={{ display:"flex", gap:"8px", flexShrink:0 }}>
+              <button onClick={restoreRecovery} style={{ padding:"7px 16px", borderRadius:"6px", background:"rgba(252,211,77,0.2)", border:"1px solid rgba(252,211,77,0.5)", color:"#FCD34D", fontSize:"12px", fontWeight:"700", cursor:"pointer", fontFamily:"inherit" }}>Restore session</button>
+              <button onClick={dismissRecovery} style={{ padding:"7px 14px", borderRadius:"6px", background:"transparent", border:"1px solid #1B3A6B", color:"#4A6A8A", fontSize:"12px", fontWeight:"700", cursor:"pointer", fontFamily:"inherit" }}>Dismiss</button>
+            </div>
+          </div>
+        )}
 
         {/* ── SETUP ── */}
         {view==="setup" && (
@@ -1151,7 +1220,7 @@ export default function MaturityScorecard() {
                   <div style={{ fontSize:"12px", color:"#4A6A8A", marginTop:"3px" }}>{f==="NIST CSF 2.0"?"6 functions · 22 categories · 106 subcategories · 0–4 NIST tiers":"3 groups · 18 controls · Implementation groups"}</div>
                 </button>
               ))}
-              <button onClick={()=>setView("assess")} style={{ width:"100%", padding:"13px", borderRadius:"9px", background:"linear-gradient(135deg,#1E6FD9,#0EA5E9)", color:"white", border:"none", fontWeight:"700", fontSize:"13px", cursor:"pointer", fontFamily:"inherit", marginTop:"4px" }}>Begin Assessment →</button>
+              <button onClick={()=>setView("workshop")} style={{ width:"100%", padding:"13px", borderRadius:"9px", background:"linear-gradient(135deg,#1E6FD9,#0EA5E9)", color:"white", border:"none", fontWeight:"700", fontSize:"13px", cursor:"pointer", fontFamily:"inherit", marginTop:"4px" }}>Begin Workshop →</button>
             </div>
             <div style={{ ...card, gridColumn:"1 / -1" }}>
               <div style={{ fontSize:"11px", fontWeight:"700", color:"#4A6A8A", letterSpacing:"0.1em", textTransform:"uppercase", marginBottom:"14px" }}>NIST CSF 2.0 — Scoring Tiers (0–4)</div>
@@ -1168,8 +1237,288 @@ export default function MaturityScorecard() {
           </div>
         )}
 
-        {/* ── ASSESS ── */}
-        {view==="assess" && (
+        {/* ── WORKSHOP ── */}
+        {view==="workshop" && (
+          <div>
+            <div style={{ marginBottom:"18px", padding:"14px 18px", borderRadius:"10px", background:"rgba(0,191,255,0.08)", border:"1px solid rgba(0,191,255,0.2)", display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+              <div>
+                <div style={{ fontSize:"14px", fontWeight:"700", color:"#00BFFF", marginBottom:"3px" }}>Workshop Mode — Discovery &amp; Evidence Capture</div>
+                <div style={{ fontSize:"12px", color:"#8BAAC8" }}>Use this screen in the client session. Ask the questions, capture responses and evidence notes. Scoring happens after the workshop.</div>
+              </div>
+              <button onClick={()=>setView("score")} style={{ padding:"8px 18px", borderRadius:"7px", background:"linear-gradient(135deg,#1E6FD9,#0EA5E9)", color:"#FFFFFF", border:"none", fontWeight:"700", fontSize:"12px", cursor:"pointer", fontFamily:"inherit", flexShrink:0 }}>Move to Scoring →</button>
+            </div>
+            <div style={{ display:"grid", gridTemplateColumns:"200px 1fr", gap:"18px" }}>
+              <div style={{ display:"flex", flexDirection:"column", gap:"6px" }}>
+                {fw.map(cat=>{
+                  const wCaptured = cat.domains.filter(d=>workshopNotes[d.id]&&workshopNotes[d.id].trim()).length;
+                  return (
+                    <button key={cat.id} onClick={()=>setActiveSection(cat.id===activeSection?null:cat.id)} style={{ padding:"11px 13px", borderRadius:"9px", textAlign:"left", border:`2px solid ${activeSection===cat.id?cat.color:"#1B3A6B"}`, background:activeSection===cat.id?cat.light:"#0A1932", cursor:"pointer", fontFamily:"inherit" }}>
+                      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                        <span style={{ fontSize:"11px", fontWeight:"800", color:cat.color, letterSpacing:"0.08em" }}>{cat.id}</span>
+                        {wCaptured>0&&<span style={{ fontSize:"10px", color:"#C8F135", background:"rgba(200,241,53,0.15)", padding:"1px 6px", borderRadius:"3px" }}>{wCaptured} noted</span>}
+                      </div>
+                      <div style={{ fontSize:"12px", fontWeight:"700", color:"#E2EAF4", marginTop:"2px" }}>{cat.name}</div>
+                    </button>
+                  );
+                })}
+                <div style={{ ...card, marginTop:"6px", padding:"13px" }}>
+                  <div style={{ fontSize:"11px", color:"#4A6A8A", marginBottom:"4px", fontWeight:"600" }}>NOTES CAPTURED</div>
+                  <div style={{ fontSize:"24px", fontWeight:"800", color:"#00BFFF" }}>{fw.flatMap(c=>c.domains).filter(d=>workshopNotes[d.id]&&workshopNotes[d.id].trim()).length}</div>
+                  <div style={{ fontSize:"11px", color:"#8BAAC8" }}>of {fw.flatMap(c=>c.domains).length} categories</div>
+                </div>
+              </div>
+
+              <div>
+                {!activeSection && (
+                  <div style={{ ...card, textAlign:"center", padding:"56px" }}>
+                    <div style={{ fontSize:"34px", marginBottom:"12px" }}>←</div>
+                    <div style={{ fontSize:"15px", fontWeight:"700", color:"#E2EAF4" }}>Select a function to start</div>
+                    <div style={{ fontSize:"12px", color:"#4A6A8A", marginTop:"6px" }}>Run through each category, ask the questions, capture what the client tells you</div>
+                  </div>
+                )}
+                {activeSection && (()=>{
+                  const cat = fw.find(c=>c.id===activeSection); if(!cat) return null;
+                  return (
+                    <div>
+                      <div style={{ ...card, marginBottom:"13px", borderLeft:`4px solid ${cat.color}` }}>
+                        <div style={{ fontSize:"11px", fontWeight:"800", color:cat.color, letterSpacing:"0.1em", textTransform:"uppercase" }}>{cat.id} — {cat.name}</div>
+                        <div style={{ fontSize:"12px", color:"#4A6A8A", marginTop:"2px" }}>{cat.description}</div>
+                      </div>
+                      {cat.domains.map(domain => {
+                        const isOpen = expandedDomains[domain.id] !== false;
+                        const wqs = WORKSHOP_QS[domain.id] || [];
+                        const hasNotes = workshopNotes[domain.id]?.trim();
+                        return (
+                          <div key={domain.id} style={{ ...card, marginBottom:"10px", borderLeft: hasNotes?`3px solid #C8F135`:"3px solid transparent" }}>
+                            <button onClick={()=>setExpandedDomains(p=>({...p,[domain.id]:!isOpen}))} style={{ width:"100%", background:"none", border:"none", cursor:"pointer", textAlign:"left", padding:0, display:"flex", justifyContent:"space-between", alignItems:"center", fontFamily:"inherit" }}>
+                              <div>
+                                <span style={{ fontSize:"11px", fontWeight:"700", color:cat.color, letterSpacing:"0.08em" }}>{domain.id}</span>
+                                <span style={{ fontSize:"13px", fontWeight:"700", color:"#E2EAF4", marginLeft:"9px" }}>{domain.name}</span>
+                                <span style={{ fontSize:"10px", color:"#4A6A8A", marginLeft:"8px" }}>({wqs.length} questions)</span>
+                              </div>
+                              <div style={{ display:"flex", alignItems:"center", gap:"8px" }}>
+                                {hasNotes && <span style={{ fontSize:"10px", color:"#C8F135", fontWeight:"700" }}>✓ Notes</span>}
+                                <span style={{ color:"#4A6A8A", fontSize:"11px" }}>{isOpen?"▲":"▼"}</span>
+                              </div>
+                            </button>
+                            {isOpen && (
+                              <div style={{ marginTop:"14px", borderTop:"1px solid #1B3A6B", paddingTop:"14px" }}>
+                                {wqs.length > 0 && (
+                                  <div style={{ marginBottom:"16px" }}>
+                                    <div style={{ fontSize:"11px", fontWeight:"700", color:"#00BFFF", marginBottom:"10px", letterSpacing:"0.05em", textTransform:"uppercase" }}>Discovery Questions</div>
+                                    {wqs.map((q,i) => (
+                                      <div key={i} style={{ display:"flex", gap:"10px", marginBottom:"12px", alignItems:"flex-start", padding:"10px 12px", background:"rgba(0,191,255,0.05)", borderRadius:"7px", border:"1px solid rgba(0,191,255,0.12)" }}>
+                                        <span style={{ fontSize:"12px", fontWeight:"800", color:"#00BFFF", minWidth:"22px", marginTop:"1px", flexShrink:0 }}>{i+1}.</span>
+                                        <span style={{ fontSize:"13px", color:"#E2EAF4", lineHeight:"1.6" }}>{q}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                                <div style={{ fontSize:"11px", fontWeight:"700", color:"#00BFFF", marginBottom:"7px", letterSpacing:"0.05em", textTransform:"uppercase" }}>Evidence &amp; Workshop Notes</div>
+                                <textarea
+                                  value={workshopNotes[domain.id]||""}
+                                  onChange={e=>setWorkshopNotes(p=>({...p,[domain.id]:e.target.value}))}
+                                  placeholder={`Capture client responses, examples and context for ${domain.name}. These notes will be visible alongside each subcategory when you move to scoring.`}
+                                  style={{ width:"100%", minHeight:"110px", padding:"10px 12px", borderRadius:"7px", border:`1px solid ${hasNotes?"rgba(200,241,53,0.35)":"#1B3A6B"}`, fontSize:"12px", fontFamily:"inherit", outline:"none", background:"#0A1932", color:"#E2EAF4", boxSizing:"border-box", lineHeight:"1.6", resize:"vertical" }}
+                                />
+                                {/* Evidence notes per subcategory — lightweight capture during workshop */}
+                                <div style={{ marginTop:"12px" }}>
+                                  <div style={{ fontSize:"11px", fontWeight:"700", color:"#4A6A8A", marginBottom:"8px", letterSpacing:"0.05em", textTransform:"uppercase" }}>Quick Evidence Notes — per subcategory (optional)</div>
+                                  {domain.questions.map((q,qi) => {
+                                    const key = `${domain.id}_q${qi}`;
+                                    const [subId,...rest] = q.split(" — ");
+                                    return (
+                                      <div key={qi} style={{ marginBottom:"8px" }}>
+                                        <div style={{ fontSize:"10px", fontWeight:"700", color:cat.color, marginBottom:"3px" }}>{subId}</div>
+                                        <input
+                                          placeholder={rest.join(" — ") || q}
+                                          value={notes[key]||""}
+                                          onChange={e=>setNotes(p=>({...p,[key]:e.target.value}))}
+                                          style={{ width:"100%", padding:"6px 10px", borderRadius:"5px", border:"1px solid #1B3A6B", fontSize:"11px", fontFamily:"inherit", outline:"none", background:"#0A1932", color:"#E2EAF4", boxSizing:"border-box" }}
+                                        />
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── SCORE ── */}
+        {view==="score" && (
+          <div>
+            <div style={{ marginBottom:"18px", padding:"14px 18px", borderRadius:"10px", background:"rgba(200,241,53,0.07)", border:"1px solid rgba(200,241,53,0.25)", display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+              <div>
+                <div style={{ fontSize:"14px", fontWeight:"700", color:"#C8F135", marginBottom:"3px" }}>Scoring Mode — Post-Workshop Assessment</div>
+                <div style={{ fontSize:"12px", color:"#8BAAC8" }}>Score each subcategory 0–4 using workshop notes and document evidence. Set a target score alongside the current score. Save JSON regularly.</div>
+              </div>
+              <div style={{ display:"flex", gap:"8px", flexShrink:0 }}>
+                <button onClick={saveSession} style={{ padding:"8px 16px", borderRadius:"7px", background:"rgba(200,241,53,0.15)", border:"1px solid rgba(200,241,53,0.4)", color:"#C8F135", fontWeight:"700", fontSize:"12px", cursor:"pointer", fontFamily:"inherit" }}>Save JSON ↓</button>
+                <button onClick={()=>setView("results")} style={{ padding:"8px 16px", borderRadius:"7px", background:"rgba(0,191,255,0.12)", border:"1px solid rgba(0,191,255,0.3)", color:"#00BFFF", fontWeight:"700", fontSize:"12px", cursor:"pointer", fontFamily:"inherit" }}>View Results →</button>
+              </div>
+            </div>
+            <div style={{ display:"grid", gridTemplateColumns:"220px 1fr", gap:"18px" }}>
+              <div style={{ display:"flex", flexDirection:"column", gap:"6px" }}>
+                {fw.map(cat=>{
+                  const sc = catScore(cat);
+                  const scoredCount = cat.domains.flatMap(d=>d.questions.map((_,qi)=>scores[`${d.id}_q${qi}`])).filter(v=>v!==undefined).length;
+                  const totalCount = cat.domains.flatMap(d=>d.questions).length;
+                  return (
+                    <button key={cat.id} onClick={()=>setActiveSection(cat.id===activeSection?null:cat.id)} style={{ padding:"11px 13px", borderRadius:"9px", textAlign:"left", border:`2px solid ${activeSection===cat.id?cat.color:"#1B3A6B"}`, background:activeSection===cat.id?cat.light:"#0A1932", cursor:"pointer", fontFamily:"inherit" }}>
+                      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                        <span style={{ fontSize:"11px", fontWeight:"800", color:cat.color, letterSpacing:"0.08em" }}>{cat.id}</span>
+                        {sc && <span style={{ fontSize:"13px", fontWeight:"800", color:getMC(sc) }}>{sc}</span>}
+                      </div>
+                      <div style={{ fontSize:"12px", fontWeight:"700", color:"#E2EAF4", marginTop:"2px" }}>{cat.name}</div>
+                      <div style={{ height:"3px", background:"#1B3A6B", borderRadius:"2px", marginTop:"6px", overflow:"hidden" }}>
+                        <div style={{ width:`${(scoredCount/totalCount)*100}%`, height:"100%", background:cat.color, opacity:0.7 }}/>
+                      </div>
+                    </button>
+                  );
+                })}
+                <div style={{ ...card, marginTop:"6px", padding:"13px" }}>
+                  <div style={{ fontSize:"11px", color:"#4A6A8A", marginBottom:"5px", fontWeight:"600" }}>OVERALL</div>
+                  <div style={{ fontSize:"26px", fontWeight:"800", color:getMC(overall) }}>{overall||"—"}</div>
+                  <div style={{ fontSize:"11px", color:"#8BAAC8" }}>{getML(overall)}</div>
+                  {overallTarget && overall && (
+                    <div style={{ fontSize:"10px", color:"#00BFFF", marginTop:"3px" }}>Target: {overallTarget}</div>
+                  )}
+                  <div style={{ fontSize:"10px", color:"#4A6A8A", marginTop:"3px" }}>{completion}% scored</div>
+                </div>
+              </div>
+
+              <div>
+                {!activeSection && (
+                  <div style={{ ...card, textAlign:"center", padding:"56px" }}>
+                    <div style={{ fontSize:"34px", marginBottom:"12px" }}>←</div>
+                    <div style={{ fontSize:"15px", fontWeight:"700", color:"#E2EAF4" }}>Select a function to score</div>
+                    <div style={{ fontSize:"12px", color:"#4A6A8A", marginTop:"6px" }}>Workshop notes from Step 2 appear above each subcategory to inform your scoring</div>
+                  </div>
+                )}
+                {activeSection && (()=>{
+                  const cat = fw.find(c=>c.id===activeSection); if(!cat) return null;
+                  return (
+                    <div>
+                      <div style={{ ...card, marginBottom:"13px", borderLeft:`4px solid ${cat.color}` }}>
+                        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
+                          <div>
+                            <div style={{ fontSize:"11px", fontWeight:"800", color:cat.color, letterSpacing:"0.1em", textTransform:"uppercase" }}>{cat.id} — {cat.name}</div>
+                            <div style={{ fontSize:"12px", color:"#4A6A8A", marginTop:"2px" }}>{cat.description}</div>
+                          </div>
+                          {catScore(cat) && <div style={{ textAlign:"right" }}>
+                            <div style={{ fontSize:"22px", fontWeight:"800", color:getMC(catScore(cat)) }}>{catScore(cat)}</div>
+                            <div style={{ fontSize:"11px", color:"#8BAAC8" }}>{getML(catScore(cat))}</div>
+                          </div>}
+                        </div>
+                      </div>
+
+                      {cat.domains.map(domain => {
+                        const isOpen = expandedDomains[domain.id] !== false;
+                        const ds = domainScore(domain);
+                        const dt = domainTarget(domain);
+                        const wNote = workshopNotes[domain.id];
+                        return (
+                          <div key={domain.id} style={{ ...card, marginBottom:"10px" }}>
+                            <button onClick={()=>setExpandedDomains(p=>({...p,[domain.id]:!isOpen}))} style={{ width:"100%", background:"none", border:"none", cursor:"pointer", textAlign:"left", padding:0, display:"flex", justifyContent:"space-between", alignItems:"center", fontFamily:"inherit" }}>
+                              <div>
+                                <span style={{ fontSize:"11px", fontWeight:"700", color:cat.color, letterSpacing:"0.08em" }}>{domain.id}</span>
+                                <span style={{ fontSize:"13px", fontWeight:"700", color:"#E2EAF4", marginLeft:"9px" }}>{domain.name}</span>
+                                <span style={{ fontSize:"10px", color:"#4A6A8A", marginLeft:"8px" }}>({domain.questions.length} subcategories)</span>
+                              </div>
+                              <div style={{ display:"flex", alignItems:"center", gap:"10px" }}>
+                                {ds && <span style={{ fontSize:"14px", fontWeight:"800", color:getMC(ds) }}>{ds}{dt&&dt!==ds?<span style={{ fontSize:"11px", color:"#00BFFF" }}> → {dt}</span>:null}</span>}
+                                <span style={{ color:"#4A6A8A", fontSize:"11px" }}>{isOpen?"▲":"▼"}</span>
+                              </div>
+                            </button>
+
+                            {isOpen && (
+                              <div style={{ marginTop:"14px", borderTop:"1px solid #1B3A6B", paddingTop:"14px" }}>
+                                {/* Workshop notes from Step 2 — visible here to inform scoring */}
+                                {wNote && (
+                                  <div style={{ marginBottom:"16px", padding:"12px 14px", borderRadius:"8px", background:"rgba(200,241,53,0.06)", border:"1px solid rgba(200,241,53,0.2)" }}>
+                                    <div style={{ fontSize:"10px", fontWeight:"700", color:"#C8F135", marginBottom:"5px", letterSpacing:"0.06em", textTransform:"uppercase" }}>Workshop Notes</div>
+                                    <div style={{ fontSize:"12px", color:"#8BAAC8", lineHeight:"1.6", whiteSpace:"pre-wrap" }}>{wNote}</div>
+                                  </div>
+                                )}
+
+                                {domain.questions.map((q, qi) => {
+                                  const key = `${domain.id}_q${qi}`;
+                                  const cur = scores[key];
+                                  const [subId, ...rest] = q.split(" — ");
+                                  const qText = rest.join(" — ") || q;
+                                  return (
+                                    <div key={qi} style={{ marginBottom:"18px", paddingBottom:"18px", borderBottom: qi<domain.questions.length-1?"1px solid #0D1F3C":"none" }}>
+                                      <div style={{ display:"flex", gap:"8px", marginBottom:"8px", alignItems:"flex-start" }}>
+                                        {isNIST && <span style={{ fontSize:"10px", fontWeight:"800", color:cat.color, whiteSpace:"nowrap", marginTop:"2px", background:cat.light, padding:"2px 6px", borderRadius:"4px", flexShrink:0 }}>{subId}</span>}
+                                        <span style={{ fontSize:"13px", color:"#E2EAF4", lineHeight:"1.5", fontWeight:"500" }}>{isNIST ? qText : q}</span>
+                                      </div>
+
+                                      {/* Evidence note from workshop — shown above scoring if captured */}
+                                      {notes[key] && (
+                                        <div style={{ marginBottom:"8px", padding:"7px 10px", borderRadius:"5px", background:"rgba(0,191,255,0.06)", border:"1px solid rgba(0,191,255,0.15)", fontSize:"11px", color:"#8BAAC8", fontStyle:"italic" }}>
+                                          📝 {notes[key]}
+                                        </div>
+                                      )}
+
+                                      {/* Current score */}
+                                      <div style={{ marginBottom:"6px" }}>
+                                        <div style={{ fontSize:"10px", fontWeight:"700", color:"#4A6A8A", textTransform:"uppercase", letterSpacing:"0.06em", marginBottom:"5px" }}>Current Score</div>
+                                        <div style={{ display:"flex", gap:"4px", flexWrap:"wrap", alignItems:"center" }}>
+                                          <button onClick={()=>setScores(p=>({...p,[key]:-1}))} style={{ padding:"5px 11px", borderRadius:"5px", border:`2px solid ${cur===-1?"#4A6A8A":"#1B3A6B"}`, background:cur===-1?"rgba(74,106,138,0.3)":"#0A1932", color:cur===-1?"#8BAAC8":"#4A6A8A", fontSize:"11px", fontWeight:"700", cursor:"pointer", fontFamily:"inherit" }}>N/A</button>
+                                          {ML.map(m=>(
+                                            <button key={m.value} onClick={()=>setScores(p=>({...p,[key]:m.value}))} style={{ padding:"5px 11px", borderRadius:"5px", border:`2px solid ${cur===m.value?m.color:"#1B3A6B"}`, background:cur===m.value?m.bg:"#0A1932", color:cur===m.value?m.color:"#4A6A8A", fontSize:"12px", fontWeight:"700", cursor:"pointer", fontFamily:"inherit" }}>{m.value}</button>
+                                          ))}
+                                          {cur!==-1&&cur!==undefined&&<span style={{ fontSize:"11px", color:"#8BAAC8", marginLeft:"4px" }}>{ML.find(m=>m.value===cur)?.label}</span>}
+                                          {cur===-1&&<span style={{ fontSize:"11px", color:"#4A6A8A", marginLeft:"4px" }}>N/A — excluded</span>}
+                                        </div>
+                                      </div>
+
+                                      {/* Target score */}
+                                      {isNIST && (
+                                        <div style={{ marginBottom:"8px" }}>
+                                          <div style={{ fontSize:"10px", fontWeight:"700", color:"#00BFFF", textTransform:"uppercase", letterSpacing:"0.06em", marginBottom:"5px" }}>Target Score</div>
+                                          <div style={{ display:"flex", gap:"4px", flexWrap:"wrap", alignItems:"center" }}>
+                                            <button onClick={()=>setTargetScores(p=>({...p,[key]:-1}))} style={{ padding:"5px 11px", borderRadius:"5px", border:`2px solid ${targetScores[key]===-1?"#4A6A8A":"#1B3A6B"}`, background:targetScores[key]===-1?"rgba(74,106,138,0.2)":"transparent", color:targetScores[key]===-1?"#8BAAC8":"#4A6A8A", fontSize:"11px", fontWeight:"700", cursor:"pointer", fontFamily:"inherit" }}>N/A</button>
+                                            {ML.map(m=>{ const tgt=targetScores[key]; return (
+                                              <button key={m.value} onClick={()=>setTargetScores(p=>({...p,[key]:m.value}))} style={{ padding:"5px 11px", borderRadius:"5px", border:`2px solid ${tgt===m.value?"#00BFFF":"#1B3A6B"}`, background:tgt===m.value?"rgba(0,191,255,0.15)":"transparent", color:tgt===m.value?"#00BFFF":"#4A6A8A", fontSize:"12px", fontWeight:"700", cursor:"pointer", fontFamily:"inherit" }}>{m.value}</button>
+                                            );})}
+                                            {targetScores[key]!==undefined&&targetScores[key]!==-1&&<span style={{ fontSize:"11px", color:"#00BFFF", marginLeft:"4px" }}>{ML.find(m=>m.value===targetScores[key])?.label}</span>}
+                                            {targetScores[key]===undefined&&cur!==undefined&&cur!==-1&&<span style={{ fontSize:"10px", color:"#4A6A8A", marginLeft:"4px", fontStyle:"italic" }}>defaults to current ({cur})</span>}
+                                          </div>
+                                        </div>
+                                      )}
+
+                                      {/* Evidence note field */}
+                                      <input
+                                        placeholder="Evidence note — document references, verbatim quotes, observations..."
+                                        value={notes[key]||""}
+                                        onChange={e=>setNotes(p=>({...p,[key]:e.target.value}))}
+                                        style={{ width:"100%", padding:"7px 10px", borderRadius:"6px", border:"1px solid #1B3A6B", fontSize:"12px", fontFamily:"inherit", outline:"none", background:"#0A1932", color:"#E2EAF4", boxSizing:"border-box" }}
+                                      />
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
+              </div>
+            </div>
+          </div>
+        )}
           <div style={{ display:"grid", gridTemplateColumns:"200px 1fr", gap:"18px" }}>
             <div style={{ display:"flex", flexDirection:"column", gap:"6px" }}>
               {fw.map(cat=>{
@@ -1314,7 +1663,7 @@ export default function MaturityScorecard() {
               })()}
             </div>
           </div>
-        )}
+        )&rbrace;
 
         {/* ── RESULTS ── */}
         {view==="results" && (
