@@ -1347,7 +1347,7 @@ export default function MaturityScorecard() {
                       })}
                     </div>
                   );
-                })()}
+                })}
               </div>
             </div>
           </div>
@@ -1663,7 +1663,7 @@ export default function MaturityScorecard() {
               })()}
             </div>
           </div>
-        )}
+        )&rbrace;
 
         {/* ── RESULTS ── */}
         {view==="results" && (
