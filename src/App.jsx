@@ -734,6 +734,7 @@ export default function MaturityScorecard() {
   const [statusMsg, setStatusMsg] = useState("");
   const [showWorkshop, setShowWorkshop] = useState({});
   const [generatingReport, setGeneratingReport] = useState(false);
+  const [narrativeCopied, setNarrativeCopied] = useState(false);
   const [recoveryAvailable, setRecoveryAvailable] = useState(false);
   const fileInputRef = useRef();
 
@@ -880,6 +881,191 @@ export default function MaturityScorecard() {
   }
 
   // ── Excel Export ─────────────────────────────────────────────────────────
+  // ── Narrative Generator ───────────────────────────────────────────────────
+  // Fully client-side. No API calls. No client data transmitted externally.
+  // Generates consultant-grade draft narrative from scored data using
+  // conditional logic, tier-aware language and gap-based framing.
+  function generateNarrative() {
+    const client  = clientName || "the organisation";
+    const sc      = parseFloat(overall || 0);
+    const tgt     = parseFloat(overallTarget || 0);
+    const gaps    = getAllGaps();
+    const docGaps = getDocGaps();
+    const date    = new Date().toLocaleDateString("en-GB", { month:"long", year:"numeric" });
+
+    // Tier language helpers
+    const tierAdj = (s) => {
+      const v = parseFloat(s||0);
+      if(v < 0.5) return "nascent";
+      if(v < 1.5) return "developing";
+      if(v < 2.0) return "early Risk-Informed";
+      if(v < 2.5) return "Risk-Informed";
+      if(v < 3.0) return "Risk-Informed trending to Repeatable";
+      if(v < 3.5) return "Repeatable";
+      if(v < 4.0) return "Repeatable trending to Adaptive";
+      return "Adaptive";
+    };
+    const tierSentence = (s) => {
+      const v = parseFloat(s||0);
+      if(v < 1.0) return "Cybersecurity practices are largely undocumented and reactive. Significant foundational investment is required.";
+      if(v < 2.0) return "Some security practices are in place but remain ad hoc and inconsistently applied. Risk management is primarily reactive.";
+      if(v < 2.5) return "Risk-informed practices exist and have management awareness, though implementation is not yet consistent across the organisation.";
+      if(v < 3.0) return "Security practices are broadly implemented and risk-informed, with some areas demonstrating repeatable processes.";
+      if(v < 3.5) return "Formally approved and consistently applied security practices are evident across most functions. The organisation demonstrates strong operational security maturity.";
+      return "Security practices are adaptive, continuously improved and deeply embedded in organisational culture.";
+    };
+
+    // Gap framing
+    const critGaps = gaps.filter(g=>g.rec?.priority==="Critical");
+    const highGaps  = gaps.filter(g=>g.rec?.priority==="High");
+    const medGaps   = gaps.filter(g=>g.rec?.priority==="Medium");
+    const missingCritDocs = docGaps.filter(({doc})=>doc.priority==="Critical");
+
+    // Per-function narrative
+    const funcNarratives = fw.map(cat => {
+      const sc2 = catScore(cat);
+      const scV = parseFloat(sc2 || 0);
+      const catGaps = gaps.filter(g=>g.cat.id===cat.id);
+      const tgtV = parseFloat(catTarget(cat) || scV);
+      const gap = (tgtV - scV).toFixed(2);
+
+      let commentary = "";
+      // Function-specific contextual language
+      if(cat.id === "GV") {
+        if(scV < 2.0) commentary = `Governance foundations require significant strengthening. Risk management objectives, accountability structures and policy frameworks are not yet sufficiently formalised to provide consistent direction to the security programme.`;
+        else if(scV < 3.0) commentary = `Governance practices demonstrate risk-informed management awareness, though consistency of application across the organisation requires improvement. Policy frameworks and oversight mechanisms are in place but would benefit from more rigorous enforcement and executive sponsorship.`;
+        else commentary = `Governance posture is strong, with well-defined risk management objectives, clear accountability structures and a policy framework that is actively maintained and enforced. Leadership engagement with cybersecurity risk is evident.`;
+      } else if(cat.id === "ID") {
+        if(scV < 2.0) commentary = `Asset visibility and risk assessment capability are limited. Without a comprehensive and current view of the technology estate, data flows and associated risks, the organisation cannot prioritise security investment effectively or respond to threats in a timely manner.`;
+        else if(scV < 3.0) commentary = `Asset management and risk assessment processes are established, though completeness and currency of asset inventories and risk registers require improvement. Threat intelligence integration into risk decision-making is an area for development.`;
+        else commentary = `Identification capability is well-developed, with maintained asset inventories, an active risk register and structured risk assessment processes. Threat intelligence is integrated into risk prioritisation decisions.`;
+      } else if(cat.id === "PR") {
+        if(scV < 2.0) commentary = `Protective controls require significant investment. Gaps in identity management, data security and platform hardening represent material risk exposure that should be addressed as a priority.`;
+        else if(scV < 3.0) commentary = `Core protective controls are in place and risk-informed. Identity and access management, awareness training and data security practices are operational, though consistency of application and coverage across the full technology estate requires attention.`;
+        else commentary = `Protective controls are well-implemented and consistently applied. Identity lifecycle management, data security practices and platform hardening demonstrate a mature security engineering approach.`;
+      } else if(cat.id === "DE") {
+        if(scV < 2.0) commentary = `Detection capability is limited, creating material risk that security events will go unidentified for extended periods. Investment in monitoring infrastructure, log management and alert management processes is a priority.`;
+        else if(scV < 3.0) commentary = `Detection capability is operational with network and endpoint monitoring in place. Opportunities exist to improve alert correlation, baseline definition and the speed and consistency of event analysis.`;
+        else commentary = `Detection capability is strong, with effective monitoring across network and endpoint environments, centralised log management and defined processes for adverse event analysis and escalation.`;
+      } else if(cat.id === "RS") {
+        if(scV < 2.0) commentary = `Incident response capability requires urgent attention. Without a tested response plan, defined severity classifications and clear communication protocols, the organisation's ability to contain and recover from a significant incident is materially constrained.`;
+        else if(scV < 3.0) commentary = `Incident response processes are established and documented, though testing and rehearsal of response procedures would strengthen confidence in execution under pressure. Regulatory notification obligations and communication protocols should be reviewed.`;
+        else commentary = `Incident response capability is well-developed, with a tested response plan, defined severity classifications, clear escalation paths and understood regulatory notification obligations.`;
+      } else if(cat.id === "RC") {
+        if(scV < 2.0) commentary = `Recovery capability is underdeveloped. The absence of tested recovery plans and validated backup procedures for critical systems represents a significant business continuity risk.`;
+        else if(scV < 3.0) commentary = `Recovery processes are documented and operational. Backup procedures are in place, though more rigorous testing of restoration at meaningful scale and against defined RTO and RPO targets would strengthen confidence in recovery capability.`;
+        else commentary = `Recovery capability is well-established, with tested recovery runbooks for critical systems, validated backup and restoration procedures and defined recovery time objectives that have been exercised.`;
+      } else {
+        // CIS or other
+        commentary = scV < 2.0
+          ? `This area shows significant room for improvement and should be prioritised in the remediation roadmap.`
+          : scV < 3.0
+          ? `Practices are in place and developing. Focused investment in the identified gaps will drive meaningful maturity improvement.`
+          : `This area demonstrates strong maturity with well-implemented controls.`;
+      }
+
+      const gapNote = catGaps.length > 0
+        ? ` ${catGaps.length} subcategor${catGaps.length>1?"ies":"y"} scored below the Repeatable threshold, representing the primary focus areas for improvement in this function.`
+        : ` No subcategories fell below the Repeatable threshold in this function.`;
+
+      const scoreNote = sc2
+        ? ` Current score: ${parseFloat(sc2).toFixed(2)} (${tierAdj(sc2)})${tgtV > scV ? `. Target: ${tgtV.toFixed(2)} — a gap of ${gap} to close.` : "."}`
+        : ` This function has not yet been fully assessed.`;
+
+      return { cat, sc2, scV, commentary, gapNote, scoreNote, catGaps };
+    });
+
+    // Document confidence statement
+    const docConfidence = (() => {
+      const reviewed = NIST_DOCS.filter(d=>docsProvided[d.id]==="yes"||docsProvided[d.id]==="partial").length;
+      const total = NIST_DOCS.length;
+      const pct = Math.round((reviewed/total)*100);
+      if(pct >= 80) return `The assessment was supported by a strong documentation base, with ${reviewed} of ${total} standard documents provided or partially provided.`;
+      if(pct >= 50) return `The assessment was supported by ${reviewed} of ${total} standard documents. ${total-reviewed} documents were not available for review, which has been noted in the confidence ratings for relevant subcategories.`;
+      return `A limited documentation base was available for this assessment, with only ${reviewed} of ${total} standard documents provided. Scoring confidence is reduced for a number of subcategories as a result. LevelBlue recommends a supplementary documentation review once outstanding documents are available.`;
+    })();
+
+    // Assemble the full narrative
+    const sections = [];
+
+    // ── Executive Summary ──────────────────────────────────────────────────
+    sections.push(`EXECUTIVE SUMMARY\n${"─".repeat(60)}`);
+
+    const introScope = `LevelBlue was engaged by ${client} to provide a view of cyber security maturity in line with the ${framework}. This assessment evaluates the organisation's current security posture across ${fw.length} function areas, ${fw.flatMap(c=>c.domains).length} categories and ${fw.flatMap(c=>c.domains.flatMap(d=>d.questions)).length} individual controls, scoring each against the NIST implementation tier scale of 0 to 4.`;
+
+    const introResult = overall
+      ? `${client} achieved an overall current profile score of ${sc.toFixed(2)}, placing the organisation at a ${tierAdj(sc)} maturity level. ${tierSentence(sc)}`
+      : `The assessment is not yet complete. Scores have been entered for ${completion}% of controls assessed to date.`;
+
+    const introTarget = overallTarget && parseFloat(overallTarget) > sc
+      ? ` A target profile of ${parseFloat(overallTarget).toFixed(2)} (${tierAdj(overallTarget)}) has been identified as an appropriate balance of investment and security maturity for ${client}, representing a gap of ${(parseFloat(overallTarget)-sc).toFixed(2)} points to close.`
+      : "";
+
+    sections.push(`${introScope}\n\n${introResult}${introTarget}`);
+
+    sections.push(docConfidence);
+
+    // Key findings summary
+    if(gaps.length > 0 || docGaps.length > 0) {
+      const findingLines = [];
+      if(critGaps.length > 0) findingLines.push(`${critGaps.length} Critical priority control gap${critGaps.length>1?"s":""} requiring immediate attention`);
+      if(highGaps.length > 0)  findingLines.push(`${highGaps.length} High priority gap${highGaps.length>1?"s":""} to be addressed within the next 3–6 months`);
+      if(medGaps.length > 0)   findingLines.push(`${medGaps.length} Medium priority gap${medGaps.length>1?"s":""} forming part of the 6–12 month roadmap`);
+      if(missingCritDocs.length > 0) findingLines.push(`${missingCritDocs.length} Critical document${missingCritDocs.length>1?"s":""} not provided, reducing scoring confidence in associated areas`);
+      sections.push(`Key Findings Summary:\n${findingLines.map(l=>`• ${l}`).join("\n")}`);
+    }
+
+    // ── Function-by-Function Commentary ───────────────────────────────────
+    sections.push(`\nFUNCTION ASSESSMENT\n${"─".repeat(60)}`);
+
+    funcNarratives.forEach(({cat, sc2, commentary, gapNote, scoreNote, catGaps}) => {
+      const header = `${cat.id} — ${cat.name}${sc2 ? ` [${parseFloat(sc2).toFixed(2)} / 4.0 — ${tierAdj(sc2)}]` : " [Not yet assessed]"}`;
+      const topGap = catGaps[0];
+      const topRec = topGap ? `\n\nPrimary recommendation: ${topGap.rec?.action || "Address identified gaps in this function"} (${topGap.rec?.priority||"High"} priority, ${topGap.rec?.effort||"Medium"} effort).` : "";
+      sections.push(`${header}\n\n${commentary}${gapNote}${scoreNote}${topRec}`);
+    });
+
+    // ── Recommendations Framing ────────────────────────────────────────────
+    if(gaps.length > 0) {
+      sections.push(`\nRECOMMENDATIONS OVERVIEW\n${"─".repeat(60)}`);
+
+      const workstreamCount = critGaps.length + highGaps.length;
+      const intro = `To move ${client} from the current profile score of ${sc.toFixed(2)} to the agreed target of ${overallTarget ? parseFloat(overallTarget).toFixed(2) : "the target profile"}, LevelBlue has identified ${gaps.length} improvement workstreams across ${[critGaps.length>0?"Critical":"", highGaps.length>0?"High":"", medGaps.length>0?"Medium":""].filter(Boolean).join(", ")} priority levels.`;
+      sections.push(intro);
+
+      if(critGaps.length > 0) {
+        sections.push(`Critical Priority Workstreams (${critGaps.length}):\n${critGaps.slice(0,5).map((g,i)=>`${i+1}. ${g.rec?.action||g.domain.name} — ${g.rec?.detail?.slice(0,100)||"See detailed recommendations"}...`).join("\n")}`);
+      }
+      if(highGaps.length > 0) {
+        sections.push(`High Priority Workstreams (${highGaps.length}):\n${highGaps.slice(0,5).map((g,i)=>`${i+1}. ${g.rec?.action||g.domain.name}`).join("\n")}${highGaps.length>5?`\n...and ${highGaps.length-5} further High priority workstreams.`:""}`);
+      }
+
+      // 3-horizon roadmap framing
+      sections.push(`Recommended Implementation Roadmap:\n\n• 0–3 months (Immediate): Address all Critical priority workstreams. Establish foundational documentation and governance structures where absent.\n• 3–6 months (Short-term): Progress High priority workstreams. Focus on identity, detection and response capability improvements.\n• 6–12 months (Medium-term): Complete Medium priority workstreams. Embed continuous improvement processes and prepare for re-assessment against target profile.`);
+    }
+
+    // ── Conclusion ─────────────────────────────────────────────────────────
+    sections.push(`\nCONCLUSION\n${"─".repeat(60)}`);
+
+    const strongFunctions = funcNarratives.filter(f=>f.scV>=3.0).map(f=>f.cat.name);
+    const weakFunctions   = funcNarratives.filter(f=>f.sc2&&f.scV<2.0).map(f=>f.cat.name);
+
+    const strongNote = strongFunctions.length > 0
+      ? `${client} demonstrates particular strength in ${strongFunctions.join(", ")}, where controls are consistently applied and the organisation can evidence repeatable or better practice.`
+      : "";
+    const weakNote = weakFunctions.length > 0
+      ? ` The most significant opportunities for improvement lie in ${weakFunctions.join(", ")}, where targeted investment will deliver the greatest uplift to the overall maturity profile.`
+      : "";
+    const closeNote = `\n\nLevelBlue recommends ${critGaps.length+highGaps.length} high/critical priority workstream${critGaps.length+highGaps.length!==1?"s":""} to bring ${client} to the agreed target profile. Security maturity is cumulative — each improvement strengthens the overall posture and reduces the incremental cost of further improvement. LevelBlue is well-positioned to support ${client} in progressing this roadmap.`;
+
+    sections.push(`${strongNote}${weakNote}${closeNote}`);
+
+    // ── Footer ─────────────────────────────────────────────────────────────
+    sections.push(`\n${"─".repeat(60)}\nDraft narrative generated by the LevelBlue Cyber Maturity Assessment Centre · ${date}\nThis is a working draft. Review and edit before including in client deliverables.\nAll data processed locally — no client information was transmitted externally.`);
+
+    return sections.join("\n\n");
+  }
+
   function exportExcel() {
     const wb = XLSX.utils.book_new();
 
@@ -2026,9 +2212,9 @@ export default function MaturityScorecard() {
             </div>
 
             <div style={{ display:"flex", gap:"3px", marginBottom:"18px", background:"#0A1932", padding:"4px", borderRadius:"8px", width:"fit-content", border:"1px solid #1B3A6B" }}>
-              {["overview","insights","recommendations","workshop"].map(t=>(
+              {["overview","insights","recommendations","narrative","workshop"].map(t=>(
                 <button key={t} onClick={()=>setResultsTab(t)} style={{ padding:"7px 16px", borderRadius:"6px", border:"none", background:resultsTab===t?"#1B3A6B":"transparent", color:resultsTab===t?"#FFFFFF":"#4A6A8A", fontSize:"12px", fontWeight:"700", cursor:"pointer", fontFamily:"inherit" }}>
-                  {t==="overview"?"Scorecard":t==="insights"?"Insights":t==="recommendations"?`Recommendations${(getAllGaps().length+getDocGaps().length)>0?` (${getAllGaps().length+getDocGaps().length})`:""}` :"Workshop Notes"}
+                  {t==="overview"?"Scorecard":t==="insights"?"Insights":t==="recommendations"?`Recommendations${(getAllGaps().length+getDocGaps().length)>0?` (${getAllGaps().length+getDocGaps().length})`:""}`:t==="narrative"?"✦ Narrative":"Workshop Notes"}
                 </button>
               ))}
             </div>
@@ -2358,6 +2544,75 @@ export default function MaturityScorecard() {
                 </div>
               )
             )}
+
+            {/* NARRATIVE */}
+            {resultsTab==="narrative" && (()=>{
+              const narrative = generateNarrative();
+              const sections = narrative.split("\n\n");
+              return (
+                <div>
+                  {/* Header */}
+                  <div style={{ marginBottom:"18px", padding:"16px 20px", borderRadius:"12px", background:"linear-gradient(135deg, rgba(30,111,217,0.12), rgba(0,191,255,0.08))", border:"1px solid rgba(0,191,255,0.25)", display:"flex", alignItems:"flex-start", justifyContent:"space-between", gap:"20px" }}>
+                    <div>
+                      <div style={{ fontSize:"15px", fontWeight:"800", color:"#FFFFFF", marginBottom:"4px" }}>✦ AI-Assisted Report Narrative</div>
+                      <div style={{ fontSize:"12px", color:"#8BAAC8", lineHeight:"1.6", maxWidth:"600px" }}>
+                        Draft narrative generated entirely from your scored data — no client information was transmitted externally. Review, edit and refine before including in any client deliverable.
+                      </div>
+                      <div style={{ marginTop:"8px", display:"flex", gap:"8px", flexWrap:"wrap" }}>
+                        <span style={{ fontSize:"10px", color:"#C8F135", background:"rgba(200,241,53,0.1)", padding:"2px 10px", borderRadius:"20px", border:"1px solid rgba(200,241,53,0.25)", fontWeight:"700" }}>✓ 100% Client-Side</span>
+                        <span style={{ fontSize:"10px", color:"#00BFFF", background:"rgba(0,191,255,0.1)", padding:"2px 10px", borderRadius:"20px", border:"1px solid rgba(0,191,255,0.2)", fontWeight:"700" }}>✓ No Data Transmitted</span>
+                        <span style={{ fontSize:"10px", color:"#8BAAC8", background:"rgba(139,170,200,0.1)", padding:"2px 10px", borderRadius:"20px", border:"1px solid rgba(139,170,200,0.2)", fontWeight:"700" }}>Draft — Requires Review</span>
+                      </div>
+                    </div>
+                    <div style={{ display:"flex", gap:"8px", flexShrink:0 }}>
+                      <button
+                        onClick={()=>{ navigator.clipboard.writeText(narrative).then(()=>{ setNarrativeCopied(true); setTimeout(()=>setNarrativeCopied(false),2500); }); }}
+                        style={{ padding:"9px 18px", borderRadius:"8px", border:"1px solid rgba(0,191,255,0.4)", background:"rgba(0,191,255,0.1)", color:"#00BFFF", fontSize:"12px", fontWeight:"700", cursor:"pointer", fontFamily:"inherit" }}>
+                        {narrativeCopied ? "Copied ✓" : "Copy to Clipboard"}
+                      </button>
+                    </div>
+                  </div>
+
+                  {completion < 20 && (
+                    <div style={{ marginBottom:"14px", padding:"12px 16px", borderRadius:"8px", background:"rgba(252,211,77,0.08)", border:"1px solid rgba(252,211,77,0.25)", fontSize:"12px", color:"#FCD34D" }}>
+                      ⚠ Only {completion}% of controls have been scored. The narrative will be more complete and accurate once scoring is further progressed.
+                    </div>
+                  )}
+
+                  {/* Narrative rendered section by section */}
+                  <div style={{ display:"flex", flexDirection:"column", gap:"12px" }}>
+                    {sections.map((section, i) => {
+                      const isHeading = section.startsWith("EXECUTIVE SUMMARY") || section.startsWith("FUNCTION ASSESSMENT") || section.startsWith("RECOMMENDATIONS OVERVIEW") || section.startsWith("CONCLUSION");
+                      const isFooter  = section.startsWith("─");
+                      const isFuncSection = fw.some(cat => section.startsWith(`${cat.id} —`));
+                      const funcCat = isFuncSection ? fw.find(cat => section.startsWith(`${cat.id} —`)) : null;
+
+                      if(isHeading) return (
+                        <div key={i} style={{ padding:"10px 16px", borderRadius:"8px", background:"rgba(30,111,217,0.12)", border:"1px solid rgba(30,111,217,0.25)" }}>
+                          <div style={{ fontSize:"11px", fontWeight:"800", color:"#00BFFF", letterSpacing:"0.12em" }}>{section.split("\n")[0]}</div>
+                        </div>
+                      );
+                      if(isFooter) return (
+                        <div key={i} style={{ padding:"10px 16px", borderRadius:"8px", background:"#0A1932", border:"1px solid #1B3A6B" }}>
+                          <div style={{ fontSize:"10px", color:"#4A6A8A", lineHeight:"1.6", whiteSpace:"pre-line" }}>{section}</div>
+                        </div>
+                      );
+                      if(funcCat) return (
+                        <div key={i} style={{ ...card, borderLeft:`4px solid ${funcCat.color}`, padding:"16px 20px" }}>
+                          <div style={{ fontSize:"12px", fontWeight:"800", color:funcCat.color, marginBottom:"8px" }}>{section.split("\n")[0]}</div>
+                          <div style={{ fontSize:"13px", color:"#E2EAF4", lineHeight:"1.7", whiteSpace:"pre-line" }}>{section.split("\n").slice(2).join("\n")}</div>
+                        </div>
+                      );
+                      return (
+                        <div key={i} style={{ ...card, padding:"16px 20px" }}>
+                          <div style={{ fontSize:"13px", color:"#E2EAF4", lineHeight:"1.8", whiteSpace:"pre-line" }}>{section}</div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* WORKSHOP NOTES */}
             {resultsTab==="workshop" && (
