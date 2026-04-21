@@ -671,8 +671,11 @@ export default function MaturityScorecard() {
   const [targetScores, setTargetScores] = useState({});
   const [notes, setNotes] = useState({});
   const [workshopNotes, setWorkshopNotes] = useState({});
+  const [docsProvided, setDocsProvided] = useState({});
+  const [customDocs, setCustomDocs] = useState([]);
+  const [customDocInput, setCustomDocInput] = useState("");
   const [activeSection, setActiveSection] = useState(null);
-  const [view, setView] = useState("setup");
+  const [view, setView] = useState("home");
   const [expandedDomains, setExpandedDomains] = useState({});
   const [resultsTab, setResultsTab] = useState("overview");
   const [statusMsg, setStatusMsg] = useState("");
@@ -767,7 +770,7 @@ export default function MaturityScorecard() {
 
   // ── JSON Save / Load ─────────────────────────────────────────────────────
   function saveSession() {
-    const session = { version:2, framework, clientName, assessor, clientSector, clientContext, date:new Date().toISOString(), scores, targetScores, notes, workshopNotes };
+    const session = { version:2, framework, clientName, assessor, clientSector, clientContext, date:new Date().toISOString(), scores, targetScores, notes, workshopNotes, docsProvided, customDocs };
     const blob = new Blob([JSON.stringify(session, null, 2)], { type:"application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -794,6 +797,8 @@ export default function MaturityScorecard() {
         setTargetScores(data.targetScores || {});
         setNotes(data.notes || {});
         setWorkshopNotes(data.workshopNotes || {});
+        setDocsProvided(data.docsProvided || {});
+        setCustomDocs(data.customDocs || {});
         flash("Session loaded ✓");
       } catch { flash("Error: invalid session file"); }
     };
@@ -1143,12 +1148,14 @@ export default function MaturityScorecard() {
             <div style={{ color:"#4A6A8A", fontSize:"10px", fontWeight:"600", letterSpacing:"0.08em", textTransform:"uppercase", marginTop:"-1px" }}>Cyber Maturity Assessment Scorecard</div>
           </div>
         </div>
-        <div style={{ display:"flex", gap:"3px", background:"rgba(13,31,60,0.8)", padding:"4px", borderRadius:"6px", border:"1px solid #1B3A6B" }}>
+        <div style={{ display:"flex", gap:"2px", background:"rgba(13,31,60,0.8)", padding:"4px", borderRadius:"6px", border:"1px solid #1B3A6B" }}>
           {[
+            {v:"home",     label:"Home"},
             {v:"setup",    label:"01 Setup"},
-            {v:"workshop", label:"02 Workshop"},
-            {v:"score",    label:"03 Score"},
-            {v:"results",  label:"04 Results"},
+            {v:"docs",     label:"02 Docs"},
+            {v:"workshop", label:"03 Workshop"},
+            {v:"score",    label:"04 Score"},
+            {v:"results",  label:"05 Results"},
           ].map(({v,label})=><button key={v} onClick={()=>setView(v)} style={navBtn(view===v)}>{label}</button>)}
         </div>
         <div style={{ display:"flex", alignItems:"center", gap:"10px" }}>
@@ -1192,42 +1199,163 @@ export default function MaturityScorecard() {
           </div>
         )}
 
+        {/* ── HOME ── */}
+        {view==="home" && (
+          <div>
+            {/* Hero */}
+            <div style={{ textAlign:"center", padding:"52px 24px 40px", borderRadius:"16px", background:"linear-gradient(160deg, #0D1F3C 0%, #08111F 60%)", border:"1px solid #1B3A6B", marginBottom:"28px", position:"relative", overflow:"hidden" }}>
+              {/* Background stripe decorations */}
+              <div style={{ position:"absolute", top:0, right:0, width:"320px", height:"100%", opacity:0.06, background:"linear-gradient(135deg, transparent 40%, #1E6FD9 40%, #1E6FD9 45%, transparent 45%, transparent 55%, #00BFFF 55%, #00BFFF 60%, transparent 60%, transparent 70%, #C8F135 70%, #C8F135 75%, transparent 75%)" }}/>
+              {/* Logo mark */}
+              <div style={{ display:"flex", justifyContent:"center", marginBottom:"20px" }}>
+                <div style={{ display:"flex", gap:"5px", transform:"skewX(-14deg)" }}>
+                  {[["#1E6FD9",60],["#00BFFF",80],["#C8F135",60]].map(([c,h],i)=>(
+                    <div key={i} style={{ width:"14px", height:`${h}px`, background:c, borderRadius:"2px" }}/>
+                  ))}
+                </div>
+              </div>
+              <div style={{ fontSize:"13px", fontWeight:"700", color:"#4A6A8A", letterSpacing:"0.18em", textTransform:"uppercase", marginBottom:"10px" }}>LevelBlue Cyber Advisory</div>
+              <div style={{ fontSize:"36px", fontWeight:"800", color:"#FFFFFF", lineHeight:1.15, marginBottom:"10px" }}>Cyber Maturity<br/><span style={{ color:"#00BFFF" }}>Assessment</span> Scorecard</div>
+              <div style={{ fontSize:"15px", color:"#8BAAC8", maxWidth:"560px", margin:"0 auto 28px", lineHeight:1.7 }}>A structured, workshop-ready tool for delivering NIST CSF 2.0 and CIS Controls v8 assessments — from discovery through scoring to client-ready reports.</div>
+              <div style={{ display:"flex", gap:"12px", justifyContent:"center", flexWrap:"wrap" }}>
+                {[["106","NIST Subcategories","#1E6FD9"],["22","NIST Categories","#00BFFF"],["0–4","NIST Tier Scale","#C8F135"],["9","Report Slides","#A78BFA"]].map(([n,l,c])=>(
+                  <div key={l} style={{ padding:"12px 20px", borderRadius:"10px", background:"rgba(0,0,0,0.3)", border:`1px solid ${c}30` }}>
+                    <div style={{ fontSize:"24px", fontWeight:"800", color:c }}>{n}</div>
+                    <div style={{ fontSize:"10px", color:"#4A6A8A", marginTop:"2px", fontWeight:"600", textTransform:"uppercase", letterSpacing:"0.06em" }}>{l}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Framework selection */}
+            <div style={{ fontSize:"11px", fontWeight:"700", color:"#4A6A8A", letterSpacing:"0.12em", textTransform:"uppercase", marginBottom:"14px" }}>Select Assessment Framework</div>
+            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"16px", marginBottom:"28px" }}>
+              {[
+                { id:"NIST CSF 2.0", badge:"Recommended", badgeCol:"#C8F135",
+                  headline:"NIST Cybersecurity Framework 2.0",
+                  sub:"The gold standard for holistic cyber risk assessment",
+                  stats:[["6","Functions"],["22","Categories"],["106","Subcategories"],["0–4","Tier Scale"]],
+                  features:["Full subcategory-level scoring","Target profile setting","Current vs target gap analysis","9-slide client report","Workshop question bank"],
+                  color:"#1E6FD9", glow:"rgba(30,111,217,0.15)" },
+                { id:"CIS Controls v8", badge:"Controls-Based", badgeCol:"#00BFFF",
+                  headline:"CIS Controls v8",
+                  sub:"Implementation-group driven security controls framework",
+                  stats:[["3","Groups"],["18","Controls"],["IG1–IG3","Implementation Groups"],["1–4","Score Range"]],
+                  features:["IG1 / IG2 / IG3 controls","Workshop questions included","Recommendations per control","Excel export with gap analysis","JSON session persistence"],
+                  color:"#00BFFF", glow:"rgba(0,191,255,0.12)" },
+              ].map(f=>(
+                <button key={f.id} onClick={()=>{ setFramework(f.id); setScores({}); setNotes({}); setWorkshopNotes({}); setTargetScores({}); }} style={{ textAlign:"left", padding:"24px", borderRadius:"14px", border:`2px solid ${framework===f.id ? f.color : "#1B3A6B"}`, background:framework===f.id ? f.glow : "#0A1932", cursor:"pointer", fontFamily:"inherit", transition:"all 0.2s", position:"relative", overflow:"hidden" }}>
+                  {/* Top accent */}
+                  <div style={{ position:"absolute", top:0, left:0, right:0, height:"3px", background:framework===f.id ? f.color : "transparent", borderRadius:"14px 14px 0 0" }}/>
+                  <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:"12px" }}>
+                    <div>
+                      <div style={{ fontSize:"16px", fontWeight:"800", color:"#FFFFFF", marginBottom:"4px" }}>{f.headline}</div>
+                      <div style={{ fontSize:"12px", color:"#8BAAC8" }}>{f.sub}</div>
+                    </div>
+                    <span style={{ fontSize:"10px", fontWeight:"700", color:f.badgeCol, background:`${f.badgeCol}18`, padding:"3px 10px", borderRadius:"20px", border:`1px solid ${f.badgeCol}40`, whiteSpace:"nowrap", flexShrink:0 }}>{f.badge}</span>
+                  </div>
+                  <div style={{ display:"flex", gap:"10px", marginBottom:"16px", flexWrap:"wrap" }}>
+                    {f.stats.map(([n,l])=>(
+                      <div key={l} style={{ padding:"8px 12px", borderRadius:"8px", background:"rgba(0,0,0,0.3)", border:`1px solid ${f.color}25` }}>
+                        <div style={{ fontSize:"18px", fontWeight:"800", color:f.color }}>{n}</div>
+                        <div style={{ fontSize:"10px", color:"#4A6A8A", fontWeight:"600" }}>{l}</div>
+                      </div>
+                    ))}
+                  </div>
+                  {f.features.map(ft=>(
+                    <div key={ft} style={{ display:"flex", gap:"8px", alignItems:"center", marginBottom:"6px" }}>
+                      <div style={{ width:"5px", height:"5px", borderRadius:"50%", background:f.color, flexShrink:0 }}/>
+                      <span style={{ fontSize:"12px", color:"#8BAAC8" }}>{ft}</span>
+                    </div>
+                  ))}
+                  {framework===f.id && (
+                    <div style={{ marginTop:"16px", padding:"8px 14px", borderRadius:"7px", background:`${f.color}18`, border:`1px solid ${f.color}40`, fontSize:"12px", fontWeight:"700", color:f.color }}>✓ Selected</div>
+                  )}
+                </button>
+              ))}
+            </div>
+
+            {/* How it works */}
+            <div style={{ ...card, marginBottom:"24px" }}>
+              <div style={{ fontSize:"11px", fontWeight:"700", color:"#4A6A8A", letterSpacing:"0.12em", textTransform:"uppercase", marginBottom:"16px" }}>How It Works</div>
+              <div style={{ display:"grid", gridTemplateColumns:"repeat(6,1fr)", gap:"0" }}>
+                {[
+                  {n:"01", label:"Setup", desc:"Client details & framework", col:"#1E6FD9"},
+                  {n:"02", label:"Docs", desc:"Document review checklist", col:"#0EA5E9"},
+                  {n:"03", label:"Workshop", desc:"Discovery questions & notes", col:"#00BFFF"},
+                  {n:"04", label:"Score", desc:"Rate 0–4 per subcategory", col:"#C8F135"},
+                  {n:"05", label:"Results", desc:"Insights, gaps & radar", col:"#A78BFA"},
+                  {n:"06", label:"Report", desc:"PPTX & Excel export", col:"#F87171"},
+                ].map((s,i)=>(
+                  <div key={s.n} style={{ display:"flex", alignItems:"flex-start", gap:0 }}>
+                    <div style={{ flex:1, padding:"14px 10px", position:"relative" }}>
+                      <div style={{ fontSize:"20px", fontWeight:"800", color:s.col, marginBottom:"4px" }}>{s.n}</div>
+                      <div style={{ fontSize:"12px", fontWeight:"700", color:"#E2EAF4", marginBottom:"3px" }}>{s.label}</div>
+                      <div style={{ fontSize:"11px", color:"#4A6A8A", lineHeight:"1.4" }}>{s.desc}</div>
+                      {i<5 && <div style={{ position:"absolute", right:0, top:"50%", transform:"translateY(-50%)", color:"#1B3A6B", fontSize:"16px" }}>›</div>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div style={{ display:"flex", gap:"12px", justifyContent:"center" }}>
+              <button onClick={()=>setView("setup")} style={{ padding:"14px 36px", borderRadius:"10px", background:"linear-gradient(135deg,#1E6FD9,#0EA5E9)", color:"#FFFFFF", border:"none", fontWeight:"700", fontSize:"14px", cursor:"pointer", fontFamily:"inherit" }}>
+                Start Assessment →
+              </button>
+              {(clientName || Object.keys(scores).length > 0) && (
+                <button onClick={()=>fileInputRef.current?.click()} style={{ padding:"14px 28px", borderRadius:"10px", background:"transparent", color:"#8BAAC8", border:"1px solid #1B3A6B", fontWeight:"700", fontSize:"13px", cursor:"pointer", fontFamily:"inherit" }}>
+                  Load Saved Session ↑
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* ── SETUP ── */}
         {view==="setup" && (
           <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"18px" }}>
             <div style={card}>
               <div style={{ fontSize:"11px", fontWeight:"700", color:"#4A6A8A", letterSpacing:"0.1em", textTransform:"uppercase", marginBottom:"16px" }}>Engagement Details</div>
-              {[{label:"Client Name",val:clientName,set:setClientName,ph:"e.g. Acme Pharma Ltd"},{label:"Assessor",val:assessor,set:setAssessor,ph:"Your name"},{label:"Sector",val:clientSector,set:setClientSector,ph:"e.g. Pharmaceuticals, Financial Services"}].map(({label,val,set,ph})=>(
+              {[{label:"Client Name",val:clientName,set:setClientName,ph:"e.g. Acme Pharma Ltd"},{label:"Assessor / Lead Consultant",val:assessor,set:setAssessor,ph:"Your name"},{label:"Sector",val:clientSector,set:setClientSector,ph:"e.g. Pharmaceuticals, Financial Services"}].map(({label,val,set,ph})=>(
                 <div key={label} style={{ marginBottom:"13px" }}>
                   <label style={{ fontSize:"12px", fontWeight:"600", color:"#8BAAC8", display:"block", marginBottom:"5px" }}>{label}</label>
                   <input value={val} onChange={e=>set(e.target.value)} placeholder={ph} style={{ width:"100%", padding:"9px 12px", borderRadius:"7px", border:"1px solid #1B3A6B", fontSize:"13px", fontFamily:"inherit", outline:"none", boxSizing:"border-box", background:"#0A1932", color:"#E2EAF4" }}/>
                 </div>
               ))}
               <div style={{ marginBottom:"13px" }}>
-                <label style={{ fontSize:"12px", fontWeight:"600", color:"#8BAAC8", display:"block", marginBottom:"5px" }}>Business Context <span style={{color:"#4A6A8A",fontWeight:"400"}}>(for report)</span></label>
-                <textarea value={clientContext} onChange={e=>setClientContext(e.target.value)} placeholder="Brief description of the organisation, key technology context, engagement background..." style={{ width:"100%", padding:"9px 12px", borderRadius:"7px", border:"1px solid #1B3A6B", fontSize:"12px", fontFamily:"inherit", outline:"none", boxSizing:"border-box", background:"#0A1932", color:"#E2EAF4", minHeight:"70px", resize:"vertical", lineHeight:"1.5" }}/>
-              </div>
-              <div style={{ marginTop:"16px", padding:"12px 14px", borderRadius:"8px", background:"rgba(200,241,53,0.08)", border:"1px solid rgba(200,241,53,0.25)" }}>
-                <div style={{ fontSize:"12px", fontWeight:"700", color:"#C8F135", marginBottom:"4px" }}>Session persistence</div>
-                <div style={{ fontSize:"11px", color:"#8BAAC8", lineHeight:"1.5" }}>Use <strong style={{color:"#C8F135"}}>Save JSON</strong> to download your progress at any time. Upload it with <strong style={{color:"#C8F135"}}>Load JSON</strong> in any future session to resume exactly where you left off. Scores, notes and workshop notes all persist.</div>
+                <label style={{ fontSize:"12px", fontWeight:"600", color:"#8BAAC8", display:"block", marginBottom:"5px" }}>Business Context <span style={{color:"#4A6A8A",fontWeight:"400"}}>(used in report)</span></label>
+                <textarea value={clientContext} onChange={e=>setClientContext(e.target.value)} placeholder="Brief description of the organisation, key technology context and engagement background..." style={{ width:"100%", padding:"9px 12px", borderRadius:"7px", border:"1px solid #1B3A6B", fontSize:"12px", fontFamily:"inherit", outline:"none", boxSizing:"border-box", background:"#0A1932", color:"#E2EAF4", minHeight:"80px", resize:"vertical", lineHeight:"1.5" }}/>
               </div>
             </div>
-            <div style={card}>
-              <div style={{ fontSize:"11px", fontWeight:"700", color:"#4A6A8A", letterSpacing:"0.1em", textTransform:"uppercase", marginBottom:"16px" }}>Select Framework</div>
-              {Object.keys(FRAMEWORKS).map(f=>(
-                <button key={f} onClick={()=>{ setFramework(f); setScores({}); setNotes({}); setWorkshopNotes({}); }} style={{ width:"100%", padding:"14px 16px", borderRadius:"9px", border:`2px solid ${framework===f?"#1E6FD9":"#1B3A6B"}`, background:framework===f?"rgba(30,111,217,0.15)":"#0A1932", marginBottom:"10px", textAlign:"left", cursor:"pointer", fontFamily:"inherit" }}>
-                  <div style={{ fontWeight:"700", fontSize:"14px", color:framework===f?"#00BFFF":"#E2EAF4" }}>{f}</div>
-                  <div style={{ fontSize:"12px", color:"#4A6A8A", marginTop:"3px" }}>{f==="NIST CSF 2.0"?"6 functions · 22 categories · 106 subcategories · 0–4 NIST tiers":"3 groups · 18 controls · Implementation groups"}</div>
-                </button>
-              ))}
-              <button onClick={()=>setView("workshop")} style={{ width:"100%", padding:"13px", borderRadius:"9px", background:"linear-gradient(135deg,#1E6FD9,#0EA5E9)", color:"white", border:"none", fontWeight:"700", fontSize:"13px", cursor:"pointer", fontFamily:"inherit", marginTop:"4px" }}>Begin Workshop →</button>
+            <div style={{ display:"flex", flexDirection:"column", gap:"14px" }}>
+              <div style={card}>
+                <div style={{ fontSize:"11px", fontWeight:"700", color:"#4A6A8A", letterSpacing:"0.1em", textTransform:"uppercase", marginBottom:"10px" }}>Selected Framework</div>
+                <div style={{ padding:"14px", borderRadius:"9px", background:`${FRAMEWORKS[framework][0]?.color ? "rgba(30,111,217,0.1)" : "#0A1932"}`, border:`1px solid ${FRAMEWORKS[framework][0]?.color || "#1B3A6B"}40` }}>
+                  <div style={{ fontSize:"15px", fontWeight:"800", color:"#FFFFFF", marginBottom:"3px" }}>{framework}</div>
+                  <div style={{ fontSize:"11px", color:"#8BAAC8" }}>{framework==="NIST CSF 2.0" ? "6 functions · 22 categories · 106 subcategories · 0–4 NIST tiers" : "3 groups · 18 controls · Implementation groups"}</div>
+                </div>
+                <button onClick={()=>setView("home")} style={{ marginTop:"10px", fontSize:"11px", color:"#4A6A8A", background:"none", border:"none", cursor:"pointer", fontFamily:"inherit", textDecoration:"underline", padding:0 }}>← Change framework</button>
+              </div>
+              <div style={card}>
+                <div style={{ fontSize:"11px", fontWeight:"700", color:"#4A6A8A", letterSpacing:"0.1em", textTransform:"uppercase", marginBottom:"10px" }}>Session Persistence</div>
+                <div style={{ fontSize:"11px", color:"#8BAAC8", lineHeight:"1.6", marginBottom:"10px" }}>Use <strong style={{color:"#C8F135"}}>Save JSON</strong> to download progress at any time. Load it in any future session to resume exactly where you left off.</div>
+                <div style={{ display:"flex", gap:"8px" }}>
+                  <button onClick={saveSession} style={{ flex:1, padding:"8px", borderRadius:"6px", border:"1px solid rgba(200,241,53,0.4)", background:"rgba(200,241,53,0.08)", color:"#C8F135", fontSize:"11px", fontWeight:"700", cursor:"pointer", fontFamily:"inherit" }}>Save JSON ↓</button>
+                  <button onClick={()=>fileInputRef.current?.click()} style={{ flex:1, padding:"8px", borderRadius:"6px", border:"1px solid #1B3A6B", background:"#0A1932", color:"#8BAAC8", fontSize:"11px", fontWeight:"700", cursor:"pointer", fontFamily:"inherit" }}>Load JSON ↑</button>
+                </div>
+              </div>
+              <div style={{ ...card, borderTop:`3px solid #1E6FD9` }}>
+                <div style={{ fontSize:"12px", color:"#8BAAC8", marginBottom:"12px" }}>Once details are complete, proceed to review documentation provided by the client before the workshop.</div>
+                <button onClick={()=>setView("docs")} style={{ width:"100%", padding:"13px", borderRadius:"9px", background:"linear-gradient(135deg,#1E6FD9,#0EA5E9)", color:"white", border:"none", fontWeight:"700", fontSize:"13px", cursor:"pointer", fontFamily:"inherit" }}>Continue to Documentation Review →</button>
+              </div>
             </div>
             <div style={{ ...card, gridColumn:"1 / -1" }}>
-              <div style={{ fontSize:"11px", fontWeight:"700", color:"#4A6A8A", letterSpacing:"0.1em", textTransform:"uppercase", marginBottom:"14px" }}>NIST CSF 2.0 — Scoring Tiers (0–4)</div>
+              <div style={{ fontSize:"11px", fontWeight:"700", color:"#4A6A8A", letterSpacing:"0.1em", textTransform:"uppercase", marginBottom:"14px" }}>NIST CSF 2.0 — Scoring Tiers Reference</div>
               <div style={{ display:"grid", gridTemplateColumns:"repeat(5,1fr)", gap:"10px" }}>
                 {ML.map(m=>(
                   <div key={m.value} style={{ padding:"12px", borderRadius:"8px", background:m.bg, border:`1px solid ${m.color}40` }}>
-                    <div style={{ fontWeight:"800", fontSize:"24px", color:m.color }}>{m.value}</div>
+                    <div style={{ fontWeight:"800", fontSize:"22px", color:m.color }}>{m.value}</div>
                     <div style={{ fontWeight:"700", fontSize:"12px", color:"#E2EAF4", marginTop:"3px" }}>{m.label}</div>
                     <div style={{ fontSize:"11px", color:"#8BAAC8", marginTop:"3px", lineHeight:"1.4" }}>{ML_DESC[m.value]}</div>
                   </div>
@@ -1237,12 +1365,143 @@ export default function MaturityScorecard() {
           </div>
         )}
 
+        {/* ── DOCS ── */}
+        {view==="docs" && (()=>{
+          const NIST_DOCS = [
+            { id:"d01", cat:"Governance", label:"Information Security Policy" },
+            { id:"d02", cat:"Governance", label:"Cybersecurity Risk Management Framework / Policy" },
+            { id:"d03", cat:"Governance", label:"Acceptable Use Policy" },
+            { id:"d04", cat:"Governance", label:"Roles & Responsibilities / RACI for Security" },
+            { id:"d05", cat:"Governance", label:"Board / Executive Cybersecurity Reporting Pack" },
+            { id:"d06", cat:"Governance", label:"Supplier / Third-Party Risk Management Policy" },
+            { id:"d07", cat:"Identify", label:"IT Asset Inventory — Hardware" },
+            { id:"d08", cat:"Identify", label:"Software Asset Inventory / Licence Register" },
+            { id:"d09", cat:"Identify", label:"Network Topology / Architecture Diagrams" },
+            { id:"d10", cat:"Identify", label:"Data Flow Diagrams" },
+            { id:"d11", cat:"Identify", label:"Data Classification Policy / Register" },
+            { id:"d12", cat:"Identify", label:"Risk Register with Treatment Plans" },
+            { id:"d13", cat:"Identify", label:"Business Impact Assessment (BIA)" },
+            { id:"d14", cat:"Identify", label:"Previous Assessment / Audit Reports" },
+            { id:"d15", cat:"Protect", label:"Access Control Policy / IAM Procedures" },
+            { id:"d16", cat:"Protect", label:"Joiner-Mover-Leaver (JML) Process Documentation" },
+            { id:"d17", cat:"Protect", label:"Security Awareness Training Records" },
+            { id:"d18", cat:"Protect", label:"Patch Management Policy / Compliance Reports" },
+            { id:"d19", cat:"Protect", label:"Change Management Policy / CAB Records" },
+            { id:"d20", cat:"Protect", label:"Data Retention & Secure Disposal Policy" },
+            { id:"d21", cat:"Protect", label:"Encryption Standards / Key Management Policy" },
+            { id:"d22", cat:"Protect", label:"Secure Configuration Baselines (CIS / NCSC)" },
+            { id:"d23", cat:"Protect", label:"Backup & Recovery Procedures" },
+            { id:"d24", cat:"Detect", label:"SIEM / Log Management Configuration & Evidence" },
+            { id:"d25", cat:"Detect", label:"Vulnerability Scan Reports (last 3 months)" },
+            { id:"d26", cat:"Detect", label:"Penetration Test Report (last 12 months)" },
+            { id:"d27", cat:"Detect", label:"EDR / AV Deployment Evidence" },
+            { id:"d28", cat:"Respond", label:"Incident Response Plan (IRP)" },
+            { id:"d29", cat:"Respond", label:"Incident Log / Register" },
+            { id:"d30", cat:"Respond", label:"Regulatory Notification Procedures (ICO / NIS2)" },
+            { id:"d31", cat:"Respond", label:"Business Continuity Plan (BCP)" },
+            { id:"d32", cat:"Recover", label:"Disaster Recovery Plan (DRP)" },
+            { id:"d33", cat:"Recover", label:"DR / BCP Test Records & Results" },
+            { id:"d34", cat:"Supply Chain", label:"Supplier Contracts with Security Clauses" },
+            { id:"d35", cat:"Supply Chain", label:"Supplier Risk Assessments / Questionnaires" },
+            { id:"d36", cat:"Supply Chain", label:"Critical Supplier Register" },
+          ];
+          const cats = [...new Set(NIST_DOCS.map(d=>d.cat))];
+          const catColors = { Governance:"#1E6FD9", Identify:"#00BFFF", Protect:"#C8F135", Detect:"#F59E0B", Respond:"#F87171", Recover:"#A78BFA", "Supply Chain":"#34D399" };
+          const provided = NIST_DOCS.filter(d=>docsProvided[d.id]==="yes").length;
+          const partial  = NIST_DOCS.filter(d=>docsProvided[d.id]==="partial").length;
+          const totalDocs = NIST_DOCS.length + customDocs.length;
+          return (
+            <div>
+              {/* Header bar */}
+              <div style={{ marginBottom:"20px", padding:"16px 20px", borderRadius:"12px", background:"rgba(30,111,217,0.08)", border:"1px solid rgba(30,111,217,0.25)", display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+                <div>
+                  <div style={{ fontSize:"15px", fontWeight:"700", color:"#1E6FD9", marginBottom:"3px" }}>Documentation Review</div>
+                  <div style={{ fontSize:"12px", color:"#8BAAC8" }}>Record which documents the client has provided ahead of the workshop. This informs scoring confidence and appears in the report appendix.</div>
+                </div>
+                <div style={{ display:"flex", gap:"16px", flexShrink:0, marginLeft:"24px" }}>
+                  {[["Provided", provided, "#C8F135"],["Partial", partial, "#FCD34D"],["Total Docs", totalDocs, "#8BAAC8"]].map(([l,n,c])=>(
+                    <div key={l} style={{ textAlign:"center" }}>
+                      <div style={{ fontSize:"22px", fontWeight:"800", color:c }}>{n}</div>
+                      <div style={{ fontSize:"10px", color:"#4A6A8A", fontWeight:"600" }}>{l}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Legend */}
+              <div style={{ display:"flex", gap:"10px", marginBottom:"18px", flexWrap:"wrap" }}>
+                {[["yes","Provided","#C8F135","rgba(200,241,53,0.12)"],["partial","Partial / In Progress","#FCD34D","rgba(252,211,77,0.1)"],["no","Not Provided","#F87171","rgba(248,113,113,0.08)"],["na","Not Applicable","#4A6A8A","rgba(74,106,138,0.1)"]].map(([v,l,c,bg])=>(
+                  <div key={v} style={{ display:"flex", alignItems:"center", gap:"6px", padding:"5px 12px", borderRadius:"20px", background:bg, border:`1px solid ${c}40` }}>
+                    <div style={{ width:"8px", height:"8px", borderRadius:"2px", background:c }}/>
+                    <span style={{ fontSize:"11px", color:c, fontWeight:"600" }}>{l}</span>
+                  </div>
+                ))}
+              </div>
+
+              {/* Doc checklist grouped by NIST function */}
+              {cats.map(cat=>{
+                const catDocs = NIST_DOCS.filter(d=>d.cat===cat);
+                const col = catColors[cat] || "#8BAAC8";
+                return (
+                  <div key={cat} style={{ ...card, marginBottom:"12px", borderLeft:`4px solid ${col}` }}>
+                    <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"12px" }}>
+                      <div style={{ fontSize:"12px", fontWeight:"800", color:col, letterSpacing:"0.08em", textTransform:"uppercase" }}>{cat}</div>
+                      <div style={{ fontSize:"11px", color:"#4A6A8A" }}>{catDocs.filter(d=>docsProvided[d.id]==="yes").length} / {catDocs.length} provided</div>
+                    </div>
+                    <div style={{ display:"flex", flexDirection:"column", gap:"6px" }}>
+                      {catDocs.map(doc=>{
+                        const status = docsProvided[doc.id] || "";
+                        return (
+                          <div key={doc.id} style={{ display:"flex", alignItems:"center", gap:"10px", padding:"10px 12px", borderRadius:"8px", background:status==="yes"?"rgba(200,241,53,0.06)":status==="partial"?"rgba(252,211,77,0.05)":status==="no"?"rgba(248,113,113,0.04)":"#0A1932", border:`1px solid ${status==="yes"?"rgba(200,241,53,0.2)":status==="partial"?"rgba(252,211,77,0.15)":status==="no"?"rgba(248,113,113,0.1)":"#1B3A6B"}` }}>
+                            <div style={{ flex:1, fontSize:"12px", color:"#E2EAF4", fontWeight:"500" }}>{doc.label}</div>
+                            <div style={{ display:"flex", gap:"4px" }}>
+                              {[["yes","✓ Provided","#C8F135","rgba(200,241,53,0.15)"],["partial","~ Partial","#FCD34D","rgba(252,211,77,0.12)"],["no","✗ Not Provided","#F87171","rgba(248,113,113,0.12)"],["na","N/A","#4A6A8A","rgba(74,106,138,0.12)"]].map(([v,l,c,bg])=>(
+                                <button key={v} onClick={()=>setDocsProvided(p=>({...p,[doc.id]:p[doc.id]===v?"":v}))} style={{ padding:"4px 10px", borderRadius:"5px", border:`1px solid ${status===v?c:"#1B3A6B"}`, background:status===v?bg:"transparent", color:status===v?c:"#4A6A8A", fontSize:"10px", fontWeight:"700", cursor:"pointer", fontFamily:"inherit", whiteSpace:"nowrap" }}>{l}</button>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+
+              {/* Custom documents */}
+              <div style={{ ...card, marginBottom:"18px", borderLeft:"4px solid #8BAAC8" }}>
+                <div style={{ fontSize:"12px", fontWeight:"800", color:"#8BAAC8", letterSpacing:"0.08em", textTransform:"uppercase", marginBottom:"12px" }}>Additional / Custom Documents</div>
+                {customDocs.map((doc,i)=>(
+                  <div key={i} style={{ display:"flex", alignItems:"center", gap:"10px", padding:"10px 12px", borderRadius:"8px", background:docsProvided[`custom_${i}`]==="yes"?"rgba(200,241,53,0.06)":docsProvided[`custom_${i}`]==="partial"?"rgba(252,211,77,0.05)":"#0A1932", border:"1px solid #1B3A6B", marginBottom:"6px" }}>
+                    <div style={{ flex:1, fontSize:"12px", color:"#E2EAF4" }}>{doc}</div>
+                    <div style={{ display:"flex", gap:"4px" }}>
+                      {[["yes","✓","#C8F135","rgba(200,241,53,0.15)"],["partial","~","#FCD34D","rgba(252,211,77,0.12)"],["no","✗","#F87171","rgba(248,113,113,0.12)"]].map(([v,l,c,bg])=>{
+                        const s = docsProvided[`custom_${i}`];
+                        return <button key={v} onClick={()=>setDocsProvided(p=>({...p,[`custom_${i}`]:p[`custom_${i}`]===v?"":v}))} style={{ padding:"4px 8px", borderRadius:"5px", border:`1px solid ${s===v?c:"#1B3A6B"}`, background:s===v?bg:"transparent", color:s===v?c:"#4A6A8A", fontSize:"11px", fontWeight:"700", cursor:"pointer", fontFamily:"inherit" }}>{l}</button>;
+                      })}
+                    </div>
+                    <button onClick={()=>setCustomDocs(p=>p.filter((_,j)=>j!==i))} style={{ fontSize:"16px", color:"#4A6A8A", background:"none", border:"none", cursor:"pointer", lineHeight:1, padding:"0 4px" }}>×</button>
+                  </div>
+                ))}
+                <div style={{ display:"flex", gap:"8px", marginTop:"8px" }}>
+                  <input value={customDocInput} onChange={e=>setCustomDocInput(e.target.value)} onKeyDown={e=>{ if(e.key==="Enter"&&customDocInput.trim()){ setCustomDocs(p=>[...p,customDocInput.trim()]); setCustomDocInput(""); }}} placeholder="Add a custom document and press Enter..." style={{ flex:1, padding:"9px 12px", borderRadius:"7px", border:"1px solid #1B3A6B", fontSize:"12px", fontFamily:"inherit", outline:"none", background:"#0A1932", color:"#E2EAF4" }}/>
+                  <button onClick={()=>{ if(customDocInput.trim()){ setCustomDocs(p=>[...p,customDocInput.trim()]); setCustomDocInput(""); }}} style={{ padding:"9px 16px", borderRadius:"7px", background:"rgba(30,111,217,0.2)", border:"1px solid rgba(30,111,217,0.4)", color:"#1E6FD9", fontWeight:"700", fontSize:"12px", cursor:"pointer", fontFamily:"inherit" }}>Add</button>
+                </div>
+              </div>
+
+              <div style={{ display:"flex", justifyContent:"flex-end", gap:"10px" }}>
+                <button onClick={()=>setView("setup")} style={{ padding:"11px 22px", borderRadius:"9px", background:"transparent", border:"1px solid #1B3A6B", color:"#8BAAC8", fontWeight:"700", fontSize:"12px", cursor:"pointer", fontFamily:"inherit" }}>← Back to Setup</button>
+                <button onClick={()=>{ setActiveSection(null); setView("workshop"); }} style={{ padding:"11px 26px", borderRadius:"9px", background:"linear-gradient(135deg,#1E6FD9,#0EA5E9)", color:"white", border:"none", fontWeight:"700", fontSize:"13px", cursor:"pointer", fontFamily:"inherit" }}>Proceed to Workshop →</button>
+              </div>
+            </div>
+          );
+        })()}
+
         {/* ── WORKSHOP ── */}
         {view==="workshop" && (
           <div>
             <div style={{ marginBottom:"18px", padding:"14px 18px", borderRadius:"10px", background:"rgba(0,191,255,0.08)", border:"1px solid rgba(0,191,255,0.2)", display:"flex", alignItems:"center", justifyContent:"space-between" }}>
               <div>
-                <div style={{ fontSize:"14px", fontWeight:"700", color:"#00BFFF", marginBottom:"3px" }}>Workshop Mode — Discovery &amp; Evidence Capture</div>
+                <div style={{ fontSize:"14px", fontWeight:"700", color:"#00BFFF", marginBottom:"3px" }}>Workshop Mode — Discovery & Evidence Capture</div>
                 <div style={{ fontSize:"12px", color:"#8BAAC8" }}>Use this screen in the client session. Ask the questions, capture responses and evidence notes. Scoring happens after the workshop.</div>
               </div>
               <button onClick={()=>setView("score")} style={{ padding:"8px 18px", borderRadius:"7px", background:"linear-gradient(135deg,#1E6FD9,#0EA5E9)", color:"#FFFFFF", border:"none", fontWeight:"700", fontSize:"12px", cursor:"pointer", fontFamily:"inherit", flexShrink:0 }}>Move to Scoring →</button>
@@ -1314,32 +1573,13 @@ export default function MaturityScorecard() {
                                     ))}
                                   </div>
                                 )}
-                                <div style={{ fontSize:"11px", fontWeight:"700", color:"#00BFFF", marginBottom:"7px", letterSpacing:"0.05em", textTransform:"uppercase" }}>Evidence &amp; Workshop Notes</div>
+                                <div style={{ fontSize:"11px", fontWeight:"700", color:"#00BFFF", marginBottom:"7px", letterSpacing:"0.05em", textTransform:"uppercase" }}>Evidence & Workshop Notes</div>
                                 <textarea
                                   value={workshopNotes[domain.id]||""}
                                   onChange={e=>setWorkshopNotes(p=>({...p,[domain.id]:e.target.value}))}
                                   placeholder={`Capture client responses, examples and context for ${domain.name}. These notes will be visible alongside each subcategory when you move to scoring.`}
                                   style={{ width:"100%", minHeight:"110px", padding:"10px 12px", borderRadius:"7px", border:`1px solid ${hasNotes?"rgba(200,241,53,0.35)":"#1B3A6B"}`, fontSize:"12px", fontFamily:"inherit", outline:"none", background:"#0A1932", color:"#E2EAF4", boxSizing:"border-box", lineHeight:"1.6", resize:"vertical" }}
                                 />
-                                {/* Evidence notes per subcategory — lightweight capture during workshop */}
-                                <div style={{ marginTop:"12px" }}>
-                                  <div style={{ fontSize:"11px", fontWeight:"700", color:"#4A6A8A", marginBottom:"8px", letterSpacing:"0.05em", textTransform:"uppercase" }}>Quick Evidence Notes — per subcategory (optional)</div>
-                                  {domain.questions.map((q,qi) => {
-                                    const key = `${domain.id}_q${qi}`;
-                                    const [subId,...rest] = q.split(" — ");
-                                    return (
-                                      <div key={qi} style={{ marginBottom:"8px" }}>
-                                        <div style={{ fontSize:"10px", fontWeight:"700", color:cat.color, marginBottom:"3px" }}>{subId}</div>
-                                        <input
-                                          placeholder={rest.join(" — ") || q}
-                                          value={notes[key]||""}
-                                          onChange={e=>setNotes(p=>({...p,[key]:e.target.value}))}
-                                          style={{ width:"100%", padding:"6px 10px", borderRadius:"5px", border:"1px solid #1B3A6B", fontSize:"11px", fontFamily:"inherit", outline:"none", background:"#0A1932", color:"#E2EAF4", boxSizing:"border-box" }}
-                                        />
-                                      </div>
-                                    );
-                                  })}
-                                </div>
                               </div>
                             )}
                           </div>
@@ -1347,7 +1587,7 @@ export default function MaturityScorecard() {
                       })}
                     </div>
                   );
-                })}
+                })()}
               </div>
             </div>
           </div>
@@ -1519,151 +1759,6 @@ export default function MaturityScorecard() {
             </div>
           </div>
         )}
-          <div style={{ display:"grid", gridTemplateColumns:"200px 1fr", gap:"18px" }}>
-            <div style={{ display:"flex", flexDirection:"column", gap:"6px" }}>
-              {fw.map(cat=>{
-                const sc=catScore(cat);
-                return (
-                  <button key={cat.id} onClick={()=>setActiveSection(cat.id===activeSection?null:cat.id)} style={{ padding:"11px 13px", borderRadius:"9px", textAlign:"left", border:`2px solid ${activeSection===cat.id?cat.color:"#1B3A6B"}`, background:activeSection===cat.id?cat.light:"#0A1932", cursor:"pointer", fontFamily:"inherit" }}>
-                    <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-                      <span style={{ fontSize:"11px", fontWeight:"800", color:cat.color, letterSpacing:"0.08em" }}>{cat.id}</span>
-                      {sc&&<span style={{ fontSize:"13px", fontWeight:"800", color:getMC(sc) }}>{sc}</span>}
-                    </div>
-                    <div style={{ fontSize:"12px", fontWeight:"700", color:"#E2EAF4", marginTop:"2px" }}>{cat.name}</div>
-                  </button>
-                );
-              })}
-              <div style={{ ...card, marginTop:"6px", padding:"13px" }}>
-                <div style={{ fontSize:"11px", color:"#4A6A8A", marginBottom:"5px", fontWeight:"600" }}>OVERALL</div>
-                <div style={{ fontSize:"28px", fontWeight:"800", color:getMC(overall) }}>{overall||"—"}</div>
-                <div style={{ fontSize:"11px", color:"#8BAAC8" }}>{getML(overall)}</div>
-                <div style={{ fontSize:"10px", color:"#4A6A8A", marginTop:"3px" }}>{completion}% done</div>
-              </div>
-            </div>
-
-            <div>
-              {!activeSection && (
-                <div style={{ ...card, textAlign:"center", padding:"56px" }}>
-                  <div style={{ fontSize:"34px", marginBottom:"12px" }}>←</div>
-                  <div style={{ fontSize:"15px", fontWeight:"700", color:"#E2EAF4" }}>Select a function to begin</div>
-                  <div style={{ fontSize:"12px", color:"#4A6A8A", marginTop:"6px" }}>Each domain includes workshop questions and evidence capture</div>
-                </div>
-              )}
-
-              {activeSection && (()=>{
-                const cat=fw.find(c=>c.id===activeSection);
-                if(!cat) return null;
-                return (
-                  <div>
-                    <div style={{ ...card, marginBottom:"13px", borderLeft:`4px solid ${cat.color}` }}>
-                      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
-                        <div>
-                          <div style={{ fontSize:"11px", fontWeight:"800", color:cat.color, letterSpacing:"0.1em", textTransform:"uppercase" }}>{cat.id} — {cat.name}</div>
-                          <div style={{ fontSize:"12px", color:"#4A6A8A", marginTop:"2px" }}>{cat.description}</div>
-                        </div>
-                        {catScore(cat)&&<div style={{ textAlign:"right" }}><div style={{ fontSize:"24px", fontWeight:"800", color:getMC(catScore(cat)) }}>{catScore(cat)}</div><div style={{ fontSize:"11px", color:"#8BAAC8" }}>{getML(catScore(cat))}</div></div>}
-                      </div>
-                    </div>
-
-                    {cat.domains.map(domain=>{
-                      const isOpen=expandedDomains[domain.id]!==false;
-                      const ds=domainScore(domain);
-                      const wqs=WORKSHOP_QS[domain.id]||[];
-                      const wOpen=showWorkshop[domain.id];
-                      return (
-                        <div key={domain.id} style={{ ...card, marginBottom:"10px" }}>
-                          {/* Domain header */}
-                          <button onClick={()=>setExpandedDomains(p=>({...p,[domain.id]:!isOpen}))} style={{ width:"100%", background:"none", border:"none", cursor:"pointer", textAlign:"left", padding:0, display:"flex", justifyContent:"space-between", alignItems:"center", fontFamily:"inherit" }}>
-                            <div><span style={{ fontSize:"11px", fontWeight:"700", color:cat.color, letterSpacing:"0.08em" }}>{domain.id}</span><span style={{ fontSize:"13px", fontWeight:"700", color:"#E2EAF4", marginLeft:"9px" }}>{domain.name}</span></div>
-                            <div style={{ display:"flex", alignItems:"center", gap:"10px" }}>
-                              {ds&&<span style={{ fontSize:"15px", fontWeight:"800", color:getMC(ds) }}>{ds}</span>}
-                              <span style={{ color:"#4A6A8A", fontSize:"11px" }}>{isOpen?"▲":"▼"}</span>
-                            </div>
-                          </button>
-
-                          {isOpen && (
-                            <div style={{ marginTop:"14px", borderTop:"1px solid #1B3A6B", paddingTop:"14px" }}>
-
-                              {/* Workshop Questions Toggle */}
-                              {wqs.length>0 && (
-                                <div style={{ marginBottom:"16px" }}>
-                                  <button onClick={()=>setShowWorkshop(p=>({...p,[domain.id]:!wOpen}))} style={{ display:"flex", alignItems:"center", gap:"8px", background:"rgba(0,191,255,0.08)", border:"1px solid rgba(0,191,255,0.25)", borderRadius:"7px", padding:"8px 12px", cursor:"pointer", fontFamily:"inherit", width:"100%" }}>
-                                    <span style={{ fontSize:"13px" }}>💬</span>
-                                    <span style={{ fontSize:"12px", fontWeight:"700", color:"#00BFFF" }}>Workshop Questions ({wqs.length})</span>
-                                    <span style={{ fontSize:"11px", color:"#4A6A8A", marginLeft:"auto" }}>{wOpen?"Hide":"Show"}</span>
-                                  </button>
-                                  {wOpen && (
-                                    <div style={{ marginTop:"8px", padding:"14px", background:"rgba(0,191,255,0.06)", borderRadius:"8px", border:"1px solid rgba(0,191,255,0.2)" }}>
-                                      <div style={{ marginBottom:"10px" }}>
-                                        {wqs.map((q,i)=>(
-                                          <div key={i} style={{ display:"flex", gap:"10px", marginBottom:"8px", alignItems:"flex-start" }}>
-                                            <span style={{ fontSize:"11px", fontWeight:"800", color:"#00BFFF", minWidth:"18px", marginTop:"1px" }}>{i+1}.</span>
-                                            <span style={{ fontSize:"12px", color:"#8BAAC8", lineHeight:"1.6" }}>{q}</span>
-                                          </div>
-                                        ))}
-                                      </div>
-                                      <div>
-                                        <div style={{ fontSize:"11px", fontWeight:"700", color:"#00BFFF", marginBottom:"5px" }}>Workshop Notes for {domain.name}</div>
-                                        <textarea
-                                          value={workshopNotes[domain.id]||""}
-                                          onChange={e=>setWorkshopNotes(p=>({...p,[domain.id]:e.target.value}))}
-                                          placeholder="Capture client responses, observations and context from the workshop discussion..."
-                                          style={{ width:"100%", minHeight:"90px", padding:"8px 10px", borderRadius:"6px", border:"1px solid rgba(0,191,255,0.25)", fontSize:"12px", fontFamily:"inherit", outline:"none", background:"#0A1932", color:"#E2EAF4", boxSizing:"border-box", lineHeight:"1.5", resize:"vertical" }}
-                                        />
-                                      </div>
-                                    </div>
-                                  )}
-                                </div>
-                              )}
-
-                              {/* Control Questions */}
-                              {domain.questions.map((q,qi)=>{
-                                const key=`${domain.id}_q${qi}`;
-                                const cur=scores[key];
-                                return (
-                                  <div key={qi} style={{ marginBottom:"16px", paddingBottom:"16px", borderBottom:qi<domain.questions.length-1?"1px solid #0D1F3C":"none" }}>
-                                    <div style={{ fontSize:"13px", color:"#E2EAF4", marginBottom:"8px", lineHeight:"1.5", fontWeight:"500" }}>{q}</div>
-                                    {/* Current score row */}
-                                    <div style={{ marginBottom:"6px" }}>
-                                      <div style={{ fontSize:"10px", fontWeight:"700", color:"#4A6A8A", textTransform:"uppercase", letterSpacing:"0.06em", marginBottom:"5px" }}>Current</div>
-                                      <div style={{ display:"flex", gap:"4px", flexWrap:"wrap", alignItems:"center" }}>
-                                        <button onClick={()=>setScores(p=>({...p,[key]:-1}))} style={{ padding:"4px 9px", borderRadius:"5px", border:`2px solid ${cur===-1?"#4A6A8A":"#1B3A6B"}`, background:cur===-1?"rgba(74,106,138,0.3)":"#0A1932", color:cur===-1?"#8BAAC8":"#4A6A8A", fontSize:"11px", fontWeight:"700", cursor:"pointer", fontFamily:"inherit" }}>N/A</button>
-                                        {ML.map(m=>(
-                                          <button key={m.value} onClick={()=>setScores(p=>({...p,[key]:m.value}))} style={{ padding:"4px 9px", borderRadius:"5px", border:`2px solid ${cur===m.value?m.color:"#1B3A6B"}`, background:cur===m.value?m.bg:"#0A1932", color:cur===m.value?m.color:"#4A6A8A", fontSize:"12px", fontWeight:"700", cursor:"pointer", fontFamily:"inherit" }}>{m.value}</button>
-                                        ))}
-                                        {cur!==-1&&cur!==undefined&&<span style={{ fontSize:"11px", color:"#8BAAC8", marginLeft:"4px" }}>{ML.find(m=>m.value===cur)?.label}</span>}
-                                        {cur===-1&&<span style={{ fontSize:"11px", color:"#4A6A8A", marginLeft:"4px" }}>N/A — excluded</span>}
-                                      </div>
-                                    </div>
-                                    {/* Target score row */}
-                                    {isNIST && (
-                                      <div style={{ marginBottom:"7px" }}>
-                                        <div style={{ fontSize:"10px", fontWeight:"700", color:"#00BFFF", textTransform:"uppercase", letterSpacing:"0.06em", marginBottom:"5px" }}>Target</div>
-                                        <div style={{ display:"flex", gap:"4px", flexWrap:"wrap", alignItems:"center" }}>
-                                          <button onClick={()=>setTargetScores(p=>({...p,[key]:-1}))} style={{ padding:"4px 9px", borderRadius:"5px", border:`2px solid ${targetScores[key]===-1?"#4A6A8A":"#1B3A6B"}`, background:targetScores[key]===-1?"rgba(74,106,138,0.2)":"transparent", color:targetScores[key]===-1?"#8BAAC8":"#4A6A8A", fontSize:"11px", fontWeight:"700", cursor:"pointer", fontFamily:"inherit" }}>N/A</button>
-                                          {ML.map(m=>{ const tgt=targetScores[key]; return (
-                                            <button key={m.value} onClick={()=>setTargetScores(p=>({...p,[key]:m.value}))} style={{ padding:"4px 9px", borderRadius:"5px", border:`2px solid ${tgt===m.value?"#00BFFF":"#1B3A6B"}`, background:tgt===m.value?"rgba(0,191,255,0.15)":"transparent", color:tgt===m.value?"#00BFFF":"#4A6A8A", fontSize:"12px", fontWeight:"700", cursor:"pointer", fontFamily:"inherit" }}>{m.value}</button>
-                                          );})}
-                                          {targetScores[key]!==undefined&&targetScores[key]!==-1&&<span style={{ fontSize:"11px", color:"#00BFFF", marginLeft:"4px" }}>{ML.find(m=>m.value===targetScores[key])?.label}</span>}
-                                          {targetScores[key]===undefined&&cur!==undefined&&cur!==-1&&<span style={{ fontSize:"10px", color:"#4A6A8A", marginLeft:"4px", fontStyle:"italic" }}>defaults to current ({cur})</span>}
-                                        </div>
-                                      </div>
-                                    )}
-                                    <input placeholder="Evidence note (optional)" value={notes[key]||""} onChange={e=>setNotes(p=>({...p,[key]:e.target.value}))} style={{ width:"100%", padding:"7px 10px", borderRadius:"6px", border:"1px solid #1B3A6B", fontSize:"12px", fontFamily:"inherit", outline:"none", background:"#0A1932", color:"#E2EAF4", boxSizing:"border-box" }}/>
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                );
-              })()}
-            </div>
-          </div>
-        )&rbrace;
 
         {/* ── RESULTS ── */}
         {view==="results" && (
