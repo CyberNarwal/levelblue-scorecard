@@ -883,26 +883,20 @@ export default function MaturityScorecard() {
   // ── Excel Export ─────────────────────────────────────────────────────────
   // ── Narrative Generator ───────────────────────────────────────────────────
   // Fully client-side. No API calls. No client data transmitted externally.
-  // Generates consultant-grade draft narrative from scored data using
-  // conditional logic, tier-aware language and gap-based framing.
   function generateNarrative() {
     const client  = clientName || "the organisation";
     const sc      = parseFloat(overall || 0);
-    const tgt     = parseFloat(overallTarget || 0);
+    const date    = new Date().toLocaleDateString("en-GB", { month:"long", year:"numeric" });
     const gaps    = getAllGaps();
     const docGaps = getDocGaps();
-    const date    = new Date().toLocaleDateString("en-GB", { month:"long", year:"numeric" });
 
     // Tier language helpers
     const tierAdj = (s) => {
       const v = parseFloat(s||0);
-      if(v < 0.5) return "nascent";
-      if(v < 1.5) return "developing";
-      if(v < 2.0) return "early Risk-Informed";
-      if(v < 2.5) return "Risk-Informed";
+      if(v < 0.5) return "nascent"; if(v < 1.5) return "developing";
+      if(v < 2.0) return "early Risk-Informed"; if(v < 2.5) return "Risk-Informed";
       if(v < 3.0) return "Risk-Informed trending to Repeatable";
-      if(v < 3.5) return "Repeatable";
-      if(v < 4.0) return "Repeatable trending to Adaptive";
+      if(v < 3.5) return "Repeatable"; if(v < 4.0) return "Repeatable trending to Adaptive";
       return "Adaptive";
     };
     const tierSentence = (s) => {
@@ -915,22 +909,33 @@ export default function MaturityScorecard() {
       return "Security practices are adaptive, continuously improved and deeply embedded in organisational culture.";
     };
 
-    // Gap framing
     const critGaps = gaps.filter(g=>g.rec?.priority==="Critical");
     const highGaps  = gaps.filter(g=>g.rec?.priority==="High");
     const medGaps   = gaps.filter(g=>g.rec?.priority==="Medium");
     const missingCritDocs = docGaps.filter(({doc})=>doc.priority==="Critical");
+    const missingHighDocs = docGaps.filter(({doc})=>doc.priority==="High");
 
-    // Per-function narrative
+    // ── Insights data (mirrors what the Insights tab shows) ─────────────────
+    const scoreCounts = [0,1,2,3,4].map(v=>({ tier:ML.find(m=>m.value===v)?.label||String(v), count:Object.values(scores).filter(sc2=>sc2===v).length }));
+    const worstCat = fw.map(cat=>({ id:cat.id, name:cat.name, color:cat.color, n:gaps.filter(g=>g.cat.id===cat.id).length })).sort((a,b)=>b.n-a.n)[0];
+    const effortCounts = { Low:gaps.filter(g=>g.rec?.effort==="Low").length, Medium:gaps.filter(g=>g.rec?.effort==="Medium").length, High:gaps.filter(g=>g.rec?.effort==="High").length };
+    const quickWins = gaps.filter(g=>g.rec?.effort==="Low" && (g.rec?.priority==="Critical"||g.rec?.priority==="High"));
+    const scored = Object.values(scores).filter(v=>v!==-1&&v!==undefined);
+    const avgScore = scored.length ? (scored.reduce((a,b)=>a+b,0)/scored.length).toFixed(2) : null;
+
+    // ── Per-function narrative ───────────────────────────────────────────────
     const funcNarratives = fw.map(cat => {
       const sc2 = catScore(cat);
       const scV = parseFloat(sc2 || 0);
       const catGaps = gaps.filter(g=>g.cat.id===cat.id);
       const tgtV = parseFloat(catTarget(cat) || scV);
       const gap = (tgtV - scV).toFixed(2);
+      // Collect any workshop notes for this function's categories
+      const catWorkshopNotes = cat.domains.map(d=>workshopNotes[d.id]).filter(Boolean);
+      // Collect missing docs for this function
+      const catMissingDocs = NIST_DOCS.filter(d => d.cat === (cat.id==="GV"?"Governance":cat.id==="ID"?"Identify":cat.id==="PR"?"Protect":cat.id==="DE"?"Detect":cat.id==="RS"?"Respond":"Recover") && (!docsProvided[d.id] || docsProvided[d.id]==="no"));
 
       let commentary = "";
-      // Function-specific contextual language
       if(cat.id === "GV") {
         if(scV < 2.0) commentary = `Governance foundations require significant strengthening. Risk management objectives, accountability structures and policy frameworks are not yet sufficiently formalised to provide consistent direction to the security programme.`;
         else if(scV < 3.0) commentary = `Governance practices demonstrate risk-informed management awareness, though consistency of application across the organisation requires improvement. Policy frameworks and oversight mechanisms are in place but would benefit from more rigorous enforcement and executive sponsorship.`;
@@ -956,111 +961,123 @@ export default function MaturityScorecard() {
         else if(scV < 3.0) commentary = `Recovery processes are documented and operational. Backup procedures are in place, though more rigorous testing of restoration at meaningful scale and against defined RTO and RPO targets would strengthen confidence in recovery capability.`;
         else commentary = `Recovery capability is well-established, with tested recovery runbooks for critical systems, validated backup and restoration procedures and defined recovery time objectives that have been exercised.`;
       } else {
-        // CIS or other
-        commentary = scV < 2.0
-          ? `This area shows significant room for improvement and should be prioritised in the remediation roadmap.`
-          : scV < 3.0
-          ? `Practices are in place and developing. Focused investment in the identified gaps will drive meaningful maturity improvement.`
-          : `This area demonstrates strong maturity with well-implemented controls.`;
+        commentary = scV < 2.0 ? `This area shows significant room for improvement and should be prioritised in the remediation roadmap.` : scV < 3.0 ? `Practices are in place and developing. Focused investment in the identified gaps will drive meaningful maturity improvement.` : `This area demonstrates strong maturity with well-implemented controls.`;
       }
 
       const gapNote = catGaps.length > 0
-        ? ` ${catGaps.length} subcategor${catGaps.length>1?"ies":"y"} scored below the Repeatable threshold, representing the primary focus areas for improvement in this function.`
-        : ` No subcategories fell below the Repeatable threshold in this function.`;
-
+        ? ` ${catGaps.length} subcategor${catGaps.length>1?"ies":"y"} scored below the Repeatable threshold.`
+        : ` No subcategories fell below the Repeatable threshold.`;
       const scoreNote = sc2
-        ? ` Current score: ${parseFloat(sc2).toFixed(2)} (${tierAdj(sc2)})${tgtV > scV ? `. Target: ${tgtV.toFixed(2)} — a gap of ${gap} to close.` : "."}`
+        ? ` Score: ${parseFloat(sc2).toFixed(2)} / 4.0 (${tierAdj(sc2)})${tgtV > scV ? `. Target: ${tgtV.toFixed(2)} (+${gap}).` : "."}`
         : ` This function has not yet been fully assessed.`;
+      const docNote = catMissingDocs.length > 0
+        ? `\n\nDocumentation note: ${catMissingDocs.length} document${catMissingDocs.length>1?"s":""} relevant to this function were not provided (${catMissingDocs.slice(0,3).map(d=>d.label).join("; ")}${catMissingDocs.length>3?"; and others":""}). This reduces scoring confidence for associated subcategories.`
+        : "";
+      // Top 2 recommendations for this function with full detail
+      const topRecs = catGaps.slice(0,2).map((g,i) => {
+        const note = g.rec ? `${i+1}. ${g.rec.action} — ${g.rec.detail.slice(0,120)}... (${g.rec.priority}, ${g.rec.effort} effort, ${g.rec.ref})` : `${i+1}. ${g.q.slice(0,80)}`;
+        return note;
+      });
+      const recNote = topRecs.length > 0 ? `\n\nRecommendations:\n${topRecs.join("\n")}` : "";
 
-      return { cat, sc2, scV, commentary, gapNote, scoreNote, catGaps };
+      return { cat, sc2, scV, commentary, gapNote, scoreNote, docNote, recNote, catGaps, catWorkshopNotes };
     });
 
-    // Document confidence statement
+    // ── Document confidence ──────────────────────────────────────────────────
     const docConfidence = (() => {
       const reviewed = NIST_DOCS.filter(d=>docsProvided[d.id]==="yes"||docsProvided[d.id]==="partial").length;
       const total = NIST_DOCS.length;
       const pct = Math.round((reviewed/total)*100);
       if(pct >= 80) return `The assessment was supported by a strong documentation base, with ${reviewed} of ${total} standard documents provided or partially provided.`;
       if(pct >= 50) return `The assessment was supported by ${reviewed} of ${total} standard documents. ${total-reviewed} documents were not available for review, which has been noted in the confidence ratings for relevant subcategories.`;
-      return `A limited documentation base was available for this assessment, with only ${reviewed} of ${total} standard documents provided. Scoring confidence is reduced for a number of subcategories as a result. LevelBlue recommends a supplementary documentation review once outstanding documents are available.`;
+      return `A limited documentation base was available for this assessment, with only ${reviewed} of ${total} standard documents provided. Scoring confidence is reduced across a number of subcategories as a result.`;
     })();
 
-    // Assemble the full narrative
     const sections = [];
 
-    // ── Executive Summary ──────────────────────────────────────────────────
+    // ── EXECUTIVE SUMMARY ────────────────────────────────────────────────────
     sections.push(`EXECUTIVE SUMMARY\n${"─".repeat(60)}`);
 
-    const introScope = `LevelBlue was engaged by ${client} to provide a view of cyber security maturity in line with the ${framework}. This assessment evaluates the organisation's current security posture across ${fw.length} function areas, ${fw.flatMap(c=>c.domains).length} categories and ${fw.flatMap(c=>c.domains.flatMap(d=>d.questions)).length} individual controls, scoring each against the NIST implementation tier scale of 0 to 4.`;
+    sections.push([
+      `LevelBlue was engaged by ${client} to provide a view of cyber security maturity in line with the ${framework}. This assessment evaluates the organisation's security posture across ${fw.length} function areas, ${fw.flatMap(c=>c.domains).length} categories and ${fw.flatMap(c=>c.domains.flatMap(d=>d.questions)).length} individual controls.`,
+      overall
+        ? `${client} achieved an overall current profile score of ${sc.toFixed(2)}, placing the organisation at a ${tierAdj(sc)} maturity level. ${tierSentence(sc)}`
+        : `The assessment is ${completion}% complete.`,
+      overallTarget && parseFloat(overallTarget) > sc
+        ? `A target profile of ${parseFloat(overallTarget).toFixed(2)} (${tierAdj(overallTarget)}) has been identified, representing a gap of ${(parseFloat(overallTarget)-sc).toFixed(2)} points.`
+        : "",
+      docConfidence,
+    ].filter(Boolean).join("\n\n"));
 
-    const introResult = overall
-      ? `${client} achieved an overall current profile score of ${sc.toFixed(2)}, placing the organisation at a ${tierAdj(sc)} maturity level. ${tierSentence(sc)}`
-      : `The assessment is not yet complete. Scores have been entered for ${completion}% of controls assessed to date.`;
-
-    const introTarget = overallTarget && parseFloat(overallTarget) > sc
-      ? ` A target profile of ${parseFloat(overallTarget).toFixed(2)} (${tierAdj(overallTarget)}) has been identified as an appropriate balance of investment and security maturity for ${client}, representing a gap of ${(parseFloat(overallTarget)-sc).toFixed(2)} points to close.`
-      : "";
-
-    sections.push(`${introScope}\n\n${introResult}${introTarget}`);
-
-    sections.push(docConfidence);
-
-    // Key findings summary
+    // Key findings with insights
     if(gaps.length > 0 || docGaps.length > 0) {
       const findingLines = [];
-      if(critGaps.length > 0) findingLines.push(`${critGaps.length} Critical priority control gap${critGaps.length>1?"s":""} requiring immediate attention`);
-      if(highGaps.length > 0)  findingLines.push(`${highGaps.length} High priority gap${highGaps.length>1?"s":""} to be addressed within the next 3–6 months`);
-      if(medGaps.length > 0)   findingLines.push(`${medGaps.length} Medium priority gap${medGaps.length>1?"s":""} forming part of the 6–12 month roadmap`);
-      if(missingCritDocs.length > 0) findingLines.push(`${missingCritDocs.length} Critical document${missingCritDocs.length>1?"s":""} not provided, reducing scoring confidence in associated areas`);
-      sections.push(`Key Findings Summary:\n${findingLines.map(l=>`• ${l}`).join("\n")}`);
+      if(critGaps.length > 0)       findingLines.push(`${critGaps.length} Critical priority control gap${critGaps.length>1?"s":""} requiring immediate attention`);
+      if(highGaps.length > 0)        findingLines.push(`${highGaps.length} High priority gap${highGaps.length>1?"s":""} to be addressed within 3–6 months`);
+      if(medGaps.length > 0)         findingLines.push(`${medGaps.length} Medium priority gap${medGaps.length>1?"s":""} forming the 6–12 month roadmap`);
+      if(missingCritDocs.length > 0) findingLines.push(`${missingCritDocs.length} Critical document${missingCritDocs.length>1?"s":""} not provided, reducing scoring confidence`);
+      if(missingHighDocs.length > 0) findingLines.push(`${missingHighDocs.length} High priority document${missingHighDocs.length>1?"s":""} not provided`);
+      if(worstCat?.n > 0)            findingLines.push(`${worstCat.id} — ${worstCat.name} has the highest gap concentration (${worstCat.n} controls below threshold)`);
+      sections.push(`Key Findings:\n${findingLines.map(l=>`• ${l}`).join("\n")}`);
     }
 
-    // ── Function-by-Function Commentary ───────────────────────────────────
+    // Score distribution insight
+    if(scored.length > 0) {
+      const distParts = scoreCounts.filter(s=>s.count>0).map(s=>`${s.count} at ${s.tier}`).join(", ");
+      const scoreInsight = `Score Distribution: Of ${scored.length} scored controls — ${distParts}. Mean score across all controls: ${avgScore}.`;
+      sections.push(scoreInsight);
+    }
+
+    // ── FUNCTION ASSESSMENT ──────────────────────────────────────────────────
     sections.push(`\nFUNCTION ASSESSMENT\n${"─".repeat(60)}`);
 
-    funcNarratives.forEach(({cat, sc2, commentary, gapNote, scoreNote, catGaps}) => {
-      const header = `${cat.id} — ${cat.name}${sc2 ? ` [${parseFloat(sc2).toFixed(2)} / 4.0 — ${tierAdj(sc2)}]` : " [Not yet assessed]"}`;
-      const topGap = catGaps[0];
-      const topRec = topGap ? `\n\nPrimary recommendation: ${topGap.rec?.action || "Address identified gaps in this function"} (${topGap.rec?.priority||"High"} priority, ${topGap.rec?.effort||"Medium"} effort).` : "";
-      sections.push(`${header}\n\n${commentary}${gapNote}${scoreNote}${topRec}`);
+    funcNarratives.forEach(({cat, sc2, commentary, gapNote, scoreNote, docNote, recNote}) => {
+      sections.push(`${cat.id} — ${cat.name}${sc2 ? ` [${parseFloat(sc2).toFixed(2)} / 4.0 — ${tierAdj(sc2)}]` : " [Not yet assessed]"}\n\n${commentary}${gapNote}${scoreNote}${docNote}${recNote}`);
     });
 
-    // ── Recommendations Framing ────────────────────────────────────────────
+    // ── RECOMMENDATIONS OVERVIEW ─────────────────────────────────────────────
     if(gaps.length > 0) {
       sections.push(`\nRECOMMENDATIONS OVERVIEW\n${"─".repeat(60)}`);
 
-      const workstreamCount = critGaps.length + highGaps.length;
-      const intro = `To move ${client} from the current profile score of ${sc.toFixed(2)} to the agreed target of ${overallTarget ? parseFloat(overallTarget).toFixed(2) : "the target profile"}, LevelBlue has identified ${gaps.length} improvement workstreams across ${[critGaps.length>0?"Critical":"", highGaps.length>0?"High":"", medGaps.length>0?"Medium":""].filter(Boolean).join(", ")} priority levels.`;
-      sections.push(intro);
+      // Effort profile insight
+      const effortInsight = `Remediation effort profile: ${effortCounts.Low} Low effort gap${effortCounts.Low!==1?"s":""}, ${effortCounts.Medium} Medium, ${effortCounts.High} High. ${quickWins.length > 0 ? `${quickWins.length} quick win${quickWins.length>1?"s":""} identified — high impact at low effort: ${quickWins.slice(0,3).map(g=>g.rec?.action||g.domain.name).join("; ")}.` : ""}`;
+      sections.push(effortInsight);
+
+      sections.push(`To move ${client} from ${sc.toFixed(2)} to the target profile of ${overallTarget ? parseFloat(overallTarget).toFixed(2) : "the agreed target"}, LevelBlue has identified ${gaps.length} improvement workstreams across ${[critGaps.length>0?"Critical":"", highGaps.length>0?"High":"", medGaps.length>0?"Medium":""].filter(Boolean).join(", ")} priority levels.`);
 
       if(critGaps.length > 0) {
-        sections.push(`Critical Priority Workstreams (${critGaps.length}):\n${critGaps.slice(0,5).map((g,i)=>`${i+1}. ${g.rec?.action||g.domain.name} — ${g.rec?.detail?.slice(0,100)||"See detailed recommendations"}...`).join("\n")}`);
+        sections.push(`Critical Priority (${critGaps.length}):\n${critGaps.slice(0,5).map((g,i)=>`${i+1}. [${g.domain.id}] ${g.rec?.action||g.domain.name}\n   ${g.rec?.detail?.slice(0,130)||""}...\n   Effort: ${g.rec?.effort||"—"} · Ref: ${g.rec?.ref||"—"}`).join("\n\n")}${critGaps.length>5?`\n\n...and ${critGaps.length-5} further Critical workstreams.`:""}`);
       }
       if(highGaps.length > 0) {
-        sections.push(`High Priority Workstreams (${highGaps.length}):\n${highGaps.slice(0,5).map((g,i)=>`${i+1}. ${g.rec?.action||g.domain.name}`).join("\n")}${highGaps.length>5?`\n...and ${highGaps.length-5} further High priority workstreams.`:""}`);
+        sections.push(`High Priority (${highGaps.length}):\n${highGaps.slice(0,5).map((g,i)=>`${i+1}. [${g.domain.id}] ${g.rec?.action||g.domain.name} (${g.rec?.effort||"—"} effort)`).join("\n")}${highGaps.length>5?`\n...and ${highGaps.length-5} further High workstreams.`:""}`);
+      }
+      if(medGaps.length > 0) {
+        sections.push(`Medium Priority (${medGaps.length}):\n${medGaps.slice(0,5).map((g,i)=>`${i+1}. [${g.domain.id}] ${g.rec?.action||g.domain.name}`).join("\n")}${medGaps.length>5?`\n...and ${medGaps.length-5} further Medium workstreams.`:""}`);
       }
 
-      // 3-horizon roadmap framing
-      sections.push(`Recommended Implementation Roadmap:\n\n• 0–3 months (Immediate): Address all Critical priority workstreams. Establish foundational documentation and governance structures where absent.\n• 3–6 months (Short-term): Progress High priority workstreams. Focus on identity, detection and response capability improvements.\n• 6–12 months (Medium-term): Complete Medium priority workstreams. Embed continuous improvement processes and prepare for re-assessment against target profile.`);
+      // Missing docs as recommendations
+      if(docGaps.length > 0) {
+        const critDocRecs = [...missingCritDocs, ...missingHighDocs].slice(0,5);
+        if(critDocRecs.length > 0) {
+          sections.push(`Documentation Gaps (obtain before finalising assessment):\n${critDocRecs.map((({doc},i)=>`${i+1}. ${doc.label} (${doc.priority} priority) — relevant to: ${doc.subcats.join(", ")}`)).join("\n")}`);
+        }
+      }
+
+      // Roadmap
+      const immediateItems = critGaps.slice(0,3).map(g=>g.rec?.action||g.domain.name);
+      const shortTermItems = highGaps.slice(0,3).map(g=>g.rec?.action||g.domain.name);
+      const medTermItems   = medGaps.slice(0,3).map(g=>g.rec?.action||g.domain.name);
+      sections.push(`Recommended Implementation Roadmap:\n\n• 0–3 months (Immediate): Address all Critical workstreams.${immediateItems.length>0?" Priority actions: "+immediateItems.join("; ").slice(0,150)+".":""}\n• 3–6 months (Short-term): Progress High priority workstreams.${shortTermItems.length>0?" Including: "+shortTermItems.join("; ").slice(0,150)+".":""}\n• 6–12 months (Medium-term): Complete Medium priority workstreams. Embed continuous improvement and prepare for re-assessment.${medTermItems.length>0?" Including: "+medTermItems.join("; ").slice(0,120)+".":""}`);
     }
 
-    // ── Conclusion ─────────────────────────────────────────────────────────
+    // ── CONCLUSION ───────────────────────────────────────────────────────────
     sections.push(`\nCONCLUSION\n${"─".repeat(60)}`);
-
     const strongFunctions = funcNarratives.filter(f=>f.scV>=3.0).map(f=>f.cat.name);
     const weakFunctions   = funcNarratives.filter(f=>f.sc2&&f.scV<2.0).map(f=>f.cat.name);
+    const strongNote = strongFunctions.length > 0 ? `${client} demonstrates particular strength in ${strongFunctions.join(", ")}, where controls are consistently applied and repeatable or better practice is evidenced.` : "";
+    const weakNote   = weakFunctions.length > 0 ? ` The most significant opportunities for improvement lie in ${weakFunctions.join(", ")}, where targeted investment will deliver the greatest uplift.` : "";
+    sections.push(`${strongNote}${weakNote}\n\nLevelBlue recommends ${critGaps.length+highGaps.length} high/critical priority workstream${critGaps.length+highGaps.length!==1?"s":""} to move ${client} toward the agreed target profile of ${overallTarget?parseFloat(overallTarget).toFixed(2):"the agreed target"}. Security maturity is cumulative — each improvement strengthens the overall posture. LevelBlue is well-positioned to support ${client} in progressing this roadmap.`);
 
-    const strongNote = strongFunctions.length > 0
-      ? `${client} demonstrates particular strength in ${strongFunctions.join(", ")}, where controls are consistently applied and the organisation can evidence repeatable or better practice.`
-      : "";
-    const weakNote = weakFunctions.length > 0
-      ? ` The most significant opportunities for improvement lie in ${weakFunctions.join(", ")}, where targeted investment will deliver the greatest uplift to the overall maturity profile.`
-      : "";
-    const closeNote = `\n\nLevelBlue recommends ${critGaps.length+highGaps.length} high/critical priority workstream${critGaps.length+highGaps.length!==1?"s":""} to bring ${client} to the agreed target profile. Security maturity is cumulative — each improvement strengthens the overall posture and reduces the incremental cost of further improvement. LevelBlue is well-positioned to support ${client} in progressing this roadmap.`;
-
-    sections.push(`${strongNote}${weakNote}${closeNote}`);
-
-    // ── Footer ─────────────────────────────────────────────────────────────
     sections.push(`\n${"─".repeat(60)}\nDraft narrative generated by the LevelBlue Cyber Maturity Assessment Centre · ${date}\nThis is a working draft. Review and edit before including in client deliverables.\nAll data processed locally — no client information was transmitted externally.`);
 
     return sections.join("\n\n");
@@ -1563,182 +1580,135 @@ export default function MaturityScorecard() {
         {/* ── HOME ── */}
         {view==="home" && (
           <div>
-            {/* Hero */}
-            <div style={{ textAlign:"center", padding:"52px 24px 40px", borderRadius:"16px", background:"linear-gradient(160deg, #0D1F3C 0%, #08111F 60%)", border:"1px solid #1B3A6B", marginBottom:"28px", position:"relative", overflow:"hidden" }}>
-              {/* Background stripe decorations */}
-              <div style={{ position:"absolute", top:0, right:0, width:"320px", height:"100%", opacity:0.06, background:"linear-gradient(135deg, transparent 40%, #1E6FD9 40%, #1E6FD9 45%, transparent 45%, transparent 55%, #00BFFF 55%, #00BFFF 60%, transparent 60%, transparent 70%, #C8F135 70%, #C8F135 75%, transparent 75%)" }}/>
-              {/* Logo mark */}
-              <div style={{ display:"flex", justifyContent:"center", marginBottom:"20px" }}>
-                <div style={{ display:"flex", gap:"5px", transform:"skewX(-14deg)" }}>
-                  {[["#1E6FD9",60],["#00BFFF",80],["#C8F135",60]].map(([c,h],i)=>(
-                    <div key={i} style={{ width:"14px", height:`${h}px`, background:c, borderRadius:"2px" }}/>
+            {/* Hero — compact two-column layout */}
+            <div style={{ display:"grid", gridTemplateColumns:"1fr 380px", gap:"20px", marginBottom:"24px", alignItems:"stretch" }}>
+              {/* Left — title + description + CTA */}
+              <div style={{ padding:"36px 40px", borderRadius:"16px", background:"linear-gradient(160deg, #0D1F3C 0%, #08111F 70%)", border:"1px solid #1B3A6B", position:"relative", overflow:"hidden", display:"flex", flexDirection:"column", justifyContent:"space-between" }}>
+                <div style={{ position:"absolute", top:0, right:0, width:"260px", height:"100%", opacity:0.05, background:"linear-gradient(135deg, transparent 40%, #1E6FD9 40%, #1E6FD9 45%, transparent 45%, transparent 55%, #00BFFF 55%, #00BFFF 60%, transparent 60%, transparent 70%, #C8F135 70%, #C8F135 75%, transparent 75%)" }}/>
+                {/* Logo mark */}
+                <div style={{ display:"flex", gap:"4px", transform:"skewX(-14deg)", marginBottom:"24px" }}>
+                  {[["#1E6FD9",44],["#00BFFF",58],["#C8F135",44]].map(([c,h],i)=>(
+                    <div key={i} style={{ width:"10px", height:`${h}px`, background:c, borderRadius:"2px" }}/>
+                  ))}
+                </div>
+                <div>
+                  <div style={{ fontSize:"11px", fontWeight:"700", color:"#4A6A8A", letterSpacing:"0.16em", textTransform:"uppercase", marginBottom:"8px" }}>LevelBlue Cyber Advisory</div>
+                  <div style={{ fontSize:"30px", fontWeight:"800", color:"#FFFFFF", lineHeight:1.2, marginBottom:"12px" }}>Cyber Maturity<br/><span style={{ color:"#00BFFF" }}>Assessment</span> Centre</div>
+                  <div style={{ fontSize:"13px", color:"#8BAAC8", lineHeight:1.7, marginBottom:"28px", maxWidth:"480px" }}>A structured, workshop-ready platform for delivering NIST CSF 2.0 and CIS Controls v8 assessments — from discovery through scoring to client-ready reports and AI-assisted narratives.</div>
+                  <div style={{ display:"flex", gap:"10px", flexWrap:"wrap" }}>
+                    <button onClick={()=>setView("setup")} style={{ padding:"12px 28px", borderRadius:"9px", background:"linear-gradient(135deg,#1E6FD9,#0EA5E9)", color:"#FFFFFF", border:"none", fontWeight:"700", fontSize:"13px", cursor:"pointer", fontFamily:"inherit" }}>Start Assessment →</button>
+                    <button onClick={()=>fileInputRef.current?.click()} style={{ padding:"12px 20px", borderRadius:"9px", background:"transparent", color:"#8BAAC8", border:"1px solid #1B3A6B", fontWeight:"600", fontSize:"12px", cursor:"pointer", fontFamily:"inherit" }}>Load Session ↑</button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Right — framework selector */}
+              <div style={{ display:"flex", flexDirection:"column", gap:"12px" }}>
+                <div style={{ fontSize:"10px", fontWeight:"700", color:"#4A6A8A", letterSpacing:"0.12em", textTransform:"uppercase" }}>Select Framework</div>
+                {[
+                  { id:"NIST CSF 2.0", badge:"Recommended", badgeCol:"#C8F135", headline:"NIST CSF 2.0", sub:"6 functions · 22 categories · 106 subcategories", detail:"Full subcategory scoring, target profiles, 9-slide report, AI narrative", color:"#1E6FD9", glow:"rgba(30,111,217,0.15)" },
+                  { id:"CIS Controls v8", badge:"Controls-Based", badgeCol:"#00BFFF", headline:"CIS Controls v8", sub:"3 groups · 18 controls · IG1–IG3", detail:"Implementation group scoring, gap analysis, Excel export", color:"#00BFFF", glow:"rgba(0,191,255,0.12)" },
+                ].map(f=>(
+                  <button key={f.id} onClick={()=>{ setFramework(f.id); setScores({}); setNotes({}); setWorkshopNotes({}); setTargetScores({}); }} style={{ flex:1, textAlign:"left", padding:"18px 20px", borderRadius:"12px", border:`2px solid ${framework===f.id ? f.color : "#1B3A6B"}`, background:framework===f.id ? f.glow : "#0A1932", cursor:"pointer", fontFamily:"inherit", position:"relative", overflow:"hidden" }}>
+                    <div style={{ position:"absolute", top:0, left:0, right:0, height:"3px", background:framework===f.id ? f.color : "transparent", borderRadius:"12px 12px 0 0" }}/>
+                    <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:"6px" }}>
+                      <div style={{ fontSize:"14px", fontWeight:"800", color:"#FFFFFF" }}>{f.headline}</div>
+                      <span style={{ fontSize:"9px", fontWeight:"700", color:f.badgeCol, background:`${f.badgeCol}18`, padding:"2px 8px", borderRadius:"20px", border:`1px solid ${f.badgeCol}40`, whiteSpace:"nowrap" }}>{f.badge}</span>
+                    </div>
+                    <div style={{ fontSize:"11px", color:framework===f.id ? f.color : "#4A6A8A", fontWeight:"600", marginBottom:"4px" }}>{f.sub}</div>
+                    <div style={{ fontSize:"11px", color:"#8BAAC8" }}>{f.detail}</div>
+                    {framework===f.id && <div style={{ marginTop:"10px", fontSize:"10px", fontWeight:"700", color:f.color }}>✓ Selected — framework info below</div>}
+                  </button>
+                ))}
+
+                {/* Stat pills */}
+                <div style={{ display:"grid", gridTemplateColumns:"repeat(2,1fr)", gap:"8px" }}>
+                  {(framework==="NIST CSF 2.0"
+                    ? [["106","Subcategories","#1E6FD9"],["22","Categories","#00BFFF"],["0–4","Tier Scale","#C8F135"],["9","Report Slides","#A78BFA"]]
+                    : [["153","Controls","#00BFFF"],["18","Control Groups","#1E6FD9"],["3","Impl. Groups","#C8F135"],["1–4","Score Range","#A78BFA"]]
+                  ).map(([n,l,c])=>(
+                    <div key={l} style={{ padding:"10px 12px", borderRadius:"8px", background:"rgba(0,0,0,0.3)", border:`1px solid ${c}25`, textAlign:"center" }}>
+                      <div style={{ fontSize:"20px", fontWeight:"800", color:c }}>{n}</div>
+                      <div style={{ fontSize:"9px", color:"#4A6A8A", fontWeight:"600", textTransform:"uppercase", letterSpacing:"0.06em" }}>{l}</div>
+                    </div>
                   ))}
                 </div>
               </div>
-              <div style={{ fontSize:"13px", fontWeight:"700", color:"#4A6A8A", letterSpacing:"0.18em", textTransform:"uppercase", marginBottom:"10px" }}>LevelBlue Cyber Advisory</div>
-              <div style={{ fontSize:"36px", fontWeight:"800", color:"#FFFFFF", lineHeight:1.15, marginBottom:"10px" }}>Cyber Maturity<br/><span style={{ color:"#00BFFF" }}>Assessment</span> Centre</div>
-              <div style={{ fontSize:"15px", color:"#8BAAC8", maxWidth:"560px", margin:"0 auto 28px", lineHeight:1.7 }}>A structured, workshop-ready platform for delivering NIST CSF 2.0 and CIS Controls v8 assessments — from discovery through scoring to client-ready reports.</div>
-              <div style={{ display:"flex", gap:"12px", justifyContent:"center", flexWrap:"wrap" }}>
-                {(framework==="NIST CSF 2.0"
-                  ? [["106","Subcategories","#1E6FD9"],["22","Categories","#00BFFF"],["6","Functions","#C8F135"],["0–4","Tier Scale","#A78BFA"]]
-                  : [["153","Controls","#00BFFF"],["18","Control Groups","#1E6FD9"],["3","Impl. Groups","#C8F135"],["1–4","Score Range","#A78BFA"]]
-                ).map(([n,l,c])=>(
-                  <div key={l} style={{ padding:"12px 20px", borderRadius:"10px", background:"rgba(0,0,0,0.3)", border:`1px solid ${c}30` }}>
-                    <div style={{ fontSize:"24px", fontWeight:"800", color:c }}>{n}</div>
-                    <div style={{ fontSize:"10px", color:"#4A6A8A", marginTop:"2px", fontWeight:"600", textTransform:"uppercase", letterSpacing:"0.06em" }}>{l}</div>
+            </div>
+
+            {/* How it works + process — single compact row */}
+            <div style={{ ...card, marginBottom:"20px" }}>
+              <div style={{ fontSize:"10px", fontWeight:"700", color:"#4A6A8A", letterSpacing:"0.12em", textTransform:"uppercase", marginBottom:"14px" }}>Assessment Process</div>
+              <div style={{ display:"grid", gridTemplateColumns:"repeat(6,1fr)" }}>
+                {[
+                  {n:"01", label:"Setup",    desc:"Client & framework",       col:"#1E6FD9", v:"setup"},
+                  {n:"02", label:"Docs",     desc:"Documentation review",     col:"#0EA5E9", v:"docs"},
+                  {n:"03", label:"Workshop", desc:"Discovery & notes",        col:"#00BFFF", v:"workshop"},
+                  {n:"04", label:"Score",    desc:"0–4 per subcategory",      col:"#C8F135", v:"score"},
+                  {n:"05", label:"Results",  desc:"Insights & gap analysis",  col:"#A78BFA", v:"results"},
+                  {n:"06", label:"Report",   desc:"PPTX, Excel & narrative",  col:"#F87171", v:"results"},
+                ].map((s,i)=>(
+                  <div key={s.n} style={{ padding:"12px 8px", position:"relative", cursor:"pointer" }} onClick={()=>s.v && setView(s.v)}>
+                    <div style={{ fontSize:"18px", fontWeight:"800", color:s.col, marginBottom:"3px" }}>{s.n}</div>
+                    <div style={{ fontSize:"12px", fontWeight:"700", color:"#E2EAF4", marginBottom:"2px" }}>{s.label}</div>
+                    <div style={{ fontSize:"10px", color:"#4A6A8A", lineHeight:"1.4" }}>{s.desc}</div>
+                    {i<5 && <div style={{ position:"absolute", right:"-1px", top:"50%", transform:"translateY(-50%)", color:"#1B3A6B", fontSize:"14px" }}>›</div>}
                   </div>
                 ))}
               </div>
             </div>
 
-            {/* Framework selection */}
-            <div style={{ fontSize:"11px", fontWeight:"700", color:"#4A6A8A", letterSpacing:"0.12em", textTransform:"uppercase", marginBottom:"14px" }}>Select Assessment Framework</div>
-            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"16px", marginBottom:"28px" }}>
-              {[
-                { id:"NIST CSF 2.0", badge:"Recommended", badgeCol:"#C8F135",
-                  headline:"NIST Cybersecurity Framework 2.0",
-                  sub:"The gold standard for holistic cyber risk assessment",
-                  stats:[["6","Functions"],["22","Categories"],["106","Subcategories"],["0–4","Tier Scale"]],
-                  features:["Full subcategory-level scoring","Target profile setting","Current vs target gap analysis","9-slide client report","Workshop question bank"],
-                  color:"#1E6FD9", glow:"rgba(30,111,217,0.15)" },
-                { id:"CIS Controls v8", badge:"Controls-Based", badgeCol:"#00BFFF",
-                  headline:"CIS Controls v8",
-                  sub:"Implementation-group driven security controls framework",
-                  stats:[["3","Groups"],["18","Controls"],["IG1–IG3","Implementation Groups"],["1–4","Score Range"]],
-                  features:["IG1 / IG2 / IG3 controls","Workshop questions included","Recommendations per control","Excel export with gap analysis","JSON session persistence"],
-                  color:"#00BFFF", glow:"rgba(0,191,255,0.12)" },
-              ].map(f=>(
-                <button key={f.id} onClick={()=>{ setFramework(f.id); setScores({}); setNotes({}); setWorkshopNotes({}); setTargetScores({}); }} style={{ textAlign:"left", padding:"24px", borderRadius:"14px", border:`2px solid ${framework===f.id ? f.color : "#1B3A6B"}`, background:framework===f.id ? f.glow : "#0A1932", cursor:"pointer", fontFamily:"inherit", transition:"all 0.2s", position:"relative", overflow:"hidden" }}>
-                  {/* Top accent */}
-                  <div style={{ position:"absolute", top:0, left:0, right:0, height:"3px", background:framework===f.id ? f.color : "transparent", borderRadius:"14px 14px 0 0" }}/>
-                  <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:"12px" }}>
-                    <div>
-                      <div style={{ fontSize:"16px", fontWeight:"800", color:"#FFFFFF", marginBottom:"4px" }}>{f.headline}</div>
-                      <div style={{ fontSize:"12px", color:"#8BAAC8" }}>{f.sub}</div>
-                    </div>
-                    <span style={{ fontSize:"10px", fontWeight:"700", color:f.badgeCol, background:`${f.badgeCol}18`, padding:"3px 10px", borderRadius:"20px", border:`1px solid ${f.badgeCol}40`, whiteSpace:"nowrap", flexShrink:0 }}>{f.badge}</span>
-                  </div>
-                  <div style={{ display:"flex", gap:"10px", marginBottom:"16px", flexWrap:"wrap" }}>
-                    {f.stats.map(([n,l])=>(
-                      <div key={l} style={{ padding:"8px 12px", borderRadius:"8px", background:"rgba(0,0,0,0.3)", border:`1px solid ${f.color}25` }}>
-                        <div style={{ fontSize:"18px", fontWeight:"800", color:f.color }}>{n}</div>
-                        <div style={{ fontSize:"10px", color:"#4A6A8A", fontWeight:"600" }}>{l}</div>
-                      </div>
-                    ))}
-                  </div>
-                  {f.features.map(ft=>(
-                    <div key={ft} style={{ display:"flex", gap:"8px", alignItems:"center", marginBottom:"6px" }}>
-                      <div style={{ width:"5px", height:"5px", borderRadius:"50%", background:f.color, flexShrink:0 }}/>
-                      <span style={{ fontSize:"12px", color:"#8BAAC8" }}>{ft}</span>
-                    </div>
-                  ))}
-                  {framework===f.id && (
-                    <div style={{ marginTop:"16px", padding:"8px 14px", borderRadius:"7px", background:`${f.color}18`, border:`1px solid ${f.color}40`, fontSize:"12px", fontWeight:"700", color:f.color }}>✓ Selected</div>
-                  )}
-                </button>
-              ))}
-            </div>
-
-            {/* Dynamic framework breakdown — shows when a framework is selected */}
+            {/* Framework breakdown — inline, no toggle needed, clean compact grid */}
             {framework === "NIST CSF 2.0" && (
-              <div style={{ ...card, marginBottom:"20px", borderTop:"3px solid #1E6FD9" }}>
-                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"16px" }}>
-                  <div>
-                    <div style={{ fontSize:"13px", fontWeight:"800", color:"#FFFFFF" }}>NIST CSF 2.0 — Framework Breakdown</div>
-                    <div style={{ fontSize:"11px", color:"#4A6A8A", marginTop:"2px" }}>6 functions · 22 categories · 106 subcategories. Click a function to expand.</div>
-                  </div>
-                  <span style={{ fontSize:"10px", color:"#C8F135", background:"rgba(200,241,53,0.1)", padding:"3px 10px", borderRadius:"20px", border:"1px solid rgba(200,241,53,0.3)", fontWeight:"700" }}>Selected</span>
-                </div>
-                <div style={{ display:"grid", gridTemplateColumns:"repeat(6,1fr)", gap:"8px" }}>
+              <div style={{ ...card, marginBottom:"20px" }}>
+                <div style={{ fontSize:"10px", fontWeight:"700", color:"#4A6A8A", letterSpacing:"0.12em", textTransform:"uppercase", marginBottom:"14px" }}>NIST CSF 2.0 — Functions & Categories</div>
+                <div style={{ display:"grid", gridTemplateColumns:"repeat(6,1fr)", gap:"8px", marginBottom:"14px" }}>
                   {FRAMEWORKS["NIST CSF 2.0"].map(cat=>(
-                    <div key={cat.id} style={{ padding:"12px", borderRadius:"10px", background:cat.light, border:`1px solid ${cat.color}40` }}>
-                      <div style={{ fontSize:"11px", fontWeight:"800", color:cat.color, letterSpacing:"0.08em", marginBottom:"4px" }}>{cat.id}</div>
-                      <div style={{ fontSize:"12px", fontWeight:"700", color:"#FFFFFF", marginBottom:"6px" }}>{cat.name}</div>
-                      <div style={{ fontSize:"11px", color:"#4A6A8A", marginBottom:"8px" }}>{cat.domains.length} categories · {cat.domains.reduce((a,d)=>a+d.questions.length,0)} subcategories</div>
-                      {cat.domains.map(d=>(
-                        <div key={d.id} style={{ fontSize:"10px", color:"#8BAAC8", marginBottom:"3px", display:"flex", justifyContent:"space-between" }}>
-                          <span style={{ color:cat.color, fontWeight:"600" }}>{d.id}</span>
-                          <span style={{ color:"#4A6A8A" }}>{d.questions.length} subs</span>
-                        </div>
-                      ))}
+                    <div key={cat.id} style={{ padding:"12px", borderRadius:"9px", background:cat.light, border:`1px solid ${cat.color}35` }}>
+                      <div style={{ fontSize:"11px", fontWeight:"800", color:cat.color, marginBottom:"3px" }}>{cat.id}</div>
+                      <div style={{ fontSize:"12px", fontWeight:"700", color:"#FFFFFF", marginBottom:"4px" }}>{cat.name}</div>
+                      <div style={{ fontSize:"10px", color:"#4A6A8A" }}>{cat.domains.reduce((a,d)=>a+d.questions.length,0)} subcategories</div>
+                      <div style={{ marginTop:"6px", display:"flex", flexWrap:"wrap", gap:"2px" }}>
+                        {cat.domains.map(d=><span key={d.id} style={{ fontSize:"9px", color:cat.color, background:`${cat.color}18`, padding:"1px 5px", borderRadius:"3px", fontWeight:"600" }}>{d.id}</span>)}
+                      </div>
                     </div>
                   ))}
                 </div>
-                <div style={{ marginTop:"14px", display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:"8px" }}>
-                  {[["0 — Not Present","Controls or practices do not exist","#F87171"],["1 — Partial","Ad hoc and reactive, limited awareness","#FB923C"],["2 — Risk-Informed","Management-approved but inconsistently applied","#FCD34D"],["3 — Repeatable","Formally approved, consistently implemented","#C8F135"]].map(([t,d,c])=>(
-                    <div key={t} style={{ padding:"10px 12px", borderRadius:"8px", background:`${c}10`, border:`1px solid ${c}30` }}>
-                      <div style={{ fontSize:"11px", fontWeight:"700", color:c, marginBottom:"3px" }}>{t}</div>
-                      <div style={{ fontSize:"10px", color:"#4A6A8A", lineHeight:"1.4" }}>{d}</div>
+                <div style={{ display:"grid", gridTemplateColumns:"repeat(5,1fr)", gap:"8px" }}>
+                  {ML.map(m=>(
+                    <div key={m.value} style={{ padding:"9px 11px", borderRadius:"7px", background:m.bg, border:`1px solid ${m.color}35` }}>
+                      <div style={{ fontSize:"16px", fontWeight:"800", color:m.color }}>{m.value}</div>
+                      <div style={{ fontSize:"11px", fontWeight:"700", color:"#E2EAF4", marginTop:"2px" }}>{m.label}</div>
+                      <div style={{ fontSize:"10px", color:"#4A6A8A", marginTop:"2px", lineHeight:"1.3" }}>{ML_DESC[m.value]?.slice(0,50)}...</div>
                     </div>
                   ))}
                 </div>
               </div>
             )}
             {framework === "CIS Controls v8" && (
-              <div style={{ ...card, marginBottom:"20px", borderTop:"3px solid #00BFFF" }}>
-                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"16px" }}>
-                  <div>
-                    <div style={{ fontSize:"13px", fontWeight:"800", color:"#FFFFFF" }}>CIS Controls v8 — Framework Breakdown</div>
-                    <div style={{ fontSize:"11px", color:"#4A6A8A", marginTop:"2px" }}>3 implementation groups · 18 control groups. Designed to prioritise security investment by organisational maturity.</div>
-                  </div>
-                  <span style={{ fontSize:"10px", color:"#00BFFF", background:"rgba(0,191,255,0.1)", padding:"3px 10px", borderRadius:"20px", border:"1px solid rgba(0,191,255,0.3)", fontWeight:"700" }}>Selected</span>
-                </div>
-                <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:"12px", marginBottom:"14px" }}>
+              <div style={{ ...card, marginBottom:"20px" }}>
+                <div style={{ fontSize:"10px", fontWeight:"700", color:"#4A6A8A", letterSpacing:"0.12em", textTransform:"uppercase", marginBottom:"14px" }}>CIS Controls v8 — Implementation Groups</div>
+                <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:"12px", marginBottom:"12px" }}>
                   {FRAMEWORKS["CIS Controls v8"].map(grp=>(
-                    <div key={grp.id} style={{ padding:"14px", borderRadius:"10px", background:grp.light, border:`1px solid ${grp.color}40` }}>
-                      <div style={{ fontSize:"11px", fontWeight:"800", color:grp.color, letterSpacing:"0.08em", marginBottom:"2px" }}>{grp.id} — {grp.name}</div>
+                    <div key={grp.id} style={{ padding:"14px", borderRadius:"9px", background:grp.light, border:`1px solid ${grp.color}35` }}>
+                      <div style={{ fontSize:"11px", fontWeight:"800", color:grp.color, marginBottom:"2px" }}>{grp.id} — {grp.name}</div>
                       <div style={{ fontSize:"11px", color:"#8BAAC8", marginBottom:"10px" }}>{grp.description}</div>
                       {grp.domains.map(d=>(
-                        <div key={d.id} style={{ fontSize:"11px", color:"#8BAAC8", marginBottom:"4px", display:"flex", justifyContent:"space-between", padding:"5px 8px", borderRadius:"5px", background:"rgba(0,0,0,0.2)" }}>
-                          <span style={{ color:grp.color, fontWeight:"600" }}>{d.id}</span>
-                          <span>{d.name}</span>
-                          <span style={{ color:"#4A6A8A" }}>{d.questions.length}q</span>
+                        <div key={d.id} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"4px 7px", borderRadius:"5px", background:"rgba(0,0,0,0.2)", marginBottom:"3px" }}>
+                          <span style={{ fontSize:"10px", color:grp.color, fontWeight:"600" }}>{d.id}</span>
+                          <span style={{ fontSize:"10px", color:"#8BAAC8" }}>{d.name}</span>
                         </div>
                       ))}
                     </div>
                   ))}
                 </div>
-                <div style={{ padding:"12px 14px", borderRadius:"8px", background:"rgba(0,191,255,0.06)", border:"1px solid rgba(0,191,255,0.18)", fontSize:"11px", color:"#8BAAC8", lineHeight:"1.6" }}>
-                  <strong style={{color:"#00BFFF"}}>IG1</strong> — Basic hygiene every organisation should have. <strong style={{color:"#00BFFF"}}>IG2</strong> — For organisations with IT expertise supporting multiple departments. <strong style={{color:"#00BFFF"}}>IG3</strong> — For organisations with dedicated security expertise. Each higher group builds on the previous.
+                <div style={{ padding:"10px 14px", borderRadius:"7px", background:"rgba(0,191,255,0.06)", border:"1px solid rgba(0,191,255,0.18)", fontSize:"11px", color:"#8BAAC8" }}>
+                  <strong style={{color:"#00BFFF"}}>IG1</strong> Basic hygiene.&nbsp;&nbsp;<strong style={{color:"#00BFFF"}}>IG2</strong> IT expertise supporting multiple departments.&nbsp;&nbsp;<strong style={{color:"#00BFFF"}}>IG3</strong> Dedicated security expertise. Each group builds on the previous.
                 </div>
               </div>
             )}
-            <div style={{ ...card, marginBottom:"24px" }}>
-              <div style={{ fontSize:"11px", fontWeight:"700", color:"#4A6A8A", letterSpacing:"0.12em", textTransform:"uppercase", marginBottom:"16px" }}>How It Works</div>
-              <div style={{ display:"grid", gridTemplateColumns:"repeat(6,1fr)", gap:"0" }}>
-                {[
-                  {n:"01", label:"Setup", desc:"Client details & framework", col:"#1E6FD9"},
-                  {n:"02", label:"Docs", desc:"Document review checklist", col:"#0EA5E9"},
-                  {n:"03", label:"Workshop", desc:"Discovery questions & notes", col:"#00BFFF"},
-                  {n:"04", label:"Score", desc:"Rate 0–4 per subcategory", col:"#C8F135"},
-                  {n:"05", label:"Results", desc:"Insights, gaps & radar", col:"#A78BFA"},
-                  {n:"06", label:"Report", desc:"PPTX & Excel export", col:"#F87171"},
-                ].map((s,i)=>(
-                  <div key={s.n} style={{ display:"flex", alignItems:"flex-start", gap:0 }}>
-                    <div style={{ flex:1, padding:"14px 10px", position:"relative" }}>
-                      <div style={{ fontSize:"20px", fontWeight:"800", color:s.col, marginBottom:"4px" }}>{s.n}</div>
-                      <div style={{ fontSize:"12px", fontWeight:"700", color:"#E2EAF4", marginBottom:"3px" }}>{s.label}</div>
-                      <div style={{ fontSize:"11px", color:"#4A6A8A", lineHeight:"1.4" }}>{s.desc}</div>
-                      {i<5 && <div style={{ position:"absolute", right:0, top:"50%", transform:"translateY(-50%)", color:"#1B3A6B", fontSize:"16px" }}>›</div>}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div style={{ display:"flex", gap:"12px", justifyContent:"center" }}>
-              <button onClick={()=>setView("setup")} style={{ padding:"14px 36px", borderRadius:"10px", background:"linear-gradient(135deg,#1E6FD9,#0EA5E9)", color:"#FFFFFF", border:"none", fontWeight:"700", fontSize:"14px", cursor:"pointer", fontFamily:"inherit" }}>
-                Start Assessment →
-              </button>
-              {(clientName || Object.keys(scores).length > 0) && (
-                <button onClick={()=>fileInputRef.current?.click()} style={{ padding:"14px 28px", borderRadius:"10px", background:"transparent", color:"#8BAAC8", border:"1px solid #1B3A6B", fontWeight:"700", fontSize:"13px", cursor:"pointer", fontFamily:"inherit" }}>
-                  Load Saved Session ↑
-                </button>
-              )}
-            </div>
           </div>
         )}
-
         {/* ── SETUP ── */}
         {view==="setup" && (
           <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"18px" }}>
