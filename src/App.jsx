@@ -1606,8 +1606,8 @@ export default function MaturityScorecard() {
               <div style={{ display:"flex", flexDirection:"column", gap:"12px" }}>
                 <div style={{ fontSize:"10px", fontWeight:"700", color:"#4A6A8A", letterSpacing:"0.12em", textTransform:"uppercase" }}>Select Framework</div>
                 {[
-                  { id:"NIST CSF 2.0", badge:"Recommended", badgeCol:"#C8F135", headline:"NIST CSF 2.0", sub:"6 functions · 22 categories · 106 subcategories", detail:"Full subcategory scoring, target profiles, 9-slide report, AI narrative", color:"#1E6FD9", glow:"rgba(30,111,217,0.15)" },
-                  { id:"CIS Controls v8", badge:"Controls-Based", badgeCol:"#00BFFF", headline:"CIS Controls v8", sub:"3 groups · 18 controls · IG1–IG3", detail:"Implementation group scoring, gap analysis, Excel export", color:"#00BFFF", glow:"rgba(0,191,255,0.12)" },
+                  { id:"NIST CSF 2.0", badge:"NIST CSF 2.0", badgeCol:"#1E6FD9", headline:"NIST CSF 2.0", sub:"6 functions · 22 categories · 106 subcategories", detail:"Full subcategory scoring, target profiles, 9-slide report, AI narrative", color:"#1E6FD9", glow:"rgba(30,111,217,0.15)" },
+                  { id:"CIS Controls v8", badge:"CIS Controls v8", badgeCol:"#00BFFF", headline:"CIS Controls v8", sub:"3 groups · 18 controls · IG1–IG3", detail:"Implementation group scoring, gap analysis, Excel export", color:"#00BFFF", glow:"rgba(0,191,255,0.12)" },
                 ].map(f=>(
                   <button key={f.id} onClick={()=>{ setFramework(f.id); setScores({}); setNotes({}); setWorkshopNotes({}); setTargetScores({}); }} style={{ flex:1, textAlign:"left", padding:"18px 20px", borderRadius:"12px", border:`2px solid ${framework===f.id ? f.color : "#1B3A6B"}`, background:framework===f.id ? f.glow : "#0A1932", cursor:"pointer", fontFamily:"inherit", position:"relative", overflow:"hidden" }}>
                     <div style={{ position:"absolute", top:0, left:0, right:0, height:"3px", background:framework===f.id ? f.color : "transparent", borderRadius:"12px 12px 0 0" }}/>
