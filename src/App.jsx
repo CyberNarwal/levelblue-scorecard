@@ -1,239 +1,404 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import * as XLSX from "xlsx";
 
-// ─── WORKSHOP QUESTIONS ──────────────────────────────────────────────────────
+// --- MONO FONT  -  used for all scores, IDs and data values --------------------
+const MONO = "'IBM Plex Mono', 'JetBrains Mono', 'Courier New', monospace";
+
+// --- useCountUp  -  animates a number from 0 to target over duration ms --------
+function useCountUp(target, duration = 900, deps = []) {
+  const [val, setVal] = useState(null);
+  useEffect(() => {
+    if (target === null || target === undefined) { setVal(null); return; }
+    const end   = parseFloat(target);
+    const steps = Math.max(30, Math.floor(duration / 16));
+    let   step  = 0;
+    setVal(0);
+    const id = setInterval(() => {
+      step++;
+      const progress = step / steps;
+      // ease-out cubic
+      const eased = 1 - Math.pow(1 - progress, 3);
+      if (step >= steps) { setVal(end); clearInterval(id); }
+      else                setVal(parseFloat((eased * end).toFixed(2)));
+    }, 16);
+    return () => clearInterval(id);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, deps);
+  return val;
+}
+
+// --- HexMap  -  NIST function honeycomb visualisation --------------------------
+// Six flat-top hexagons in a ring, each showing function score + colour fill
+function HexMap({ fw, catScoreFn, getMC, getML, onClick, activeId }) {
+  const S  = 78;   // hex size (center to vertex)  -  was 54
+  const CX = 300;  // SVG center x
+  const CY = 300;  // SVG center y
+  const R  = 170;  // ring radius  -  was 118
+
+  // Flat-top hex: vertices at 0deg,60deg,120deg,180deg,240deg,300deg
+  const hexPath = (cx, cy) => {
+    const pts = [0, 60, 120, 180, 240, 300].map(deg => {
+      const r = (deg * Math.PI) / 180;
+      return `${(cx + S * Math.cos(r)).toFixed(1)},${(cy + S * Math.sin(r)).toFixed(1)}`;
+    });
+    return `M${pts.join("L")}Z`;
+  };
+
+  const angles = [-90, -30, 30, 90, 150, 210];
+  const hexes  = fw.map((cat, i) => {
+    const a  = (angles[i] * Math.PI) / 180;
+    const hx = CX + R * Math.cos(a);
+    const hy = CY + R * Math.sin(a);
+    const sc = catScoreFn(cat);
+    const scV = sc ? parseFloat(sc) : 0;
+    const fillOpacity = sc ? 0.15 + (scV / 4) * 0.55 : 0.08;
+    return { cat, hx, hy, sc, scV, fillOpacity };
+  });
+
+  return (
+    <svg width="100%" height="100%" viewBox="0 0 600 600" style={{ overflow:"visible", display:"block" }}>
+      <defs>
+        <filter id="hexGlow">
+          <feGaussianBlur stdDeviation="3" result="blur"/>
+          <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+        </filter>
+        <filter id="hexGlowActive">
+          <feGaussianBlur stdDeviation="8" result="blur"/>
+          <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+        </filter>
+        {hexes.map(({cat}) => (
+          <radialGradient key={cat.id} id={`hg-${cat.id}`} cx="50%" cy="50%" r="60%">
+            <stop offset="0%" stopColor={cat.color} stopOpacity="0.9"/>
+            <stop offset="100%" stopColor={cat.color} stopOpacity="0.1"/>
+          </radialGradient>
+        ))}
+      </defs>
+
+      {/* Connecting lines */}
+      {hexes.map((h, i) => {
+        const next = hexes[(i+1) % hexes.length];
+        return (
+          <line key={i}
+            x1={h.hx} y1={h.hy} x2={next.hx} y2={next.hy}
+            stroke="#1B3A6B" strokeWidth="1" strokeOpacity="0.35" strokeDasharray="4,5"
+          />
+        );
+      })}
+
+      {/* Center label */}
+      <circle cx={CX} cy={CY} r="52" fill="rgba(13,31,60,0.95)" stroke="#1B3A6B" strokeWidth="1.5"/>
+      <circle cx={CX} cy={CY} r="48" fill="none" stroke="rgba(0,191,255,0.2)" strokeWidth="1"/>
+      <text x={CX} y={CY-8} textAnchor="middle" fontSize="13" fill="#4A6A8A" fontFamily={MONO} letterSpacing="0.08em">NIST CSF</text>
+      <text x={CX} y={CY+10} textAnchor="middle" fontSize="13" fill="#4A6A8A" fontFamily={MONO} letterSpacing="0.08em">2.0</text>
+
+      {/* Hexagons */}
+      {hexes.map(({cat, hx, hy, sc, scV, fillOpacity}) => {
+        const isActive = activeId === cat.id;
+        const col      = cat.color;
+        return (
+          <g key={cat.id}
+            onClick={() => onClick && onClick(cat.id)}
+            style={{ cursor:"pointer" }}
+            filter={isActive ? "url(#hexGlowActive)" : undefined}
+          >
+            {isActive && (
+              <path d={hexPath(hx, hy)}
+                fill="none" stroke={col} strokeWidth="3" opacity="0.5"
+                style={{ transform:`scale(1.07)`, transformOrigin:`${hx}px ${hy}px` }}
+              />
+            )}
+            <path d={hexPath(hx, hy)}
+              fill={`url(#hg-${cat.id})`}
+              fillOpacity={fillOpacity}
+              stroke={col}
+              strokeWidth={isActive ? 2.5 : 1.5}
+              strokeOpacity={isActive ? 1 : 0.6}
+            />
+            {/* Score arc */}
+            {sc && (()=>{
+              const startAngle = -90 * Math.PI / 180;
+              const sweep      = (scV / 4) * 2 * Math.PI;
+              const endAngle   = startAngle + sweep;
+              const r2         = S * 0.7;
+              const x1 = hx + r2 * Math.cos(startAngle);
+              const y1 = hy + r2 * Math.sin(startAngle);
+              const x2 = hx + r2 * Math.cos(endAngle);
+              const y2 = hy + r2 * Math.sin(endAngle);
+              const largeArc = sweep > Math.PI ? 1 : 0;
+              if (scV === 0) return null;
+              return (
+                <path
+                  d={`M${x1.toFixed(1)},${y1.toFixed(1)} A${r2},${r2} 0 ${largeArc} 1 ${x2.toFixed(1)},${y2.toFixed(1)}`}
+                  fill="none" stroke={col} strokeWidth="4" strokeOpacity="0.9"
+                  strokeLinecap="round"
+                />
+              );
+            })()}
+            {/* Function ID */}
+            <text x={hx} y={hy - 22}
+              textAnchor="middle" fontSize="14" fontWeight="800"
+              fill={col} fontFamily={MONO} letterSpacing="0.04em">
+              {cat.id}
+            </text>
+            {/* Function name */}
+            <text x={hx} y={hy - 6}
+              textAnchor="middle" fontSize="12" fill="rgba(226,234,244,0.9)"
+              fontFamily="'Outfit',sans-serif" fontWeight="600">
+              {cat.name.length > 10 ? cat.name.slice(0,10)+"..." : cat.name}
+            </text>
+            {/* Score */}
+            <text x={hx} y={hy + 16}
+              textAnchor="middle" fontSize="20" fontWeight="700"
+              fill={sc ? getMC(sc) : "#4A6A8A"} fontFamily={MONO}>
+              {sc ? parseFloat(sc).toFixed(1) : " - "}
+            </text>
+            {/* Tier label */}
+            <text x={hx} y={hy + 32}
+              textAnchor="middle" fontSize="11" fill="#8BAAC8"
+              fontFamily="'Outfit',sans-serif">
+              {getML(sc)}
+            </text>
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
+
+// --- WORKSHOP QUESTIONS ------------------------------------------------------
 const WORKSHOP_QS = {
 
   "GV.OC": [
-    "How are cybersecurity priorities connected to business strategy — is security driven by business context or handled in isolation by IT?",
-    "What regulations and contractual obligations apply to you — UK GDPR, NIS2, sector-specific — and who owns that understanding?",
+    "How are cybersecurity priorities connected to business strategy  -  is security driven by business context or handled in isolation by IT?",
+    "What regulations and contractual obligations apply to you  -  UK GDPR, NIS2, sector-specific  -  and who owns that understanding?",
     "Have you mapped your most critical business processes and the systems, people and third parties they depend on?",
     "Does cyber risk reach the board regularly, or does it stay within IT?"
   ],
 
   "GV.RM": [
     "Are your cyber risk management objectives formally documented and signed off at a senior level, or does risk management happen reactively?",
-    "When a new risk is identified, how do you decide what's acceptable to carry versus what must be fixed — is that judgement explicit and documented?",
-    "Who is accountable for cyber risk — not just who manages controls, but who is answerable to the board if something goes wrong?",
-    "How often is cyber risk formally reviewed — risk committee, regular reporting cadence, or mainly when something goes wrong?"
+    "When a new risk is identified, how do you decide what's acceptable to carry versus what must be fixed  -  is that judgement explicit and documented?",
+    "Who is accountable for cyber risk  -  not just who manages controls, but who is answerable to the board if something goes wrong?",
+    "How often is cyber risk formally reviewed  -  risk committee, regular reporting cadence, or mainly when something goes wrong?"
   ],
 
   "GV.SC": [
     "Is there a structured programme for managing supplier security risk, or is it handled case by case?",
-    "Before onboarding a supplier with system or data access, what does your security assessment process look like — questionnaire, certifications, due diligence?",
+    "Before onboarding a supplier with system or data access, what does your security assessment process look like  -  questionnaire, certifications, due diligence?",
     "Do your supplier contracts require minimum security controls, incident notification timelines and audit rights?",
-    "How do you maintain visibility of supplier security post-onboarding — ongoing monitoring or just at contract renewal?"
+    "How do you maintain visibility of supplier security post-onboarding  -  ongoing monitoring or just at contract renewal?"
   ],
 
   "GV.PO": [
-    "Walk me through your security policy landscape — what exists, who approved it, and how staff are made aware?",
-    "When were policies last reviewed — is there a defined annual cycle with a named owner, or does it happen reactively?",
-    "Where business needs conflict with policy — legacy systems, access exceptions — is there a formal exception process with documented risk acceptance and an expiry date?",
-    "How do you confirm staff have read and understood policies — sign-off, testing, or something else?"
+    "Walk me through your security policy landscape  -  what exists, who approved it, and how staff are made aware?",
+    "When were policies last reviewed  -  is there a defined annual cycle with a named owner, or does it happen reactively?",
+    "Where business needs conflict with policy  -  legacy systems, access exceptions  -  is there a formal exception process with documented risk acceptance and an expiry date?",
+    "How do you confirm staff have read and understood policies  -  sign-off, testing, or something else?"
   ],
 
   "ID.AM": [
-    "How do you know what hardware is on your network — active discovery tooling or a manually maintained register — and how confident are you it's complete?",
-    "How do you track software across the estate — Intune, SCCM, manual — and do you have visibility of shadow IT?",
-    "Is your network topology formally documented, showing system interconnections, trust boundaries and data flows — and when was it last validated?",
+    "How do you know what hardware is on your network  -  active discovery tooling or a manually maintained register  -  and how confident are you it's complete?",
+    "How do you track software across the estate  -  Intune, SCCM, manual  -  and do you have visibility of shadow IT?",
+    "Is your network topology formally documented, showing system interconnections, trust boundaries and data flows  -  and when was it last validated?",
     "Do you maintain a register of external systems and SaaS dependencies, including what data they handle and what access they hold?"
   ],
 
   "ID.RA": [
-    "Are you running regular authenticated vulnerability scans covering the full scope — cloud, remote endpoints, on-premise — and how quickly are findings acted on?",
-    "How do you consume threat intelligence relevant to your sector — NCSC, ISAC, commercial feeds — and does it actually change your prioritisation decisions?",
-    "Walk me through your risk register — who maintains it, what does a typical entry include, and is it a live decision-making tool or a compliance document?",
-    "How do you prioritise which risks get fixed first — a documented likelihood and impact methodology, or individual judgement?"
+    "Are you running regular authenticated vulnerability scans covering the full scope  -  cloud, remote endpoints, on-premise  -  and how quickly are findings acted on?",
+    "How do you consume threat intelligence relevant to your sector  -  NCSC, ISAC, commercial feeds  -  and does it actually change your prioritisation decisions?",
+    "Walk me through your risk register  -  who maintains it, what does a typical entry include, and is it a live decision-making tool or a compliance document?",
+    "How do you prioritise which risks get fixed first  -  a documented likelihood and impact methodology, or individual judgement?"
   ],
 
   "ID.IM": [
     "After an incident or near-miss, is there a formal post-incident review process with documented outputs and tracked actions, or a verbal debrief that doesn't translate into change?",
     "When assessment or audit findings come in, is there a structured process to turn them into a prioritised remediation plan with owners and timelines?",
-    "Do you measure security programme performance with tracked KPIs — patch SLA compliance, phishing rates, vuln remediation — reported to leadership regularly?"
+    "Do you measure security programme performance with tracked KPIs  -  patch SLA compliance, phishing rates, vuln remediation  -  reported to leadership regularly?"
   ],
 
   "PR.AA": [
-    "Walk me through your joiner-mover-leaver process — is it HR-integrated and automated, or manual? How quickly are leavers fully disabled?",
-    "Where is MFA enforced — VPN, privileged accounts, cloud consoles, email — and what type: authenticator app, hardware token or SMS?",
-    "How do you ensure users only hold the access they need — defined role profiles, regular access recertification, handling of accumulated permissions after role changes?",
-    "How do you manage service accounts, API keys and certificates — inventoried, same provisioning discipline as user accounts, credentials rotated on a schedule?"
+    "Walk me through your joiner-mover-leaver process  -  is it HR-integrated and automated, or manual? How quickly are leavers fully disabled?",
+    "Where is MFA enforced  -  VPN, privileged accounts, cloud consoles, email  -  and what type: authenticator app, hardware token or SMS?",
+    "How do you ensure users only hold the access they need  -  defined role profiles, regular access recertification, handling of accumulated permissions after role changes?",
+    "How do you manage service accounts, API keys and certificates  -  inventoried, same provisioning discipline as user accounts, credentials rotated on a schedule?"
   ],
 
   "PR.AT": [
     "Is security awareness training a structured platform with tracked completion and enforced renewal, and does every joiner receive it?",
     "Do IT admins, finance teams and executives receive role-specific training beyond the standard content, given their elevated threat exposure?",
-    "Do you run phishing simulations — how frequently, what are click-through rates trending, and what happens to repeat failures?",
+    "Do you run phishing simulations  -  how frequently, what are click-through rates trending, and what happens to repeat failures?",
     "When someone clicks a simulation or reports a suspicious email, is there an immediate educational response and does the data drive targeted training?"
   ],
 
   "PR.DS": [
-    "Do you have a formal data classification scheme — Public, Internal, Confidential, Restricted — and do staff actually handle data accordingly day to day?",
-    "Is sensitive data encrypted at rest — BitLocker or FileVault on endpoints, database field or volume encryption, encrypted backup media?",
+    "Do you have a formal data classification scheme  -  Public, Internal, Confidential, Restricted  -  and do staff actually handle data accordingly day to day?",
+    "Is sensitive data encrypted at rest  -  BitLocker or FileVault on endpoints, database field or volume encryption, encrypted backup media?",
     "Are legacy unencrypted protocols still in use anywhere, and is TLS enforced to a current standard across all services including internal communication?",
     "Are retention periods defined per data type, enforced through automated deletion, and is hardware disposal handled through certified secure destruction?"
   ],
 
   "PR.PS": [
-    "When a new system is built and deployed, is it built to a defined security baseline — CIS Benchmark or equivalent — and is configuration drift monitored after deployment?",
-    "Who owns patching, what tooling is used, and what are the SLAs for critical and high severity patches — how are hard-to-patch systems handled?",
-    "Is there a formal change management process — CAB, impact assessment, rollback plan — and is it consistently followed including for emergency changes?"
+    "When a new system is built and deployed, is it built to a defined security baseline  -  CIS Benchmark or equivalent  -  and is configuration drift monitored after deployment?",
+    "Who owns patching, what tooling is used, and what are the SLAs for critical and high severity patches  -  how are hard-to-patch systems handled?",
+    "Is there a formal change management process  -  CAB, impact assessment, rollback plan  -  and is it consistently followed including for emergency changes?"
   ],
 
   "DE.CM": [
-    "How do you monitor network traffic for threats — IDS, IPS, NDR — and does that cover cloud as well as on-premise, including east-west internal traffic?",
-    "Are you running traditional AV or an EDR solution — CrowdStrike, SentinelOne, Defender for Endpoint — and if still on AV, what's driving that decision?",
-    "Where does log data go — central SIEM or on individual systems — how long is it retained, and is it searchable and tamper-protected?",
-    "Do you have any UEBA capability to detect unusual account behaviour — logins at odd times, abnormal data access, authentication anomalies?"
+    "How do you monitor network traffic for threats  -  IDS, IPS, NDR  -  and does that cover cloud as well as on-premise, including east-west internal traffic?",
+    "Are you running traditional AV or an EDR solution  -  CrowdStrike, SentinelOne, Defender for Endpoint  -  and if still on AV, what's driving that decision?",
+    "Where does log data go  -  central SIEM or on individual systems  -  how long is it retained, and is it searchable and tamper-protected?",
+    "Do you have any UEBA capability to detect unusual account behaviour  -  logins at odd times, abnormal data access, authentication anomalies?"
   ],
 
   "DE.AE": [
-    "When an alert fires, who receives it, what's the triage process, and is there a defined SLA for response by severity — or is alert volume a problem?",
-    "How do you distinguish genuine alerts from noise — are baselines and thresholds defined and tuned, and how much time goes on false positives?",
+    "When an alert fires, who receives it, what's the triage process, and is there a defined SLA for response by severity  -  or is alert volume a problem?",
+    "How do you distinguish genuine alerts from noise  -  are baselines and thresholds defined and tuned, and how much time goes on false positives?",
     "Do you have SIEM or XDR correlation rules that chain related events together to surface lateral movement, privilege escalation or exfiltration patterns?"
   ],
 
   "RS.MA": [
-    "Does a current IR plan exist with playbooks for realistic scenarios — ransomware, breach, account compromise — or is it a high-level document that wouldn't hold up in a crisis?",
-    "Is there a defined severity classification matrix — P1 to P4 — with escalation paths, response time targets and notification obligations for each level?",
-    "Are IR team members named with defined responsibilities, including backups, documented and known before an incident — or worked out on the day?",
-    "Has the IR plan been tested in the last 12 months — tabletop, simulation or live incident?"
+    "Does a current IR plan exist with playbooks for realistic scenarios  -  ransomware, breach, account compromise  -  or is it a high-level document that wouldn't hold up in a crisis?",
+    "Is there a defined severity classification matrix  -  P1 to P4  -  with escalation paths, response time targets and notification obligations for each level?",
+    "Are IR team members named with defined responsibilities, including backups, documented and known before an incident  -  or worked out on the day?",
+    "Has the IR plan been tested in the last 12 months  -  tabletop, simulation or live incident?"
   ],
 
   "RS.AN": [
-    "After an incident is resolved, is there a structured root cause analysis process — 5 Whys, formal PIR — with documented outputs and tracked actions, or does the team move on?",
-    "Are there documented procedures for forensic evidence acquisition, chain of custody and integrity verification — both for investigation and potential legal or regulatory use?",
-    "During an incident, do you cross-reference suspicious IPs, malware or TTPs against threat intel to understand actor context — and does that change how you respond?"
+    "After an incident is resolved, is there a structured root cause analysis process  -  5 Whys, formal PIR  -  with documented outputs and tracked actions, or does the team move on?",
+    "Are there documented procedures for forensic evidence acquisition, chain of custody and integrity verification  -  both for investigation and potential legal or regulatory use?",
+    "During an incident, do you cross-reference suspicious IPs, malware or TTPs against threat intel to understand actor context  -  and does that change how you respond?"
   ],
 
   "RS.CO": [
     "When a significant incident occurs, is there a documented escalation path covering the exec team, board and key business functions including out-of-hours contacts?",
-    "Do you understand your regulatory notification obligations — ICO 72 hours, NIS2 — who owns it and is it embedded in the IR plan with defined triggers?",
+    "Do you understand your regulatory notification obligations  -  ICO 72 hours, NIS2  -  who owns it and is it embedded in the IR plan with defined triggers?",
     "Do you have pre-approved breach communication templates and a named communications lead with a clear approval chain ready to go before an incident happens?",
     "Is your IR plan aligned to your cyber insurance policy's notification requirements?"
   ],
 
   "RC.RP": [
-    "Do critical systems have documented recovery runbooks — step-by-step, with owners, dependencies and configuration sources — stored somewhere accessible if primary systems are down?",
-    "Walk me through your backup strategy — coverage, frequency, tooling, storage location — and when did you last actually restore from backup at meaningful scale?",
+    "Do critical systems have documented recovery runbooks  -  step-by-step, with owners, dependencies and configuration sources  -  stored somewhere accessible if primary systems are down?",
+    "Walk me through your backup strategy  -  coverage, frequency, tooling, storage location  -  and when did you last actually restore from backup at meaningful scale?",
     "Have RTO and RPO been defined for each critical system, agreed with the business, and validated against your actual recovery capability?"
   ],
 
   "RC.CO": [
-    "During a recovery, is there a defined process for stakeholder communications — who communicates, to whom, how often, and through what channel if primary comms are affected?",
+    "During a recovery, is there a defined process for stakeholder communications  -  who communicates, to whom, how often, and through what channel if primary comms are affected?",
     "Is the post-incident review a structured documented exercise with assigned actions that reach senior leadership, or an informal debrief?",
     "Can you give an example of something that changed in your security programme as a direct result of a lessons-learned review?"
   ],
 
   "CIS1": [
-    "How do you maintain visibility of every authorised device on your network — active discovery tooling or manual register — and how confident are you it's complete and current?",
-    "What happens when an unauthorised device connects — is there NAC, DHCP monitoring or scanning alerts to detect it in near real-time, and is the response process documented?",
+    "How do you maintain visibility of every authorised device on your network  -  active discovery tooling or manual register  -  and how confident are you it's complete and current?",
+    "What happens when an unauthorised device connects  -  is there NAC, DHCP monitoring or scanning alerts to detect it in near real-time, and is the response process documented?",
     "How often is the asset inventory formally reconciled against the actual network, and who owns that process?"
   ],
 
   "CIS2": [
-    "How do you maintain an accurate software inventory — Intune, SCCM, Jamf — covering installed applications, SaaS, licences and browser extensions across all platforms?",
-    "How do you prevent or detect unauthorised software — application allowlisting, software restriction policies — and how broadly is that enforced?",
+    "How do you maintain an accurate software inventory  -  Intune, SCCM, Jamf  -  covering installed applications, SaaS, licences and browser extensions across all platforms?",
+    "How do you prevent or detect unauthorised software  -  application allowlisting, software restriction policies  -  and how broadly is that enforced?",
     "Does the software inventory include version numbers linked to vulnerability data, so you can quickly identify outdated or end-of-life software against a critical advisory?"
   ],
 
   "CIS3": [
     "Do you have a formal data classification scheme and do staff genuinely handle data according to it day to day, not just on paper?",
-    "Is sensitive data encrypted at rest — endpoints, databases, file stores, backup media — and is TLS enforced for all data in transit including internal system communication?",
+    "Is sensitive data encrypted at rest  -  endpoints, databases, file stores, backup media  -  and is TLS enforced for all data in transit including internal system communication?",
     "Are retention periods defined per data type, aligned to legal obligations, enforced through automated deletion, and is hardware disposal certified secure?"
   ],
 
   "CIS4": [
-    "Is every new system built to a documented security baseline — CIS Benchmark, NCSC guidance or your own standard — enforced consistently, not left to individual engineers?",
-    "How do you ensure default credentials are changed before any system goes into production — is there a build checklist with an explicit verification step?",
-    "How do you detect configuration drift after deployment — CIS-CAT, DSC, CSPM for cloud — and is there alerting when a system deviates from its approved baseline?"
+    "Is every new system built to a documented security baseline  -  CIS Benchmark, NCSC guidance or your own standard  -  enforced consistently, not left to individual engineers?",
+    "How do you ensure default credentials are changed before any system goes into production  -  is there a build checklist with an explicit verification step?",
+    "How do you detect configuration drift after deployment  -  CIS-CAT, DSC, CSPM for cloud  -  and is there alerting when a system deviates from its approved baseline?"
   ],
 
   "CIS5": [
-    "Walk me through your JML process — is it HR-integrated with a defined SLA, or manual? How quickly are leavers fully disabled after their last day?",
+    "Walk me through your JML process  -  is it HR-integrated with a defined SLA, or manual? How quickly are leavers fully disabled after their last day?",
     "Do IT admins and privileged users have separate dedicated accounts for elevated activity, distinct from their day-to-day standard account?",
-    "How do you identify dormant accounts — former staff, decommissioned service accounts, shared accounts — and is detection automated or only surfaced at audit?"
+    "How do you identify dormant accounts  -  former staff, decommissioned service accounts, shared accounts  -  and is detection automated or only surfaced at audit?"
   ],
 
   "CIS6": [
     "How is access provisioned against defined role profiles with minimum necessary permissions, and what prevents privilege creep when someone changes roles?",
-    "Where is MFA enforced — VPN, RDP, cloud admin consoles, email, privileged accounts, internet-facing apps — and are there known exceptions that haven't been addressed?",
-    "How regularly do line managers formally certify their team's access is still appropriate — and is access that can't be justified removed promptly?"
+    "Where is MFA enforced  -  VPN, RDP, cloud admin consoles, email, privileged accounts, internet-facing apps  -  and are there known exceptions that haven't been addressed?",
+    "How regularly do line managers formally certify their team's access is still appropriate  -  and is access that can't be justified removed promptly?"
   ],
 
   "CIS7": [
-    "Are vulnerability scans authenticated and covering the full scope — cloud workloads, remote endpoints, on-premise — and who reviews output and acts on it?",
-    "Are there defined remediation SLAs by severity — Critical 48hrs, High 7 days — tracked and reported, and how are hard-to-patch systems handled?",
+    "Are vulnerability scans authenticated and covering the full scope  -  cloud workloads, remote endpoints, on-premise  -  and who reviews output and acts on it?",
+    "Are there defined remediation SLAs by severity  -  Critical 48hrs, High 7 days  -  tracked and reported, and how are hard-to-patch systems handled?",
     "When was the last penetration test, what was the scope, was it CREST-accredited, and are findings tracked through to verified remediation?"
   ],
 
   "CIS8": [
-    "What are you logging — authentication events, privileged activity, network devices, cloud management plane, key application logs — and where are the gaps?",
-    "Are logs forwarded to a central SIEM or sitting on individual systems — is storage tamper-protected with write-once or append-only enforcement?",
-    "How long is log data retained — is 12 months total with hot and cold tiers defined formally, or based on platform defaults?"
+    "What are you logging  -  authentication events, privileged activity, network devices, cloud management plane, key application logs  -  and where are the gaps?",
+    "Are logs forwarded to a central SIEM or sitting on individual systems  -  is storage tamper-protected with write-once or append-only enforcement?",
+    "How long is log data retained  -  is 12 months total with hot and cold tiers defined formally, or based on platform defaults?"
   ],
 
   "CIS9": [
-    "Walk me through your email security stack — gateway filtering, attachment sandboxing, impersonation protection, and integration with Microsoft or Google native security?",
-    "How do you block malicious domains and control web access — DNS filtering like Umbrella or Cloudflare Gateway, web proxy, or relying on endpoint AV post-click?",
-    "Are SPF, DKIM and DMARC configured for all sending domains including subsidiaries — and is DMARC in enforcement mode with quarantine or reject policy?"
+    "Walk me through your email security stack  -  gateway filtering, attachment sandboxing, impersonation protection, and integration with Microsoft or Google native security?",
+    "How do you block malicious domains and control web access  -  DNS filtering like Umbrella or Cloudflare Gateway, web proxy, or relying on endpoint AV post-click?",
+    "Are SPF, DKIM and DMARC configured for all sending domains including subsidiaries  -  and is DMARC in enforcement mode with quarantine or reject policy?"
   ],
 
   "CIS10": [
-    "Is anti-malware deployed across all endpoints, servers, mobile devices and non-Windows platforms — and are there known coverage gaps or unmanaged systems?",
-    "Are you running traditional signature AV or an EDR solution — CrowdStrike, SentinelOne, Defender for Endpoint — and if still on AV, what's blocking the move to EDR?",
-    "Are definition and agent updates applied automatically, and is there monitoring to identify endpoints that have fallen behind — particularly those travelling off-network?"
+    "Is anti-malware deployed across all endpoints, servers, mobile devices and non-Windows platforms  -  and are there known coverage gaps or unmanaged systems?",
+    "Are you running traditional signature AV or an EDR solution  -  CrowdStrike, SentinelOne, Defender for Endpoint  -  and if still on AV, what's blocking the move to EDR?",
+    "Are definition and agent updates applied automatically, and is there monitoring to identify endpoints that have fallen behind  -  particularly those travelling off-network?"
   ],
 
   "CIS11": [
-    "Walk me through backup coverage — what's included, frequency, tooling, storage location — and are there gaps like SaaS data or cloud configurations not covered?",
-    "Could ransomware reach your backups — is there an air-gapped or immutable copy following the 3-2-1 principle, or are backups on the same accessible network?",
+    "Walk me through backup coverage  -  what's included, frequency, tooling, storage location  -  and are there gaps like SaaS data or cloud configurations not covered?",
+    "Could ransomware reach your backups  -  is there an air-gapped or immutable copy following the 3-2-1 principle, or are backups on the same accessible network?",
     "When did you last restore from backup at meaningful scale, validate it came back within RTO, and how is that testing documented?"
   ],
 
   "CIS12": [
-    "Are critical systems — domain controllers, finance platforms, production databases — isolated in their own network segments with controlled traffic flows, or is this largely a flat network?",
-    "Is there a documented firewall rule set with business justifications for each rule, reviewed on a defined schedule — when did you last do a full rule review?",
-    "How is remote access controlled — VPN with MFA, no direct RDP or SMB internet exposure, sessions logged — and is unusual access visible in your monitoring?"
+    "Are critical systems  -  domain controllers, finance platforms, production databases  -  isolated in their own network segments with controlled traffic flows, or is this largely a flat network?",
+    "Is there a documented firewall rule set with business justifications for each rule, reviewed on a defined schedule  -  when did you last do a full rule review?",
+    "How is remote access controlled  -  VPN with MFA, no direct RDP or SMB internet exposure, sessions logged  -  and is unusual access visible in your monitoring?"
   ],
 
   "CIS13": [
-    "What capability do you have to detect threats in network traffic — IDS, IPS, NDR — covering cloud as well as on-premise, including east-west lateral movement?",
-    "Where is IDS or IPS deployed, are signatures current, alerts integrated into SIEM, and is there a response process — or is it deployed but effectively unmonitored?",
-    "Are DNS queries routed through a security-aware resolver blocking malicious domains and C2 infrastructure — and does that cover users working off the corporate network?"
+    "What capability do you have to detect threats in network traffic  -  IDS, IPS, NDR  -  covering cloud as well as on-premise, including east-west lateral movement?",
+    "Where is IDS or IPS deployed, are signatures current, alerts integrated into SIEM, and is there a response process  -  or is it deployed but effectively unmonitored?",
+    "Are DNS queries routed through a security-aware resolver blocking malicious domains and C2 infrastructure  -  and does that cover users working off the corporate network?"
   ],
 
   "CIS14": [
-    "Is security awareness training a structured platform with tracked completion, enforced renewal and onboarding for every joiner — or more informal and optional?",
+    "Is security awareness training a structured platform with tracked completion, enforced renewal and onboarding for every joiner  -  or more informal and optional?",
     "Do IT admins, finance teams and executives receive role-specific training beyond standard content, reflecting their actual threat exposure?",
     "Do you run phishing simulations, what are click-through rates trending over time, and is the data used to target training at higher-risk individuals?"
   ],
 
   "CIS15": [
-    "Before onboarding a supplier with system or data access, is there a structured assessment — risk-tiered questionnaire, ISO 27001, Cyber Essentials — or is it mainly commercial due diligence?",
+    "Before onboarding a supplier with system or data access, is there a structured assessment  -  risk-tiered questionnaire, ISO 27001, Cyber Essentials  -  or is it mainly commercial due diligence?",
     "Do supplier contracts include minimum security controls, incident notification timelines, data handling obligations and the right to audit?",
     "Are supplier remote sessions time-limited and logged, is access periodically reviewed for continued necessity, or is supplier access persistent and largely unmonitored?"
   ],
 
   "CIS16": [
-    "Are security requirements, threat modelling and secure code review built into development as standard — or is security largely a post-development consideration?",
+    "Are security requirements, threat modelling and secure code review built into development as standard  -  or is security largely a post-development consideration?",
     "Is SAST integrated into the CI/CD pipeline, is DAST or API testing run against deployed applications, and do externally-facing apps receive independent penetration testing?",
-    "Is software composition analysis — Snyk, Dependabot or equivalent — part of the build pipeline to continuously identify vulnerable open source dependencies?"
+    "Is software composition analysis  -  Snyk, Dependabot or equivalent  -  part of the build pipeline to continuously identify vulnerable open source dependencies?"
   ],
 
   "CIS17": [
-    "Does a current IR plan exist with scenario-specific playbooks — ransomware, breach, account compromise — updated in the last 12 months and accessible if primary systems are down?",
-    "Has the IR plan been tested through a tabletop, simulation or live incident in the last year — and what changed as a result?",
+    "Does a current IR plan exist with scenario-specific playbooks  -  ransomware, breach, account compromise  -  updated in the last 12 months and accessible if primary systems are down?",
+    "Has the IR plan been tested through a tabletop, simulation or live incident in the last year  -  and what changed as a result?",
     "After incidents, is there a structured PIR with documented actions tracked to closure, or an informal debrief that doesn't consistently produce lasting change?"
   ],
 
   "CIS18": [
-    "When was the last penetration test, what was the scope — external perimeter, internal network, applications, cloud — and was it carried out by a CREST or CHECK-accredited firm?",
-    "Did the test include social engineering — phishing or vishing — alongside technical testing to give a realistic picture of the attack surface?",
+    "When was the last penetration test, what was the scope  -  external perimeter, internal network, applications, cloud  -  and was it carried out by a CREST or CHECK-accredited firm?",
+    "Did the test include social engineering  -  phishing or vishing  -  alongside technical testing to give a realistic picture of the attack surface?",
     "Are pentest findings logged in a tracked remediation plan with owners and target dates, with a retest conducted before Critical and High findings are closed?"
   ]
 };
 
-// ─── RECOMMENDATIONS LIBRARY ─────────────────────────────────────────────────
+// --- RECOMMENDATIONS LIBRARY -------------------------------------------------
 const RECS = {
   "GV.OC_q0": { action: "Define and document the cybersecurity mission", detail: "Run a facilitated workshop with senior leadership to agree cyber objectives that tie directly to business outcomes, and record these in a one-page mission statement.", effort: "Low", priority: "High", ref: "NIST CSF 2.0 GV.OC-01" },
   "GV.OC_q1": { action: "Conduct a regulatory and legal obligations review", detail: "Map applicable regulations (UK GDPR, NIS2, sector-specific) to current controls and identify gaps; assign a compliance owner.", effort: "Medium", priority: "High", ref: "NIST CSF 2.0 GV.OC-02" },
@@ -280,7 +445,7 @@ const RECS = {
   "DE.AE_q1": { action: "Establish behavioural baselines and detection thresholds", detail: "Define normal operating parameters for key systems and users; configure SIEM or monitoring tooling to alert on deviations and tune thresholds to reduce false positive rates.", effort: "High", priority: "High", ref: "NIST CSF 2.0 DE.AE-02" },
   "DE.AE_q2": { action: "Implement correlation rules for multi-stage attack detection", detail: "Develop SIEM correlation rules based on known attack patterns (MITRE ATT&CK) to detect lateral movement, privilege escalation and data exfiltration chains.", effort: "High", priority: "High", ref: "NIST CSF 2.0 DE.AE-06" },
   "RS.MA_q0": { action: "Develop and maintain an Incident Response Plan", detail: "Produce a documented IRP covering classification criteria, escalation paths, containment playbooks for common incident types and communication protocols; review annually.", effort: "Medium", priority: "Critical", ref: "NIST CSF 2.0 RS.MA-01 / CIS Control 17" },
-  "RS.MA_q1": { action: "Define incident classification and severity criteria", detail: "Create a severity matrix (P1–P4) with clear criteria, escalation triggers, response time SLAs and notification obligations for each level.", effort: "Low", priority: "High", ref: "NIST CSF 2.0 RS.MA-02" },
+  "RS.MA_q1": { action: "Define incident classification and severity criteria", detail: "Create a severity matrix (P1-P4) with clear criteria, escalation triggers, response time SLAs and notification obligations for each level.", effort: "Low", priority: "High", ref: "NIST CSF 2.0 RS.MA-02" },
   "RS.MA_q2": { action: "Assign and test IR roles and responsibilities", detail: "Define an Incident Response Team with named primary and backup contacts for each role; validate through tabletop exercises at least annually.", effort: "Low", priority: "High", ref: "NIST CSF 2.0 RS.MA-01" },
   "RS.AN_q0": { action: "Implement a root cause analysis process", detail: "Define an RCA methodology (5 Whys, fishbone or equivalent) and mandate its application for all P1/P2 incidents; track identified root causes to prevent recurrence.", effort: "Low", priority: "High", ref: "NIST CSF 2.0 RS.AN-03" },
   "RS.AN_q1": { action: "Establish forensic evidence preservation procedures", detail: "Document evidence handling procedures covering acquisition, chain of custody, integrity verification and storage; ensure IR team members are trained on legal admissibility requirements.", effort: "Medium", priority: "High", ref: "NIST CSF 2.0 RS.AN-03" },
@@ -350,7 +515,7 @@ const RECS = {
   "CIS18_q2": { action: "Track all penetration test findings to verified remediation", detail: "Log all findings in a remediation tracker with severity, owner and target date; conduct a retest for all Critical and High findings before sign-off.", effort: "Low", priority: "High", ref: "CIS Control 18.5" }
 };
 
-// ─── LevelBlue Brand Tokens ───────────────────────────────────────────────────
+// --- LevelBlue Brand Tokens ---------------------------------------------------
 // Navy: #0A1628  Card: #0D1F3C  Border: #1B3A6B  Blue: #1E6FD9  Cyan: #00BFFF  Lime: #C8F135
 const LB = {
   pageBg:   "#08111F",
@@ -372,169 +537,169 @@ const FRAMEWORKS = {
   "NIST CSF 2.0": [
     { id:"GV", name:"Govern", color:"#1E6FD9", light:"rgba(30,111,217,0.15)", description:"Organisational context, risk strategy, roles, policy & supply chain", domains:[
       { id:"GV.OC", name:"Organizational Context", questions:[
-        "GV.OC-01 — The organizational mission is understood and informs cybersecurity risk management",
-        "GV.OC-02 — Internal and external stakeholders are understood and their needs regarding cybersecurity risk management are considered",
-        "GV.OC-03 — Legal, regulatory, and contractual requirements regarding cybersecurity are understood and managed",
-        "GV.OC-04 — Critical objectives, capabilities, and services that external stakeholders depend on are understood and communicated",
-        "GV.OC-05 — Outcomes, capabilities, and services that the organization depends on are understood and communicated"
+        "GV.OC-01  -  The organizational mission is understood and informs cybersecurity risk management",
+        "GV.OC-02  -  Internal and external stakeholders are understood and their needs regarding cybersecurity risk management are considered",
+        "GV.OC-03  -  Legal, regulatory, and contractual requirements regarding cybersecurity are understood and managed",
+        "GV.OC-04  -  Critical objectives, capabilities, and services that external stakeholders depend on are understood and communicated",
+        "GV.OC-05  -  Outcomes, capabilities, and services that the organization depends on are understood and communicated"
       ]},
       { id:"GV.RM", name:"Risk Management Strategy", questions:[
-        "GV.RM-01 — Risk management objectives are established and agreed to by organizational stakeholders",
-        "GV.RM-02 — Risk appetite and risk tolerance statements are established, communicated, and maintained",
-        "GV.RM-03 — Organizational risk tolerance is determined, communicated, and reviewed",
-        "GV.RM-04 — Strategic direction that describes appropriate risk response options is established and communicated",
-        "GV.RM-05 — Lines of communication across the organization are established for cybersecurity risks",
-        "GV.RM-06 — A standardized method for calculating, documenting, categorizing, and prioritizing cybersecurity risks is established",
-        "GV.RM-07 — Strategic opportunities (positive risks) are characterized and included in cybersecurity risk discussions"
+        "GV.RM-01  -  Risk management objectives are established and agreed to by organizational stakeholders",
+        "GV.RM-02  -  Risk appetite and risk tolerance statements are established, communicated, and maintained",
+        "GV.RM-03  -  Organizational risk tolerance is determined, communicated, and reviewed",
+        "GV.RM-04  -  Strategic direction that describes appropriate risk response options is established and communicated",
+        "GV.RM-05  -  Lines of communication across the organization are established for cybersecurity risks",
+        "GV.RM-06  -  A standardized method for calculating, documenting, categorizing, and prioritizing cybersecurity risks is established",
+        "GV.RM-07  -  Strategic opportunities (positive risks) are characterized and included in cybersecurity risk discussions"
       ]},
       { id:"GV.RR", name:"Roles, Responsibilities & Authorities", questions:[
-        "GV.RR-01 — Organizational leadership is responsible and accountable for cybersecurity risk and fosters a risk-aware culture",
-        "GV.RR-02 — Roles, responsibilities, and authorities related to cybersecurity risk management are established, communicated, understood, and enforced",
-        "GV.RR-03 — Adequate resources are allocated commensurate with the cybersecurity risk strategy, roles, and policies",
-        "GV.RR-04 — Cybersecurity is included in human resources practices"
+        "GV.RR-01  -  Organizational leadership is responsible and accountable for cybersecurity risk and fosters a risk-aware culture",
+        "GV.RR-02  -  Roles, responsibilities, and authorities related to cybersecurity risk management are established, communicated, understood, and enforced",
+        "GV.RR-03  -  Adequate resources are allocated commensurate with the cybersecurity risk strategy, roles, and policies",
+        "GV.RR-04  -  Cybersecurity is included in human resources practices"
       ]},
       { id:"GV.PO", name:"Policy", questions:[
-        "GV.PO-01 — Policy for managing cybersecurity risks is established, communicated, and enforced",
-        "GV.PO-02 — Policy for managing cybersecurity risks is reviewed, updated, and enforced to reflect changes in requirements and threats"
+        "GV.PO-01  -  Policy for managing cybersecurity risks is established, communicated, and enforced",
+        "GV.PO-02  -  Policy for managing cybersecurity risks is reviewed, updated, and enforced to reflect changes in requirements and threats"
       ]},
       { id:"GV.OV", name:"Oversight", questions:[
-        "GV.OV-01 — Cybersecurity risk management strategy outcomes are reviewed to inform and adjust strategy and direction",
-        "GV.OV-02 — The cybersecurity risk management strategy is reviewed and adjusted to ensure coverage of organizational requirements and risks",
-        "GV.OV-03 — Organizational cybersecurity risk management performance is evaluated and reviewed for adjustments needed"
+        "GV.OV-01  -  Cybersecurity risk management strategy outcomes are reviewed to inform and adjust strategy and direction",
+        "GV.OV-02  -  The cybersecurity risk management strategy is reviewed and adjusted to ensure coverage of organizational requirements and risks",
+        "GV.OV-03  -  Organizational cybersecurity risk management performance is evaluated and reviewed for adjustments needed"
       ]},
       { id:"GV.SC", name:"Supply Chain Risk Management", questions:[
-        "GV.SC-01 — A cybersecurity supply chain risk management program, strategy, objectives, policies, and processes are established",
-        "GV.SC-02 — Cybersecurity roles and responsibilities for suppliers, customers, and partners are established and coordinated",
-        "GV.SC-03 — Cybersecurity supply chain risk management is integrated into cybersecurity and enterprise risk management processes",
-        "GV.SC-04 — Suppliers are known and prioritized by criticality",
-        "GV.SC-05 — Requirements to address cybersecurity risks in supply chains are integrated into contracts with suppliers",
-        "GV.SC-06 — Planning and due diligence are performed to reduce risks before entering formal supplier relationships",
-        "GV.SC-07 — The risks posed by suppliers are understood, recorded, assessed, responded to, and monitored over the course of the relationship",
-        "GV.SC-08 — Relevant suppliers are included in incident planning, response, and recovery activities",
-        "GV.SC-09 — Supply chain security practices are integrated into cybersecurity and enterprise risk management programs",
-        "GV.SC-10 — Cybersecurity supply chain risk management plans include provisions for activities after the conclusion of a partnership"
+        "GV.SC-01  -  A cybersecurity supply chain risk management program, strategy, objectives, policies, and processes are established",
+        "GV.SC-02  -  Cybersecurity roles and responsibilities for suppliers, customers, and partners are established and coordinated",
+        "GV.SC-03  -  Cybersecurity supply chain risk management is integrated into cybersecurity and enterprise risk management processes",
+        "GV.SC-04  -  Suppliers are known and prioritized by criticality",
+        "GV.SC-05  -  Requirements to address cybersecurity risks in supply chains are integrated into contracts with suppliers",
+        "GV.SC-06  -  Planning and due diligence are performed to reduce risks before entering formal supplier relationships",
+        "GV.SC-07  -  The risks posed by suppliers are understood, recorded, assessed, responded to, and monitored over the course of the relationship",
+        "GV.SC-08  -  Relevant suppliers are included in incident planning, response, and recovery activities",
+        "GV.SC-09  -  Supply chain security practices are integrated into cybersecurity and enterprise risk management programs",
+        "GV.SC-10  -  Cybersecurity supply chain risk management plans include provisions for activities after the conclusion of a partnership"
       ]}
     ]},
     { id:"ID", name:"Identify", color:"#00BFFF", light:"rgba(0,191,255,0.12)", description:"Asset management, risk assessment & improvement", domains:[
       { id:"ID.AM", name:"Asset Management", questions:[
-        "ID.AM-01 — Inventories of hardware managed by the organization are maintained",
-        "ID.AM-02 — Inventories of software, services, and systems managed by the organization are maintained",
-        "ID.AM-03 — Representations of the organization's authorized network communication and internal and external data flows are maintained",
-        "ID.AM-04 — Inventories of services provided by suppliers are maintained",
-        "ID.AM-05 — Assets are prioritized based on classification, criticality, resources, and impact on the mission",
-        "ID.AM-06 — Cybersecurity roles and responsibilities for the entire workforce and third parties are established, communicated, and enforced",
-        "ID.AM-07 — Inventories of data and corresponding metadata for designated data types are maintained",
-        "ID.AM-08 — Systems, hardware, software, services, and data are managed throughout their life cycles"
+        "ID.AM-01  -  Inventories of hardware managed by the organization are maintained",
+        "ID.AM-02  -  Inventories of software, services, and systems managed by the organization are maintained",
+        "ID.AM-03  -  Representations of the organization's authorized network communication and internal and external data flows are maintained",
+        "ID.AM-04  -  Inventories of services provided by suppliers are maintained",
+        "ID.AM-05  -  Assets are prioritized based on classification, criticality, resources, and impact on the mission",
+        "ID.AM-06  -  Cybersecurity roles and responsibilities for the entire workforce and third parties are established, communicated, and enforced",
+        "ID.AM-07  -  Inventories of data and corresponding metadata for designated data types are maintained",
+        "ID.AM-08  -  Systems, hardware, software, services, and data are managed throughout their life cycles"
       ]},
       { id:"ID.RA", name:"Risk Assessment", questions:[
-        "ID.RA-01 — Vulnerabilities in assets are identified, validated, and recorded",
-        "ID.RA-02 — Cyber threat intelligence is received from information sharing forums and sources",
-        "ID.RA-03 — Internal and external threats to the organization are identified and recorded",
-        "ID.RA-04 — Potential impacts and likelihoods of threats exploiting vulnerabilities are identified and recorded",
-        "ID.RA-05 — Threats, vulnerabilities, likelihoods, and impacts are used to understand inherent risk and inform risk response prioritization",
-        "ID.RA-06 — Risk responses are chosen, prioritized, planned, tracked, and communicated",
-        "ID.RA-07 — Changes and exceptions are managed, assessed for risk impact, recorded, and tracked",
-        "ID.RA-08 — Processes for receiving, analyzing, and responding to vulnerability disclosures are established",
-        "ID.RA-09 — The authenticity and integrity of hardware and software are assessed prior to acquisition and use",
-        "ID.RA-10 — Critical suppliers are assessed prior to acquisition"
+        "ID.RA-01  -  Vulnerabilities in assets are identified, validated, and recorded",
+        "ID.RA-02  -  Cyber threat intelligence is received from information sharing forums and sources",
+        "ID.RA-03  -  Internal and external threats to the organization are identified and recorded",
+        "ID.RA-04  -  Potential impacts and likelihoods of threats exploiting vulnerabilities are identified and recorded",
+        "ID.RA-05  -  Threats, vulnerabilities, likelihoods, and impacts are used to understand inherent risk and inform risk response prioritization",
+        "ID.RA-06  -  Risk responses are chosen, prioritized, planned, tracked, and communicated",
+        "ID.RA-07  -  Changes and exceptions are managed, assessed for risk impact, recorded, and tracked",
+        "ID.RA-08  -  Processes for receiving, analyzing, and responding to vulnerability disclosures are established",
+        "ID.RA-09  -  The authenticity and integrity of hardware and software are assessed prior to acquisition and use",
+        "ID.RA-10  -  Critical suppliers are assessed prior to acquisition"
       ]},
       { id:"ID.IM", name:"Improvement", questions:[
-        "ID.IM-01 — Improvements are identified from security program evaluations",
-        "ID.IM-02 — Improvements are identified from security tests and exercises, including those done in coordination with suppliers",
-        "ID.IM-03 — Improvements are identified from execution of operational processes, procedures, and activities"
+        "ID.IM-01  -  Improvements are identified from security program evaluations",
+        "ID.IM-02  -  Improvements are identified from security tests and exercises, including those done in coordination with suppliers",
+        "ID.IM-03  -  Improvements are identified from execution of operational processes, procedures, and activities"
       ]}
     ]},
     { id:"PR", name:"Protect", color:"#C8F135", light:"rgba(200,241,53,0.12)", description:"Identity, awareness, data security, platform security & resilience", domains:[
       { id:"PR.AA", name:"Identity Management, Authentication & Access Control", questions:[
-        "PR.AA-01 — Identities and credentials for authorized users, services, and hardware are managed by the organization",
-        "PR.AA-02 — Identities are proofed and bound to credentials based on the context of interactions",
-        "PR.AA-03 — Users, services, and hardware are authenticated",
-        "PR.AA-04 — Identity assertions are protected, conveyed, and verified",
-        "PR.AA-05 — Access permissions, entitlements, and authorizations are defined in policy, managed, enforced, and reviewed",
-        "PR.AA-06 — Physical access to assets is managed, monitored, and enforced commensurate with risk"
+        "PR.AA-01  -  Identities and credentials for authorized users, services, and hardware are managed by the organization",
+        "PR.AA-02  -  Identities are proofed and bound to credentials based on the context of interactions",
+        "PR.AA-03  -  Users, services, and hardware are authenticated",
+        "PR.AA-04  -  Identity assertions are protected, conveyed, and verified",
+        "PR.AA-05  -  Access permissions, entitlements, and authorizations are defined in policy, managed, enforced, and reviewed",
+        "PR.AA-06  -  Physical access to assets is managed, monitored, and enforced commensurate with risk"
       ]},
       { id:"PR.AT", name:"Awareness & Training", questions:[
-        "PR.AT-01 — Personnel are provided with awareness and training so that they possess the knowledge and skills to perform general tasks with cybersecurity risks in mind",
-        "PR.AT-02 — Individuals in specialized roles are provided with awareness and training so that they possess the knowledge and skills to perform relevant tasks with cybersecurity risks in mind"
+        "PR.AT-01  -  Personnel are provided with awareness and training so that they possess the knowledge and skills to perform general tasks with cybersecurity risks in mind",
+        "PR.AT-02  -  Individuals in specialized roles are provided with awareness and training so that they possess the knowledge and skills to perform relevant tasks with cybersecurity risks in mind"
       ]},
       { id:"PR.DS", name:"Data Security", questions:[
-        "PR.DS-01 — The confidentiality, integrity, and availability of data-at-rest are protected",
-        "PR.DS-02 — The confidentiality, integrity, and availability of data-in-transit are protected",
-        "PR.DS-03 — Data leakage and exfiltration activities are anticipated, resisted, detected, and mitigated",
-        "PR.DS-04 — Adequate capacity to ensure availability is maintained",
-        "PR.DS-05 — Protections against data leaks are implemented",
-        "PR.DS-06 — Integrity checking mechanisms are used to verify software, firmware, and information integrity",
-        "PR.DS-07 — The development and testing environment(s) are separate from the production environment",
-        "PR.DS-08 — Integrity checking mechanisms are used to verify hardware integrity",
-        "PR.DS-09 — Data is managed throughout its life cycle",
-        "PR.DS-10 — Data is destroyed according to policy when no longer needed"
+        "PR.DS-01  -  The confidentiality, integrity, and availability of data-at-rest are protected",
+        "PR.DS-02  -  The confidentiality, integrity, and availability of data-in-transit are protected",
+        "PR.DS-03  -  Data leakage and exfiltration activities are anticipated, resisted, detected, and mitigated",
+        "PR.DS-04  -  Adequate capacity to ensure availability is maintained",
+        "PR.DS-05  -  Protections against data leaks are implemented",
+        "PR.DS-06  -  Integrity checking mechanisms are used to verify software, firmware, and information integrity",
+        "PR.DS-07  -  The development and testing environment(s) are separate from the production environment",
+        "PR.DS-08  -  Integrity checking mechanisms are used to verify hardware integrity",
+        "PR.DS-09  -  Data is managed throughout its life cycle",
+        "PR.DS-10  -  Data is destroyed according to policy when no longer needed"
       ]},
       { id:"PR.PS", name:"Platform Security", questions:[
-        "PR.PS-01 — Configuration management practices are established and applied",
-        "PR.PS-02 — Software is maintained, replaced, and removed commensurate with risk"
+        "PR.PS-01  -  Configuration management practices are established and applied",
+        "PR.PS-02  -  Software is maintained, replaced, and removed commensurate with risk"
       ]},
       { id:"PR.IR", name:"Technology Infrastructure Resilience", questions:[
-        "PR.IR-01 — Networks and environments are protected from unauthorized logical access and usage",
-        "PR.IR-02 — The organization's technology assets are protected from environmental threats"
+        "PR.IR-01  -  Networks and environments are protected from unauthorized logical access and usage",
+        "PR.IR-02  -  The organization's technology assets are protected from environmental threats"
       ]}
     ]},
     { id:"DE", name:"Detect", color:"#F59E0B", light:"rgba(245,158,11,0.12)", description:"Continuous monitoring and adverse event analysis", domains:[
       { id:"DE.CM", name:"Continuous Monitoring", questions:[
-        "DE.CM-01 — Networks and network services are monitored to find potentially adverse events",
-        "DE.CM-02 — The physical environment is monitored to find potentially adverse events",
-        "DE.CM-03 — Personnel activity and technology usage are monitored to find potentially adverse events",
-        "DE.CM-04 — External service provider activities and services are monitored to find potentially adverse events",
-        "DE.CM-05 — Vulnerability scans are performed regularly and patch status is assessed",
-        "DE.CM-06 — Authorized users and systems are distinguished from unauthorized users and systems"
+        "DE.CM-01  -  Networks and network services are monitored to find potentially adverse events",
+        "DE.CM-02  -  The physical environment is monitored to find potentially adverse events",
+        "DE.CM-03  -  Personnel activity and technology usage are monitored to find potentially adverse events",
+        "DE.CM-04  -  External service provider activities and services are monitored to find potentially adverse events",
+        "DE.CM-05  -  Vulnerability scans are performed regularly and patch status is assessed",
+        "DE.CM-06  -  Authorized users and systems are distinguished from unauthorized users and systems"
       ]},
       { id:"DE.AE", name:"Adverse Event Analysis", questions:[
-        "DE.AE-01 — A baseline of network operations and expected data flows for users and systems is established and managed",
-        "DE.AE-02 — Potentially adverse events are analyzed to better understand associated activities",
-        "DE.AE-03 — Information is correlated from multiple sources to achieve integrated identification of adverse events",
-        "DE.AE-04 — The estimated impact and scope of adverse events are understood",
-        "DE.AE-05 — Alerts are generated and communicated by cybersecurity technologies to the appropriate personnel"
+        "DE.AE-01  -  A baseline of network operations and expected data flows for users and systems is established and managed",
+        "DE.AE-02  -  Potentially adverse events are analyzed to better understand associated activities",
+        "DE.AE-03  -  Information is correlated from multiple sources to achieve integrated identification of adverse events",
+        "DE.AE-04  -  The estimated impact and scope of adverse events are understood",
+        "DE.AE-05  -  Alerts are generated and communicated by cybersecurity technologies to the appropriate personnel"
       ]}
     ]},
     { id:"RS", name:"Respond", color:"#F87171", light:"rgba(248,113,113,0.12)", description:"Incident management, analysis, communication & mitigation", domains:[
       { id:"RS.MA", name:"Incident Management", questions:[
-        "RS.MA-01 — The incident response plan is executed in coordination with relevant third parties once an incident is declared",
-        "RS.MA-02 — Incident reports are triaged and validated, and security alerts are triaged appropriately",
-        "RS.MA-03 — Incidents are categorized and prioritized"
+        "RS.MA-01  -  The incident response plan is executed in coordination with relevant third parties once an incident is declared",
+        "RS.MA-02  -  Incident reports are triaged and validated, and security alerts are triaged appropriately",
+        "RS.MA-03  -  Incidents are categorized and prioritized"
       ]},
       { id:"RS.AN", name:"Incident Analysis", questions:[
-        "RS.AN-01 — Notifications from detection systems are investigated to understand the nature of the incident",
-        "RS.AN-02 — The impact of the incident is understood",
-        "RS.AN-03 — Forensics are performed to better understand the incident and support evidence preservation",
-        "RS.AN-04 — Incidents are categorized consistent with response plans",
-        "RS.AN-05 — Processes are established to receive, analyze, and respond to vulnerabilities disclosed to the organization"
+        "RS.AN-01  -  Notifications from detection systems are investigated to understand the nature of the incident",
+        "RS.AN-02  -  The impact of the incident is understood",
+        "RS.AN-03  -  Forensics are performed to better understand the incident and support evidence preservation",
+        "RS.AN-04  -  Incidents are categorized consistent with response plans",
+        "RS.AN-05  -  Processes are established to receive, analyze, and respond to vulnerabilities disclosed to the organization"
       ]},
       { id:"RS.CO", name:"Incident Response Reporting & Communication", questions:[
-        "RS.CO-01 — Personnel know their roles and order of operations when a response is needed",
-        "RS.CO-02 — Incidents are reported consistent with established criteria",
-        "RS.CO-03 — Information is shared consistent with response plans"
+        "RS.CO-01  -  Personnel know their roles and order of operations when a response is needed",
+        "RS.CO-02  -  Incidents are reported consistent with established criteria",
+        "RS.CO-03  -  Information is shared consistent with response plans"
       ]},
       { id:"RS.MI", name:"Incident Mitigation", questions:[
-        "RS.MI-01 — Incidents are contained",
-        "RS.MI-02 — Incidents are eradicated"
+        "RS.MI-01  -  Incidents are contained",
+        "RS.MI-02  -  Incidents are eradicated"
       ]}
     ]},
     { id:"RC", name:"Recover", color:"#A78BFA", light:"rgba(167,139,250,0.12)", description:"Incident recovery planning and communications", domains:[
       { id:"RC.RP", name:"Incident Recovery Plan Execution", questions:[
-        "RC.RP-01 — The recovery portion of the incident response plan is executed once initiated",
-        "RC.RP-02 — Recovery actions are selected, scoped, prioritized, and performed",
-        "RC.RP-03 — The integrity of backups and other restoration assets is verified before using them for restoration",
-        "RC.RP-04 — Critical mission functions and cybersecurity capabilities are re-established",
-        "RC.RP-05 — The integrity of restored assets is verified, systems and services are restored, and normal operating status is confirmed"
+        "RC.RP-01  -  The recovery portion of the incident response plan is executed once initiated",
+        "RC.RP-02  -  Recovery actions are selected, scoped, prioritized, and performed",
+        "RC.RP-03  -  The integrity of backups and other restoration assets is verified before using them for restoration",
+        "RC.RP-04  -  Critical mission functions and cybersecurity capabilities are re-established",
+        "RC.RP-05  -  The integrity of restored assets is verified, systems and services are restored, and normal operating status is confirmed"
       ]},
       { id:"RC.CO", name:"Incident Recovery Communication", questions:[
-        "RC.CO-01 — Public relations are managed during and following cybersecurity incidents",
-        "RC.CO-02 — Reputation of the organization is repaired following an incident",
-        "RC.CO-03 — Recovery activities and progress in restoring normal operations are communicated to designated internal and external stakeholders"
+        "RC.CO-01  -  Public relations are managed during and following cybersecurity incidents",
+        "RC.CO-02  -  Reputation of the organization is repaired following an incident",
+        "RC.CO-03  -  Recovery activities and progress in restoring normal operations are communicated to designated internal and external stakeholders"
       ]}
     ]}
   ],
   "CIS Controls v8": [
-    { id: "IG1", name: "Basic Hygiene",   color: "#1E6FD9", light: "rgba(30,111,217,0.15)", description: "Essential cyber hygiene — every organisation", domains: [
+    { id: "IG1", name: "Basic Hygiene",   color: "#1E6FD9", light: "rgba(30,111,217,0.15)", description: "Essential cyber hygiene  -  every organisation", domains: [
       { id: "CIS1", name: "Inventory of Enterprise Assets", questions: ["An inventory of authorised hardware assets is maintained","Unauthorised hardware is detected and addressed","Asset inventory is reviewed and updated regularly"] },
       { id: "CIS2", name: "Inventory of Software Assets",   questions: ["An inventory of authorised software is maintained","Unauthorised software is blocked or removed","Software inventory includes version and patch status"] },
       { id: "CIS3", name: "Data Protection",                questions: ["Data is classified and handled according to sensitivity","Sensitive data is encrypted at rest and in transit","Data retention and disposal processes are followed"] },
@@ -571,16 +736,16 @@ const ML = [
   { value: 4, label: "Adaptive",      color: "#00BFFF", bg: "rgba(0,191,255,0.18)"   }
 ];
 const ML_DESC = [
-  "Not Present — cybersecurity risk management is not applied or does not exist",
-  "Partial — risk management is ad hoc and reactive; limited awareness",
-  "Risk-Informed — practices exist but are not consistently applied organisation-wide",
-  "Repeatable — formally approved, consistently applied, risk-informed practices",
-  "Adaptive — continuously improved, organisation-wide, anticipates evolving threats"
+  "Not Present  -  cybersecurity risk management is not applied or does not exist",
+  "Partial  -  risk management is ad hoc and reactive; limited awareness",
+  "Risk-Informed  -  practices exist but are not consistently applied organisation-wide",
+  "Repeatable  -  formally approved, consistently applied, risk-informed practices",
+  "Adaptive  -  continuously improved, organisation-wide, anticipates evolving threats"
 ];
 const EFFORT_CFG = { Low: { color: "#C8F135", bg: "rgba(200,241,53,0.15)" }, Medium: { color: "#FCD34D", bg: "rgba(252,211,77,0.15)" }, High: { color: "#F87171", bg: "rgba(248,113,113,0.15)" } };
 const PRI_CFG   = { Critical: { color: "#F87171", bg: "rgba(248,113,113,0.15)" }, High: { color: "#FCD34D", bg: "rgba(252,211,77,0.15)" }, Medium: { color: "#00BFFF", bg: "rgba(0,191,255,0.15)" } };
 
-// ─── NIST DOCUMENTATION LIST ─────────────────────────────────────────────────
+// --- NIST DOCUMENTATION LIST -------------------------------------------------
 // Module-scoped so it can be referenced in scoring, recommendations, PPTX, Excel
 const NIST_DOCS = [
   { id:"d01", cat:"Governance",    priority:"High",     label:"Information Security Policy",                        subcats:["GV.PO-01","GV.PO-02"] },
@@ -589,7 +754,7 @@ const NIST_DOCS = [
   { id:"d04", cat:"Governance",    priority:"High",     label:"Roles & Responsibilities / RACI for Security",       subcats:["GV.RR-01","GV.RR-02"] },
   { id:"d05", cat:"Governance",    priority:"Medium",   label:"Board / Executive Cybersecurity Reporting Pack",     subcats:["GV.OV-01","GV.OV-03"] },
   { id:"d06", cat:"Governance",    priority:"High",     label:"Supplier / Third-Party Risk Management Policy",      subcats:["GV.SC-01","GV.SC-05"] },
-  { id:"d07", cat:"Identify",      priority:"High",     label:"IT Asset Inventory — Hardware",                      subcats:["ID.AM-01","ID.AM-08"] },
+  { id:"d07", cat:"Identify",      priority:"High",     label:"IT Asset Inventory  -  Hardware",                      subcats:["ID.AM-01","ID.AM-08"] },
   { id:"d08", cat:"Identify",      priority:"High",     label:"Software Asset Inventory / Licence Register",        subcats:["ID.AM-02","ID.AM-08"] },
   { id:"d09", cat:"Identify",      priority:"High",     label:"Network Topology / Architecture Diagrams",           subcats:["ID.AM-03"] },
   { id:"d10", cat:"Identify",      priority:"High",     label:"Data Flow Diagrams",                                 subcats:["ID.AM-03","PR.DS-03"] },
@@ -621,7 +786,7 @@ const NIST_DOCS = [
   { id:"d36", cat:"Supply Chain",  priority:"Medium",   label:"Critical Supplier Register",                         subcats:["GV.SC-04"] },
 ];
 
-// Map each subcategory ID prefix → which NIST_DOCS are relevant to it
+// Map each subcategory ID prefix -> which NIST_DOCS are relevant to it
 const DOC_SUBCAT_MAP = {};
 NIST_DOCS.forEach(doc => {
   doc.subcats.forEach(sub => {
@@ -651,7 +816,7 @@ function BarChart({ data, height = 150 }) {
   );
 }
 
-// ── Horizontal Bar Chart — reliable across all screen sizes ─────────────────
+// -- Horizontal Bar Chart  -  reliable across all screen sizes -----------------
 function HBarChart({ data, maxVal }) {
   const max = maxVal || Math.max(...data.map(d => d.value), 1);
   return (
@@ -670,7 +835,7 @@ function HBarChart({ data, maxVal }) {
             }}/>
           </div>
           <div style={{ width:"36px", fontSize:"13px", fontWeight:"800", color: d.value > 0 ? d.color : "#4A6A8A", textAlign:"left", flexShrink:0, fontFamily:"Outfit,sans-serif" }}>
-            {d.value > 0 ? (Number.isInteger(d.value) ? d.value : d.value.toFixed(1)) : "—"}
+            {d.value > 0 ? (Number.isInteger(d.value) ? d.value : d.value.toFixed(1)) : " - "}
           </div>
         </div>
       ))}
@@ -709,9 +874,9 @@ function DonutChart({ segments, size=120, thickness=26 }) {
   );
 }
 
-const card    = { background:"#0D1F3C", borderRadius:"12px", border:"1px solid #1B3A6B", padding:"20px", boxShadow:"0 2px 12px rgba(0,0,0,0.4)" };
-const navBtn  = (active) => ({ padding:"6px 16px", borderRadius:"4px", border:"none", background:active?"#1E6FD9":"transparent", color:active?"#FFFFFF":"#4A6A8A", fontSize:"12px", fontWeight:"600", cursor:"pointer", fontFamily:"inherit", transition:"all 0.15s" });
-const tagSty  = (cfg) => ({ padding:"3px 8px", borderRadius:"4px", fontSize:"10px", fontWeight:"700", background:cfg.bg, color:cfg.color, whiteSpace:"nowrap", letterSpacing:"0.04em" });
+const card    = { background:"rgba(13,31,60,0.72)", backdropFilter:"blur(14px)", WebkitBackdropFilter:"blur(14px)", borderRadius:"14px", border:"1px solid rgba(27,58,107,0.9)", padding:"20px", boxShadow:"0 4px 28px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.035)" };
+const navBtn  = (active) => ({ padding:"6px 16px", borderRadius:"4px", border:"none", background:active?"#1E6FD9":"transparent", color:active?"#FFFFFF":"#4A6A8A", fontSize:"14px", fontWeight:"600", cursor:"pointer", fontFamily:"inherit", transition:"all 0.15s" });
+const tagSty  = (cfg) => ({ padding:"3px 8px", borderRadius:"4px", fontSize:"12px", fontWeight:"700", background:cfg.bg, color:cfg.color, whiteSpace:"nowrap", letterSpacing:"0.04em", fontFamily:MONO });
 
 export default function MaturityScorecard() {
   const [framework, setFramework] = useState("NIST CSF 2.0");
@@ -735,6 +900,7 @@ export default function MaturityScorecard() {
   const [showWorkshop, setShowWorkshop] = useState({});
   const [generatingReport, setGeneratingReport] = useState(false);
   const [narrativeCopied, setNarrativeCopied] = useState(false);
+  const [activeHex, setActiveHex] = useState(null);
   const [recoveryAvailable, setRecoveryAvailable] = useState(false);
   const fileInputRef = useRef();
 
@@ -742,9 +908,9 @@ export default function MaturityScorecard() {
   const isNIST = framework === "NIST CSF 2.0";
   const flash = (msg) => { setStatusMsg(msg); setTimeout(()=>setStatusMsg(""),3000); };
 
-  // ── Autosave to localStorage — crash recovery buffer ─────────────────────
+  // -- Autosave to localStorage  -  crash recovery buffer ---------------------
   // This is NOT the primary save mechanism. It's a recovery net only.
-  // Primary save remains JSON export — no client data persists in the browser
+  // Primary save remains JSON export  -  no client data persists in the browser
   // beyond the session. This buffer is cleared when JSON is exported.
   useEffect(() => {
     if (!clientName && Object.keys(scores).length === 0) return;
@@ -792,12 +958,12 @@ export default function MaturityScorecard() {
   const getMC = (s) => { if(s===null||s===undefined) return "#4A6A8A"; const v=parseFloat(s); if(v<0.5) return "#F87171"; if(v<1.5) return "#FB923C"; if(v<2.5) return "#FCD34D"; if(v<3.5) return "#C8F135"; return "#00BFFF"; };
   const getML = (s) => { if(s===null||s===undefined) return "Not assessed"; const v=parseFloat(s); if(v<0.5) return "Not Present"; if(v<1.5) return "Partial"; if(v<2.5) return "Risk-Informed"; if(v<3.5) return "Repeatable"; return "Adaptive"; };
 
-  // Current scoring — N/A = -1, excluded from averages
+  // Current scoring  -  N/A = -1, excluded from averages
   const domainScore = (d) => { const vals=d.questions.map((_,qi)=>scores[`${d.id}_q${qi}`]).filter(v=>v!==undefined&&v!==-1); return vals.length?(vals.reduce((a,b)=>a+b,0)/vals.length).toFixed(2):null; };
   const catScore = (cat) => { const ds=cat.domains.map(d=>domainScore(d)).filter(v=>v!==null); return ds.length?(ds.reduce((a,b)=>a+parseFloat(b),0)/ds.length).toFixed(2):null; };
   const overall = (()=>{ const cs=fw.map(c=>catScore(c)).filter(v=>v!==null); return cs.length?(cs.reduce((a,b)=>a+parseFloat(b),0)/cs.length).toFixed(2):null; })();
 
-  // Target scoring — defaults to current score if not explicitly set
+  // Target scoring  -  defaults to current score if not explicitly set
   const domainTarget = (d) => {
     const vals = d.questions.map((_,qi) => {
       const key = `${d.id}_q${qi}`;
@@ -812,6 +978,10 @@ export default function MaturityScorecard() {
   const catTarget = (cat) => { const ds=cat.domains.map(d=>domainTarget(d)).filter(v=>v!==null); return ds.length?(ds.reduce((a,b)=>a+parseFloat(b),0)/ds.length).toFixed(2):null; };
   const overallTarget = (()=>{ const cs=fw.map(c=>catTarget(c)).filter(v=>v!==null); return cs.length?(cs.reduce((a,b)=>a+parseFloat(b),0)/cs.length).toFixed(2):null; })();
 
+  // Animated score counters - must be declared after overall/overallTarget are computed
+  const animScore  = useCountUp(overall,        900, [overall]);
+  const animTarget = useCountUp(overallTarget,   900, [overallTarget]);
+
   const completion = (()=>{ const total=fw.flatMap(c=>c.domains.flatMap(d=>d.questions)).length; const done=Object.values(scores).filter(v=>v!==undefined).length; return Math.round((done/total)*100); })();
   const radarScores = {}; fw.forEach(cat=>{ const sc=catScore(cat); radarScores[cat.id]=sc?parseFloat(sc):0; });
 
@@ -822,7 +992,7 @@ export default function MaturityScorecard() {
     return gaps.sort((a,b)=>a.sc-b.sc);
   },[fw,scores]);
 
-  // Documentation gaps — docs with status "no" or not set when they should be
+  // Documentation gaps  -  docs with status "no" or not set when they should be
   const getDocGaps = useCallback(()=>{
     return NIST_DOCS.filter(doc => {
       const status = docsProvided[doc.id];
@@ -841,7 +1011,7 @@ export default function MaturityScorecard() {
     }).filter(x => x.doc);
   }, [docsProvided]);
 
-  // ── JSON Save / Load ─────────────────────────────────────────────────────
+  // -- JSON Save / Load -----------------------------------------------------
   function saveSession() {
     const session = { version:2, framework, clientName, assessor, clientSector, clientContext, date:new Date().toISOString(), scores, targetScores, notes, workshopNotes, docsProvided, docNotes, customDocs };
     const blob = new Blob([JSON.stringify(session, null, 2)], { type:"application/json" });
@@ -880,8 +1050,8 @@ export default function MaturityScorecard() {
     e.target.value = "";
   }
 
-  // ── Excel Export ─────────────────────────────────────────────────────────
-  // ── Narrative Generator ───────────────────────────────────────────────────
+  // -- Excel Export ---------------------------------------------------------
+  // -- Narrative Generator ---------------------------------------------------
   // Fully client-side. No API calls. No client data transmitted externally.
   function generateNarrative() {
     const client  = clientName || "the organisation";
@@ -915,7 +1085,7 @@ export default function MaturityScorecard() {
     const missingCritDocs = docGaps.filter(({doc})=>doc.priority==="Critical");
     const missingHighDocs = docGaps.filter(({doc})=>doc.priority==="High");
 
-    // ── Insights data (mirrors what the Insights tab shows) ─────────────────
+    // -- Insights data (mirrors what the Insights tab shows) -----------------
     const scoreCounts = [0,1,2,3,4].map(v=>({ tier:ML.find(m=>m.value===v)?.label||String(v), count:Object.values(scores).filter(sc2=>sc2===v).length }));
     const worstCat = fw.map(cat=>({ id:cat.id, name:cat.name, color:cat.color, n:gaps.filter(g=>g.cat.id===cat.id).length })).sort((a,b)=>b.n-a.n)[0];
     const effortCounts = { Low:gaps.filter(g=>g.rec?.effort==="Low").length, Medium:gaps.filter(g=>g.rec?.effort==="Medium").length, High:gaps.filter(g=>g.rec?.effort==="High").length };
@@ -923,7 +1093,7 @@ export default function MaturityScorecard() {
     const scored = Object.values(scores).filter(v=>v!==-1&&v!==undefined);
     const avgScore = scored.length ? (scored.reduce((a,b)=>a+b,0)/scored.length).toFixed(2) : null;
 
-    // ── Per-function narrative ───────────────────────────────────────────────
+    // -- Per-function narrative -----------------------------------------------
     const funcNarratives = fw.map(cat => {
       const sc2 = catScore(cat);
       const scV = parseFloat(sc2 || 0);
@@ -975,7 +1145,7 @@ export default function MaturityScorecard() {
         : "";
       // Top 2 recommendations for this function with full detail
       const topRecs = catGaps.slice(0,2).map((g,i) => {
-        const note = g.rec ? `${i+1}. ${g.rec.action} — ${g.rec.detail.slice(0,120)}... (${g.rec.priority}, ${g.rec.effort} effort, ${g.rec.ref})` : `${i+1}. ${g.q.slice(0,80)}`;
+        const note = g.rec ? `${i+1}. ${g.rec.action}  -  ${g.rec.detail.slice(0,120)}... (${g.rec.priority}, ${g.rec.effort} effort, ${g.rec.ref})` : `${i+1}. ${g.q.slice(0,80)}`;
         return note;
       });
       const recNote = topRecs.length > 0 ? `\n\nRecommendations:\n${topRecs.join("\n")}` : "";
@@ -983,7 +1153,7 @@ export default function MaturityScorecard() {
       return { cat, sc2, scV, commentary, gapNote, scoreNote, docNote, recNote, catGaps, catWorkshopNotes };
     });
 
-    // ── Document confidence ──────────────────────────────────────────────────
+    // -- Document confidence --------------------------------------------------
     const docConfidence = (() => {
       const reviewed = NIST_DOCS.filter(d=>docsProvided[d.id]==="yes"||docsProvided[d.id]==="partial").length;
       const total = NIST_DOCS.length;
@@ -995,8 +1165,8 @@ export default function MaturityScorecard() {
 
     const sections = [];
 
-    // ── EXECUTIVE SUMMARY ────────────────────────────────────────────────────
-    sections.push(`EXECUTIVE SUMMARY\n${"─".repeat(60)}`);
+    // -- EXECUTIVE SUMMARY ----------------------------------------------------
+    sections.push(`EXECUTIVE SUMMARY\n${"-".repeat(60)}`);
 
     sections.push([
       `LevelBlue was engaged by ${client} to provide a view of cyber security maturity in line with the ${framework}. This assessment evaluates the organisation's security posture across ${fw.length} function areas, ${fw.flatMap(c=>c.domains).length} categories and ${fw.flatMap(c=>c.domains.flatMap(d=>d.questions)).length} individual controls.`,
@@ -1013,43 +1183,43 @@ export default function MaturityScorecard() {
     if(gaps.length > 0 || docGaps.length > 0) {
       const findingLines = [];
       if(critGaps.length > 0)       findingLines.push(`${critGaps.length} Critical priority control gap${critGaps.length>1?"s":""} requiring immediate attention`);
-      if(highGaps.length > 0)        findingLines.push(`${highGaps.length} High priority gap${highGaps.length>1?"s":""} to be addressed within 3–6 months`);
-      if(medGaps.length > 0)         findingLines.push(`${medGaps.length} Medium priority gap${medGaps.length>1?"s":""} forming the 6–12 month roadmap`);
+      if(highGaps.length > 0)        findingLines.push(`${highGaps.length} High priority gap${highGaps.length>1?"s":""} to be addressed within 3-6 months`);
+      if(medGaps.length > 0)         findingLines.push(`${medGaps.length} Medium priority gap${medGaps.length>1?"s":""} forming the 6-12 month roadmap`);
       if(missingCritDocs.length > 0) findingLines.push(`${missingCritDocs.length} Critical document${missingCritDocs.length>1?"s":""} not provided, reducing scoring confidence`);
       if(missingHighDocs.length > 0) findingLines.push(`${missingHighDocs.length} High priority document${missingHighDocs.length>1?"s":""} not provided`);
-      if(worstCat?.n > 0)            findingLines.push(`${worstCat.id} — ${worstCat.name} has the highest gap concentration (${worstCat.n} controls below threshold)`);
-      sections.push(`Key Findings:\n${findingLines.map(l=>`• ${l}`).join("\n")}`);
+      if(worstCat?.n > 0)            findingLines.push(`${worstCat.id}  -  ${worstCat.name} has the highest gap concentration (${worstCat.n} controls below threshold)`);
+      sections.push(`Key Findings:\n${findingLines.map(l=>`* ${l}`).join("\n")}`);
     }
 
     // Score distribution insight
     if(scored.length > 0) {
       const distParts = scoreCounts.filter(s=>s.count>0).map(s=>`${s.count} at ${s.tier}`).join(", ");
-      const scoreInsight = `Score Distribution: Of ${scored.length} scored controls — ${distParts}. Mean score across all controls: ${avgScore}.`;
+      const scoreInsight = `Score Distribution: Of ${scored.length} scored controls  -  ${distParts}. Mean score across all controls: ${avgScore}.`;
       sections.push(scoreInsight);
     }
 
-    // ── FUNCTION ASSESSMENT ──────────────────────────────────────────────────
-    sections.push(`\nFUNCTION ASSESSMENT\n${"─".repeat(60)}`);
+    // -- FUNCTION ASSESSMENT --------------------------------------------------
+    sections.push(`\nFUNCTION ASSESSMENT\n${"-".repeat(60)}`);
 
     funcNarratives.forEach(({cat, sc2, commentary, gapNote, scoreNote, docNote, recNote}) => {
-      sections.push(`${cat.id} — ${cat.name}${sc2 ? ` [${parseFloat(sc2).toFixed(2)} / 4.0 — ${tierAdj(sc2)}]` : " [Not yet assessed]"}\n\n${commentary}${gapNote}${scoreNote}${docNote}${recNote}`);
+      sections.push(`${cat.id}  -  ${cat.name}${sc2 ? ` [${parseFloat(sc2).toFixed(2)} / 4.0  -  ${tierAdj(sc2)}]` : " [Not yet assessed]"}\n\n${commentary}${gapNote}${scoreNote}${docNote}${recNote}`);
     });
 
-    // ── RECOMMENDATIONS OVERVIEW ─────────────────────────────────────────────
+    // -- RECOMMENDATIONS OVERVIEW ---------------------------------------------
     if(gaps.length > 0) {
-      sections.push(`\nRECOMMENDATIONS OVERVIEW\n${"─".repeat(60)}`);
+      sections.push(`\nRECOMMENDATIONS OVERVIEW\n${"-".repeat(60)}`);
 
       // Effort profile insight
-      const effortInsight = `Remediation effort profile: ${effortCounts.Low} Low effort gap${effortCounts.Low!==1?"s":""}, ${effortCounts.Medium} Medium, ${effortCounts.High} High. ${quickWins.length > 0 ? `${quickWins.length} quick win${quickWins.length>1?"s":""} identified — high impact at low effort: ${quickWins.slice(0,3).map(g=>g.rec?.action||g.domain.name).join("; ")}.` : ""}`;
+      const effortInsight = `Remediation effort profile: ${effortCounts.Low} Low effort gap${effortCounts.Low!==1?"s":""}, ${effortCounts.Medium} Medium, ${effortCounts.High} High. ${quickWins.length > 0 ? `${quickWins.length} quick win${quickWins.length>1?"s":""} identified  -  high impact at low effort: ${quickWins.slice(0,3).map(g=>g.rec?.action||g.domain.name).join("; ")}.` : ""}`;
       sections.push(effortInsight);
 
       sections.push(`To move ${client} from ${sc.toFixed(2)} to the target profile of ${overallTarget ? parseFloat(overallTarget).toFixed(2) : "the agreed target"}, LevelBlue has identified ${gaps.length} improvement workstreams across ${[critGaps.length>0?"Critical":"", highGaps.length>0?"High":"", medGaps.length>0?"Medium":""].filter(Boolean).join(", ")} priority levels.`);
 
       if(critGaps.length > 0) {
-        sections.push(`Critical Priority (${critGaps.length}):\n${critGaps.slice(0,5).map((g,i)=>`${i+1}. [${g.domain.id}] ${g.rec?.action||g.domain.name}\n   ${g.rec?.detail?.slice(0,130)||""}...\n   Effort: ${g.rec?.effort||"—"} · Ref: ${g.rec?.ref||"—"}`).join("\n\n")}${critGaps.length>5?`\n\n...and ${critGaps.length-5} further Critical workstreams.`:""}`);
+        sections.push(`Critical Priority (${critGaps.length}):\n${critGaps.slice(0,5).map((g,i)=>`${i+1}. [${g.domain.id}] ${g.rec?.action||g.domain.name}\n   ${g.rec?.detail?.slice(0,130)||""}...\n   Effort: ${g.rec?.effort||" - "} . Ref: ${g.rec?.ref||" - "}`).join("\n\n")}${critGaps.length>5?`\n\n...and ${critGaps.length-5} further Critical workstreams.`:""}`);
       }
       if(highGaps.length > 0) {
-        sections.push(`High Priority (${highGaps.length}):\n${highGaps.slice(0,5).map((g,i)=>`${i+1}. [${g.domain.id}] ${g.rec?.action||g.domain.name} (${g.rec?.effort||"—"} effort)`).join("\n")}${highGaps.length>5?`\n...and ${highGaps.length-5} further High workstreams.`:""}`);
+        sections.push(`High Priority (${highGaps.length}):\n${highGaps.slice(0,5).map((g,i)=>`${i+1}. [${g.domain.id}] ${g.rec?.action||g.domain.name} (${g.rec?.effort||" - "} effort)`).join("\n")}${highGaps.length>5?`\n...and ${highGaps.length-5} further High workstreams.`:""}`);
       }
       if(medGaps.length > 0) {
         sections.push(`Medium Priority (${medGaps.length}):\n${medGaps.slice(0,5).map((g,i)=>`${i+1}. [${g.domain.id}] ${g.rec?.action||g.domain.name}`).join("\n")}${medGaps.length>5?`\n...and ${medGaps.length-5} further Medium workstreams.`:""}`);
@@ -1059,7 +1229,7 @@ export default function MaturityScorecard() {
       if(docGaps.length > 0) {
         const critDocRecs = [...missingCritDocs, ...missingHighDocs].slice(0,5);
         if(critDocRecs.length > 0) {
-          sections.push(`Documentation Gaps (obtain before finalising assessment):\n${critDocRecs.map((({doc},i)=>`${i+1}. ${doc.label} (${doc.priority} priority) — relevant to: ${doc.subcats.join(", ")}`)).join("\n")}`);
+          sections.push(`Documentation Gaps (obtain before finalising assessment):\n${critDocRecs.map((({doc},i)=>`${i+1}. ${doc.label} (${doc.priority} priority)  -  relevant to: ${doc.subcats.join(", ")}`)).join("\n")}`);
         }
       }
 
@@ -1067,18 +1237,18 @@ export default function MaturityScorecard() {
       const immediateItems = critGaps.slice(0,3).map(g=>g.rec?.action||g.domain.name);
       const shortTermItems = highGaps.slice(0,3).map(g=>g.rec?.action||g.domain.name);
       const medTermItems   = medGaps.slice(0,3).map(g=>g.rec?.action||g.domain.name);
-      sections.push(`Recommended Implementation Roadmap:\n\n• 0–3 months (Immediate): Address all Critical workstreams.${immediateItems.length>0?" Priority actions: "+immediateItems.join("; ").slice(0,150)+".":""}\n• 3–6 months (Short-term): Progress High priority workstreams.${shortTermItems.length>0?" Including: "+shortTermItems.join("; ").slice(0,150)+".":""}\n• 6–12 months (Medium-term): Complete Medium priority workstreams. Embed continuous improvement and prepare for re-assessment.${medTermItems.length>0?" Including: "+medTermItems.join("; ").slice(0,120)+".":""}`);
+      sections.push(`Recommended Implementation Roadmap:\n\n* 0-3 months (Immediate): Address all Critical workstreams.${immediateItems.length>0?" Priority actions: "+immediateItems.join("; ").slice(0,150)+".":""}\n* 3-6 months (Short-term): Progress High priority workstreams.${shortTermItems.length>0?" Including: "+shortTermItems.join("; ").slice(0,150)+".":""}\n* 6-12 months (Medium-term): Complete Medium priority workstreams. Embed continuous improvement and prepare for re-assessment.${medTermItems.length>0?" Including: "+medTermItems.join("; ").slice(0,120)+".":""}`);
     }
 
-    // ── CONCLUSION ───────────────────────────────────────────────────────────
-    sections.push(`\nCONCLUSION\n${"─".repeat(60)}`);
+    // -- CONCLUSION -----------------------------------------------------------
+    sections.push(`\nCONCLUSION\n${"-".repeat(60)}`);
     const strongFunctions = funcNarratives.filter(f=>f.scV>=3.0).map(f=>f.cat.name);
     const weakFunctions   = funcNarratives.filter(f=>f.sc2&&f.scV<2.0).map(f=>f.cat.name);
     const strongNote = strongFunctions.length > 0 ? `${client} demonstrates particular strength in ${strongFunctions.join(", ")}, where controls are consistently applied and repeatable or better practice is evidenced.` : "";
     const weakNote   = weakFunctions.length > 0 ? ` The most significant opportunities for improvement lie in ${weakFunctions.join(", ")}, where targeted investment will deliver the greatest uplift.` : "";
-    sections.push(`${strongNote}${weakNote}\n\nLevelBlue recommends ${critGaps.length+highGaps.length} high/critical priority workstream${critGaps.length+highGaps.length!==1?"s":""} to move ${client} toward the agreed target profile of ${overallTarget?parseFloat(overallTarget).toFixed(2):"the agreed target"}. Security maturity is cumulative — each improvement strengthens the overall posture. LevelBlue is well-positioned to support ${client} in progressing this roadmap.`);
+    sections.push(`${strongNote}${weakNote}\n\nLevelBlue recommends ${critGaps.length+highGaps.length} high/critical priority workstream${critGaps.length+highGaps.length!==1?"s":""} to move ${client} toward the agreed target profile of ${overallTarget?parseFloat(overallTarget).toFixed(2):"the agreed target"}. Security maturity is cumulative  -  each improvement strengthens the overall posture. LevelBlue is well-positioned to support ${client} in progressing this roadmap.`);
 
-    sections.push(`\n${"─".repeat(60)}\nDraft narrative generated by the LevelBlue Cyber Maturity Assessment Centre · ${date}\nThis is a working draft. Review and edit before including in client deliverables.\nAll data processed locally — no client information was transmitted externally.`);
+    sections.push(`\n${"-".repeat(60)}\nDraft narrative generated by the LevelBlue Cyber Maturity Assessment Centre . ${date}\nThis is a working draft. Review and edit before including in client deliverables.\nAll data processed locally  -  no client information was transmitted externally.`);
 
     return sections.join("\n\n");
   }
@@ -1088,7 +1258,7 @@ export default function MaturityScorecard() {
 
     // Sheet 1: Summary
     const summaryRows = [
-      ["LEVELBLUE CYBER MATURITY SCORECARD — NIST CSF 2.0"],
+      ["LEVELBLUE CYBER MATURITY SCORECARD  -  NIST CSF 2.0"],
       [],
       ["Client", clientName || "Not specified"],
       ["Sector", clientSector || "Not specified"],
@@ -1098,15 +1268,15 @@ export default function MaturityScorecard() {
       [],
       ["OVERALL SCORES"],
       ["", "Current Score", "Current Tier", "Target Score", "Target Tier", "Gap"],
-      ["Overall", overall||"—", getML(overall), overallTarget||"—", getML(overallTarget),
-        overall&&overallTarget ? (parseFloat(overallTarget)-parseFloat(overall)).toFixed(2) : "—"],
+      ["Overall", overall||" - ", getML(overall), overallTarget||" - ", getML(overallTarget),
+        overall&&overallTarget ? (parseFloat(overallTarget)-parseFloat(overall)).toFixed(2) : " - "],
       [],
       ["FUNCTION SCORES"],
       ["Function", "Current Score", "Current Tier", "Target Score", "Target Tier", "Gap"],
       ...fw.map(cat => {
         const cur = catScore(cat); const tgt = catTarget(cat);
-        return [cat.id+" — "+cat.name, cur||"—", getML(cur), tgt||"—", getML(tgt),
-          cur&&tgt?(parseFloat(tgt)-parseFloat(cur)).toFixed(2):"—"];
+        return [cat.id+"  -  "+cat.name, cur||" - ", getML(cur), tgt||" - ", getML(tgt),
+          cur&&tgt?(parseFloat(tgt)-parseFloat(cur)).toFixed(2):" - "];
       }),
       [],
       ["GAP SUMMARY"],
@@ -1125,9 +1295,9 @@ export default function MaturityScorecard() {
         domain.questions.forEach((q, qi) => {
           const key = `${domain.id}_q${qi}`;
           const sc = scores[key]; const tgt = targetScores[key] !== undefined ? targetScores[key] : sc;
-          const [subId,...rest] = q.split(" — ");
+          const [subId,...rest] = q.split("  -  ");
           scoredRows.push([
-            cat.name, domain.id, domain.name, subId||domain.id+"-"+(qi+1), rest.join(" — ")||q,
+            cat.name, domain.id, domain.name, subId||domain.id+"-"+(qi+1), rest.join("  -  ")||q,
             sc!==-1&&sc!==undefined?sc:"", sc!==-1&&sc!==undefined?getML(sc):"",
             tgt!==-1&&tgt!==undefined?tgt:"", tgt!==-1&&tgt!==undefined?getML(tgt):"",
             sc!==-1&&sc!==undefined&&tgt!==-1&&tgt!==undefined?(tgt-sc).toFixed(0):"",
@@ -1173,7 +1343,7 @@ export default function MaturityScorecard() {
     customDocs.forEach((doc, i) => {
       const status = docsProvided[`custom_${i}`];
       const statusLabel = status==="yes"?"Provided":status==="partial"?"Partial":status==="no"?"Not Provided":"Not Reviewed";
-      docReviewRows.push([doc, "Custom", "—", statusLabel, "—", docNotes[`custom_${i}`]||""]);
+      docReviewRows.push([doc, "Custom", " - ", statusLabel, " - ", docNotes[`custom_${i}`]||""]);
     });
     const wsDocReview = XLSX.utils.aoa_to_sheet(docReviewRows);
     wsDocReview["!cols"] = [{wch:52},{wch:14},{wch:10},{wch:14},{wch:40},{wch:50}];
@@ -1183,7 +1353,7 @@ export default function MaturityScorecard() {
     flash("Excel exported ✓");
   }
 
-  // ── PPTX Report Generator — aligned to LevelBlue NIST Assessment Template ──
+  // -- PPTX Report Generator  -  aligned to LevelBlue NIST Assessment Template --
   // Requires: npm install pptxgenjs
   async function exportPPTXReport() {
     if (!isNIST) { flash("PPTX report is for NIST CSF 2.0 only"); return; }
@@ -1193,7 +1363,7 @@ export default function MaturityScorecard() {
       const prs = new PptxGenJS();
       prs.layout = "LAYOUT_WIDE";
 
-      // ── Colour palette ────────────────────────────────────────────────
+      // -- Colour palette ------------------------------------------------
       const N="08111F", CARD="0D1F3C", CARD2="0A1932", BD="1B3A6B";
       const BL="1E6FD9", CY="00BFFF", LI="C8F135";
       const WH="FFFFFF", TM="8BAAC8", TD="4A6A8A";
@@ -1213,12 +1383,12 @@ export default function MaturityScorecard() {
         s.addShape(prs.ShapeType.rect, { x:0.5, y:0.07, w:12.33, h:0.03, fill:{ color:col }, line:{ color:col, width:0 } });
         s.addText(label, { x:0.5, y:0.22, w:10, h:0.26, fontSize:8, color:col, fontFace:"Calibri", bold:true, charSpacing:5 });
       };
-      const foot = s => s.addText(`${asses}  ·  ${client}  ·  NIST CSF 2.0  ·  ${date}  ·  CONFIDENTIAL`, { x:0.5, y:7.22, w:12.33, h:0.2, fontSize:7.5, color:TD, fontFace:"Calibri" });
+      const foot = s => s.addText(`${asses}  .  ${client}  .  NIST CSF 2.0  .  ${date}  .  CONFIDENTIAL`, { x:0.5, y:7.22, w:12.33, h:0.2, fontSize:7.5, color:TD, fontFace:"Calibri" });
       const scoreCol = sc => { if(sc===null||sc===undefined) return TM; const v=parseFloat(sc); if(v<0.5) return "F87171"; if(v<1.5) return "FB923C"; if(v<2.5) return "FCD34D"; if(v<3.5) return LI; return CY; };
       const tierStr  = sc => getML(sc);
       const mkCell   = (text, fill, color, opts={}) => ({ text, options:{ fill:{ color:fill }, color, fontFace:"Calibri", valign:"middle", margin:7, ...opts } });
 
-      // ── SLIDE 1 — Cover ───────────────────────────────────────────────
+      // -- SLIDE 1  -  Cover -----------------------------------------------
       const s1 = prs.addSlide(); bg(s1);
       s1.addShape(prs.ShapeType.rect, { x:0, y:0, w:0.38, h:7.5, fill:{ color:BL }, line:{ color:BL, width:0 } });
       s1.addShape(prs.ShapeType.rect, { x:0, y:6.85, w:13.33, h:0.65, fill:{ color:CARD }, line:{ color:CARD, width:0 } });
@@ -1230,15 +1400,15 @@ export default function MaturityScorecard() {
       s1.addText(date, { x:0.6, y:3.6, w:6, h:0.35, fontSize:13, color:TM, fontFace:"Calibri" });
       s1.addText(`Prepared for ${client} by ${asses}`, { x:0.6, y:4.0, w:9, h:0.35, fontSize:12, color:TM, fontFace:"Calibri", italic:true });
       if(overall) {
-        s1.addText(`Current Score: ${parseFloat(overall).toFixed(2)} / 4.0 — ${tierStr(overall)}`, { x:0.6, y:4.9, w:9, h:0.45, fontSize:17, color:scoreCol(overall), fontFace:"Calibri", bold:true });
-        if(overallTarget) s1.addText(`Target Score: ${parseFloat(overallTarget).toFixed(2)} / 4.0 — ${tierStr(overallTarget)}`, { x:0.6, y:5.4, w:9, h:0.4, fontSize:14, color:CY, fontFace:"Calibri" });
+        s1.addText(`Current Score: ${parseFloat(overall).toFixed(2)} / 4.0  -  ${tierStr(overall)}`, { x:0.6, y:4.9, w:9, h:0.45, fontSize:17, color:scoreCol(overall), fontFace:"Calibri", bold:true });
+        if(overallTarget) s1.addText(`Target Score: ${parseFloat(overallTarget).toFixed(2)} / 4.0  -  ${tierStr(overallTarget)}`, { x:0.6, y:5.4, w:9, h:0.4, fontSize:14, color:CY, fontFace:"Calibri" });
       }
-      s1.addText("CONFIDENTIAL — NOT FOR DISTRIBUTION", { x:0.6, y:7.0, w:10, h:0.28, fontSize:9, color:TD, fontFace:"Calibri" });
+      s1.addText("CONFIDENTIAL  -  NOT FOR DISTRIBUTION", { x:0.6, y:7.0, w:10, h:0.28, fontSize:9, color:TD, fontFace:"Calibri" });
 
-      // ── SLIDE 2 — Executive Summary: Introduction ─────────────────────
+      // -- SLIDE 2  -  Executive Summary: Introduction ---------------------
       const s2 = prs.addSlide(); bg(s2); hdr(s2, "EXECUTIVE SUMMARY"); foot(s2);
       s2.addText("Introduction", { x:0.5, y:0.52, w:12, h:0.55, fontSize:22, color:WH, fontFace:"Calibri", bold:true });
-      const introBody = `${asses} was engaged by ${client} to provide a view of cyber security maturity in line with the NIST Cybersecurity Framework (CSF) 2.0. NIST CSF is widely adopted across industries and accepted by regulatory bodies.\n\n${asses} has conducted a comprehensive assessment covering all six NIST CSF function areas: Govern, Identify, Protect, Detect, Respond and Recover — scoring each of the 106 subcategories across 22 categories.\n\nNIST CSF maturity scores range from 0–4 (Not Present → Partial → Risk-Informed → Repeatable → Adaptive). ${client} achieved a current profile score of ${overall?parseFloat(overall).toFixed(2):"TBC"} (${tierStr(overall)}).${overallTarget?" A target of "+parseFloat(overallTarget).toFixed(2)+" ("+tierStr(overallTarget)+") has been identified and agreed as an appropriate balance of investment and security for "+client+".":""}`;
+      const introBody = `${asses} was engaged by ${client} to provide a view of cyber security maturity in line with the NIST Cybersecurity Framework (CSF) 2.0. NIST CSF is widely adopted across industries and accepted by regulatory bodies.\n\n${asses} has conducted a comprehensive assessment covering all six NIST CSF function areas: Govern, Identify, Protect, Detect, Respond and Recover  -  scoring each of the 106 subcategories across 22 categories.\n\nNIST CSF maturity scores range from 0-4 (Not Present -> Partial -> Risk-Informed -> Repeatable -> Adaptive). ${client} achieved a current profile score of ${overall?parseFloat(overall).toFixed(2):"TBC"} (${tierStr(overall)}).${overallTarget?" A target of "+parseFloat(overallTarget).toFixed(2)+" ("+tierStr(overallTarget)+") has been identified and agreed as an appropriate balance of investment and security for "+client+".":""}`;
       s2.addText(introBody, { x:0.5, y:1.18, w:7.7, h:3.5, fontSize:11, color:TM, fontFace:"Calibri", valign:"top" });
 
       // Score callouts right side
@@ -1263,40 +1433,40 @@ export default function MaturityScorecard() {
         ...fw.map((cat,ri) => {
           const catGaps = gaps.filter(g=>g.cat.id===cat.id);
           const topGap = catGaps[0];
-          const pri = topGap?.rec?.priority || (catGaps.length>0?"Medium":"—");
+          const pri = topGap?.rec?.priority || (catGaps.length>0?"Medium":" - ");
           const finding = topGap?.rec?.action || (catGaps.length>0?`${catGaps.length} subcategories below target threshold`:"No gaps identified");
           const fill = ri%2===0?CARD:CARD2;
-          return [mkCell(cat.id+" — "+cat.name,fill,WH,{fontSize:9}), mkCell(pri,fill,PRI_CFG[pri]?.color?.replace("#","")||TM,{fontSize:9,bold:true}), mkCell(finding,fill,TM,{fontSize:9})];
+          return [mkCell(cat.id+"  -  "+cat.name,fill,WH,{fontSize:9}), mkCell(pri,fill,PRI_CFG[pri]?.color?.replace("#","")||TM,{fontSize:9,bold:true}), mkCell(finding,fill,TM,{fontSize:9})];
         })
       ];
       s2.addTable(kfRows, { x:0.5, y:5.2, w:12.33, colW:[2.8,1.3,8.23], border:{ pt:0.4, color:BD } });
 
-      // ── SLIDE 3 — Executive Summary: Background / Journey to Target ───
+      // -- SLIDE 3  -  Executive Summary: Background / Journey to Target ---
       const s3 = prs.addSlide(); bg(s3); hdr(s3, "EXECUTIVE SUMMARY"); foot(s3);
-      s3.addText("Background — Journey to Target Profile", { x:0.5, y:0.52, w:12, h:0.55, fontSize:22, color:WH, fontFace:"Calibri", bold:true });
+      s3.addText("Background  -  Journey to Target Profile", { x:0.5, y:0.52, w:12, h:0.55, fontSize:22, color:WH, fontFace:"Calibri", bold:true });
       s3.addText(`As a first step to work towards a target profile score of ${overallTarget?parseFloat(overallTarget).toFixed(2):"the agreed target"}, ${asses} recommends that ${client} focus on the priority workstreams identified below. The recommendations have been prioritised to maximise the impact on cybersecurity risk reduction within an achievable implementation timeframe.`, { x:0.5, y:1.18, w:12.33, h:0.65, fontSize:11, color:TM, fontFace:"Calibri" });
 
       // Current vs target table
       const cvtHdr = [mkCell("Function","1E3A6B",WH,{bold:true,fontSize:10}), mkCell("Current","1E3A6B",WH,{bold:true,fontSize:10}), mkCell("Current Tier","1E3A6B",WH,{bold:true,fontSize:10}), mkCell("Target","1E3A6B",CY,{bold:true,fontSize:10}), mkCell("Target Tier","1E3A6B",CY,{bold:true,fontSize:10}), mkCell("Gap","1E3A6B",LI,{bold:true,fontSize:10})];
       const cvtRows = [cvtHdr, ...fw.map((cat,ri)=>{
         const sc=catScore(cat); const tgt=catTarget(cat);
-        const gap = sc&&tgt?(parseFloat(tgt)-parseFloat(sc)).toFixed(2):"—";
+        const gap = sc&&tgt?(parseFloat(tgt)-parseFloat(sc)).toFixed(2):" - ";
         const fill=ri%2===0?CARD:CARD2;
-        return [mkCell(cat.id+" — "+cat.name,fill,WH,{fontSize:10}), mkCell(sc||"—",fill,sc?scoreCol(sc):TD,{fontSize:12,bold:true}), mkCell(tierStr(sc),fill,sc?scoreCol(sc):TD,{fontSize:10}), mkCell(tgt||"—",fill,CY,{fontSize:12,bold:true}), mkCell(tierStr(tgt),fill,CY,{fontSize:10}), mkCell(gap,fill,parseFloat(gap)>0?LI:TD,{fontSize:11,bold:true})];
-      }), [mkCell("OVERALL","1E3A6B",WH,{bold:true,fontSize:11}), mkCell(overall||"—","1E3A6B",overall?scoreCol(overall):TD,{fontSize:14,bold:true}), mkCell(tierStr(overall),"1E3A6B",overall?scoreCol(overall):TD,{fontSize:10,bold:true}), mkCell(overallTarget||"—","1E3A6B",CY,{fontSize:14,bold:true}), mkCell(tierStr(overallTarget),"1E3A6B",CY,{fontSize:10,bold:true}), mkCell(overall&&overallTarget?(parseFloat(overallTarget)-parseFloat(overall)).toFixed(2):"—","1E3A6B",LI,{fontSize:12,bold:true})]];
+        return [mkCell(cat.id+"  -  "+cat.name,fill,WH,{fontSize:10}), mkCell(sc||" - ",fill,sc?scoreCol(sc):TD,{fontSize:12,bold:true}), mkCell(tierStr(sc),fill,sc?scoreCol(sc):TD,{fontSize:10}), mkCell(tgt||" - ",fill,CY,{fontSize:12,bold:true}), mkCell(tierStr(tgt),fill,CY,{fontSize:10}), mkCell(gap,fill,parseFloat(gap)>0?LI:TD,{fontSize:11,bold:true})];
+      }), [mkCell("OVERALL","1E3A6B",WH,{bold:true,fontSize:11}), mkCell(overall||" - ","1E3A6B",overall?scoreCol(overall):TD,{fontSize:14,bold:true}), mkCell(tierStr(overall),"1E3A6B",overall?scoreCol(overall):TD,{fontSize:10,bold:true}), mkCell(overallTarget||" - ","1E3A6B",CY,{fontSize:14,bold:true}), mkCell(tierStr(overallTarget),"1E3A6B",CY,{fontSize:10,bold:true}), mkCell(overall&&overallTarget?(parseFloat(overallTarget)-parseFloat(overall)).toFixed(2):" - ","1E3A6B",LI,{fontSize:12,bold:true})]];
       s3.addTable(cvtRows, { x:0.5, y:1.95, w:12.33, colW:[3.4,1.3,2.3,1.3,2.3,1.73], border:{ pt:0.4, color:BD } });
 
       // Workstream summary
       s3.addText("Summary of Improvement Workstreams", { x:0.5, y:5.35, w:8, h:0.3, fontSize:12, color:WH, fontFace:"Calibri", bold:true });
       const wsRows = [
         [mkCell("Priority","1E3A6B",WH,{bold:true,fontSize:10}), mkCell("Count","1E3A6B",WH,{bold:true,fontSize:10}), mkCell("Scope","1E3A6B",WH,{bold:true,fontSize:10})],
-        [mkCell("Critical","F87171"+"22","F87171",{bold:true,fontSize:10}), mkCell(String(critN),"F87171"+"22","F87171",{fontSize:13,bold:true}), mkCell(gaps.filter(g=>g.rec?.priority==="Critical").slice(0,3).map(g=>g.rec?.action||g.domain.id).join(" · "),"F87171"+"22",WH,{fontSize:9})],
-        [mkCell("High","FCD34D"+"22","FCD34D",{bold:true,fontSize:10}), mkCell(String(highN),"FCD34D"+"22","FCD34D",{fontSize:13,bold:true}), mkCell(gaps.filter(g=>g.rec?.priority==="High").slice(0,3).map(g=>g.rec?.action||g.domain.id).join(" · "),"FCD34D"+"22",WH,{fontSize:9})],
-        [mkCell("Medium","00BFFF"+"22","00BFFF",{bold:true,fontSize:10}), mkCell(String(medN),"00BFFF"+"22","00BFFF",{fontSize:13,bold:true}), mkCell(gaps.filter(g=>g.rec?.priority==="Medium").slice(0,3).map(g=>g.rec?.action||g.domain.id).join(" · "),"00BFFF"+"22",WH,{fontSize:9})],
+        [mkCell("Critical","F87171"+"22","F87171",{bold:true,fontSize:10}), mkCell(String(critN),"F87171"+"22","F87171",{fontSize:13,bold:true}), mkCell(gaps.filter(g=>g.rec?.priority==="Critical").slice(0,3).map(g=>g.rec?.action||g.domain.id).join(" . "),"F87171"+"22",WH,{fontSize:9})],
+        [mkCell("High","FCD34D"+"22","FCD34D",{bold:true,fontSize:10}), mkCell(String(highN),"FCD34D"+"22","FCD34D",{fontSize:13,bold:true}), mkCell(gaps.filter(g=>g.rec?.priority==="High").slice(0,3).map(g=>g.rec?.action||g.domain.id).join(" . "),"FCD34D"+"22",WH,{fontSize:9})],
+        [mkCell("Medium","00BFFF"+"22","00BFFF",{bold:true,fontSize:10}), mkCell(String(medN),"00BFFF"+"22","00BFFF",{fontSize:13,bold:true}), mkCell(gaps.filter(g=>g.rec?.priority==="Medium").slice(0,3).map(g=>g.rec?.action||g.domain.id).join(" . "),"00BFFF"+"22",WH,{fontSize:9})],
       ];
       s3.addTable(wsRows, { x:0.5, y:5.7, w:12.33, colW:[1.5,1.0,9.83], border:{ pt:0.4, color:BD } });
 
-      // ── SLIDE 4 — Introduction: Client Overview ───────────────────────
+      // -- SLIDE 4  -  Introduction: Client Overview -----------------------
       const s4 = prs.addSlide(); bg(s4); hdr(s4,"INTRODUCTION",BL); foot(s4);
       s4.addText("Client Overview", { x:0.5, y:0.52, w:12, h:0.55, fontSize:22, color:WH, fontFace:"Calibri", bold:true });
       s4.addShape(prs.ShapeType.rect, { x:0.5, y:1.18, w:5.9, h:5.8, fill:{ color:CARD }, line:{ color:BD, width:1 } });
@@ -1316,34 +1486,34 @@ export default function MaturityScorecard() {
         { label:"Functions", val:"6 (GV, ID, PR, DE, RS, RC)" },
         { label:"Categories", val:"22" },
         { label:"Subcategories", val:"106" },
-        { label:"Scoring Scale", val:"0 (Not Present) → 4 (Adaptive)" },
+        { label:"Scoring Scale", val:"0 (Not Present) -> 4 (Adaptive)" },
         { label:"Assessor", val:asses },
         { label:"Date", val:date },
-        { label:"Overall Score", val:overall?parseFloat(overall).toFixed(2)+" — "+tierStr(overall):"TBC" },
-        { label:"Target Score", val:overallTarget?parseFloat(overallTarget).toFixed(2)+" — "+tierStr(overallTarget):"TBC" },
+        { label:"Overall Score", val:overall?parseFloat(overall).toFixed(2)+"  -  "+tierStr(overall):"TBC" },
+        { label:"Target Score", val:overallTarget?parseFloat(overallTarget).toFixed(2)+"  -  "+tierStr(overallTarget):"TBC" },
       ].forEach(({label,val},i) => {
         s4.addText(label+":", { x:7.13, y:1.65+i*0.44, w:2.2, h:0.38, fontSize:10, color:TD, fontFace:"Calibri", bold:true });
         s4.addText(val, { x:9.38, y:1.65+i*0.44, w:3.25, h:0.38, fontSize:10, color:WH, fontFace:"Calibri" });
       });
 
-      // ── SLIDE 5 — NIST Analysis: All Categories ───────────────────────
+      // -- SLIDE 5  -  NIST Analysis: All Categories -----------------------
       const s5 = prs.addSlide(); bg(s5); hdr(s5,"NIST CYBERSECURITY FRAMEWORK ANALYSIS",LI); foot(s5);
-      s5.addText("Category Scores — Current vs Target", { x:0.5, y:0.52, w:12, h:0.55, fontSize:22, color:WH, fontFace:"Calibri", bold:true });
+      s5.addText("Category Scores  -  Current vs Target", { x:0.5, y:0.52, w:12, h:0.55, fontSize:22, color:WH, fontFace:"Calibri", bold:true });
       const catHdr = [mkCell("ID","1E3A6B",WH,{bold:true,fontSize:9}), mkCell("Category","1E3A6B",WH,{bold:true,fontSize:9}), mkCell("Current","1E3A6B",WH,{bold:true,fontSize:9}), mkCell("Tier","1E3A6B",WH,{bold:true,fontSize:9}), mkCell("Target","1E3A6B",CY,{bold:true,fontSize:9}), mkCell("Target Tier","1E3A6B",CY,{bold:true,fontSize:9}), mkCell("Gaps","1E3A6B","F87171",{bold:true,fontSize:9})];
       let catTblRows=[catHdr]; let ri3=0;
       fw.forEach(cat=>{
         // Function sub-header
-        catTblRows.push([mkCell(cat.id,"1B3A6B",cat.color.replace("#",""),{bold:true,fontSize:10,colspan:1}), mkCell(cat.name+" — "+cat.description,"1B3A6B",cat.color.replace("#",""),{bold:false,fontSize:9,colspan:6}), mkCell(catScore(cat)||"—","1B3A6B",cat.color.replace("#",""),{bold:true,fontSize:11}), mkCell(tierStr(catScore(cat)),"1B3A6B",TM,{fontSize:9}), mkCell(catTarget(cat)||"—","1B3A6B",CY,{bold:true,fontSize:11}), mkCell(tierStr(catTarget(cat)),"1B3A6B",CY,{fontSize:9}), mkCell(String(gaps.filter(g=>g.cat.id===cat.id).length),"1B3A6B",gaps.filter(g=>g.cat.id===cat.id).length>0?"F87171":TD,{bold:true,fontSize:10})]);
+        catTblRows.push([mkCell(cat.id,"1B3A6B",cat.color.replace("#",""),{bold:true,fontSize:10,colspan:1}), mkCell(cat.name+"  -  "+cat.description,"1B3A6B",cat.color.replace("#",""),{bold:false,fontSize:9,colspan:6}), mkCell(catScore(cat)||" - ","1B3A6B",cat.color.replace("#",""),{bold:true,fontSize:11}), mkCell(tierStr(catScore(cat)),"1B3A6B",TM,{fontSize:9}), mkCell(catTarget(cat)||" - ","1B3A6B",CY,{bold:true,fontSize:11}), mkCell(tierStr(catTarget(cat)),"1B3A6B",CY,{fontSize:9}), mkCell(String(gaps.filter(g=>g.cat.id===cat.id).length),"1B3A6B",gaps.filter(g=>g.cat.id===cat.id).length>0?"F87171":TD,{bold:true,fontSize:10})]);
         cat.domains.forEach(domain=>{
           const ds=domainScore(domain); const dt=domainTarget(domain); const dg=gaps.filter(g=>g.domain.id===domain.id).length;
           const fill=ri3%2===0?CARD:CARD2;
-          catTblRows.push([mkCell(domain.id,fill,cat.color.replace("#",""),{fontSize:9,bold:true}), mkCell(domain.name,fill,WH,{fontSize:9}), mkCell(ds||"—",fill,ds?scoreCol(ds):TD,{fontSize:10,bold:true}), mkCell(tierStr(ds),fill,ds?scoreCol(ds):TD,{fontSize:9}), mkCell(dt||"—",fill,CY,{fontSize:10,bold:true}), mkCell(tierStr(dt),fill,CY,{fontSize:9}), mkCell(dg>0?String(dg):"—",fill,dg>0?"F87171":TD,{fontSize:9,bold:dg>0})]);
+          catTblRows.push([mkCell(domain.id,fill,cat.color.replace("#",""),{fontSize:9,bold:true}), mkCell(domain.name,fill,WH,{fontSize:9}), mkCell(ds||" - ",fill,ds?scoreCol(ds):TD,{fontSize:10,bold:true}), mkCell(tierStr(ds),fill,ds?scoreCol(ds):TD,{fontSize:9}), mkCell(dt||" - ",fill,CY,{fontSize:10,bold:true}), mkCell(tierStr(dt),fill,CY,{fontSize:9}), mkCell(dg>0?String(dg):" - ",fill,dg>0?"F87171":TD,{fontSize:9,bold:dg>0})]);
           ri3++;
         });
       });
       s5.addTable(catTblRows, { x:0.5, y:1.15, w:12.33, colW:[1.35,4.2,1.1,1.75,1.1,1.75,1.08], border:{ pt:0.4, color:BD } });
 
-      // ── SLIDE 6 — Detailed Recommendations: Critical & High ───────────
+      // -- SLIDE 6  -  Detailed Recommendations: Critical & High -----------
       const critHighGaps = gaps.filter(g=>g.rec?.priority==="Critical"||g.rec?.priority==="High");
       if(critHighGaps.length>0) {
         const s6 = prs.addSlide(); bg(s6); hdr(s6,"DETAILED RECOMMENDATIONS","F87171"); foot(s6);
@@ -1353,12 +1523,12 @@ export default function MaturityScorecard() {
         const h6Rows=[h6Hdr,...critHighGaps.map(({cat,domain,q,sc,rec},i)=>{
           const fill=i%2===0?CARD:CARD2;
           const pc=rec?.priority==="Critical"?"F87171":"FCD34D";
-          return [mkCell(`${rec?.priority==="Critical"?"C":"H"}-${String(i+1).padStart(2,"0")}`,fill,CY,{fontSize:9,bold:true}),mkCell(rec?.priority||"—",fill,pc,{fontSize:9,bold:true}),mkCell(domain.id,fill,cat.color.replace("#",""),{fontSize:9,bold:true}),mkCell(rec?.action||q.slice(0,70),fill,WH,{fontSize:9}),mkCell(rec?.detail||"—",fill,TM,{fontSize:8}),mkCell(rec?.effort||"—",fill,TM,{fontSize:9})];
+          return [mkCell(`${rec?.priority==="Critical"?"C":"H"}-${String(i+1).padStart(2,"0")}`,fill,CY,{fontSize:9,bold:true}),mkCell(rec?.priority||" - ",fill,pc,{fontSize:9,bold:true}),mkCell(domain.id,fill,cat.color.replace("#",""),{fontSize:9,bold:true}),mkCell(rec?.action||q.slice(0,70),fill,WH,{fontSize:9}),mkCell(rec?.detail||" - ",fill,TM,{fontSize:8}),mkCell(rec?.effort||" - ",fill,TM,{fontSize:9})];
         })];
         s6.addTable(h6Rows,{ x:0.5, y:1.55, w:12.33, colW:[0.65,0.95,1.2,3.5,4.6,1.43], border:{ pt:0.4, color:BD } });
       }
 
-      // ── SLIDE 7 — Detailed Recommendations: Medium ────────────────────
+      // -- SLIDE 7  -  Detailed Recommendations: Medium --------------------
       const medGaps = gaps.filter(g=>g.rec?.priority==="Medium");
       if(medGaps.length>0) {
         const s7 = prs.addSlide(); bg(s7); hdr(s7,"DETAILED RECOMMENDATIONS","FCD34D"); foot(s7);
@@ -1367,28 +1537,28 @@ export default function MaturityScorecard() {
         const m7Hdr=[mkCell("Ref","1E3A6B",WH,{bold:true,fontSize:9}),mkCell("Subcategory","1E3A6B",WH,{bold:true,fontSize:9}),mkCell("Recommended Action","1E3A6B",WH,{bold:true,fontSize:9}),mkCell("Detail","1E3A6B",WH,{bold:true,fontSize:9}),mkCell("Effort","1E3A6B",WH,{bold:true,fontSize:9})];
         const m7Rows=[m7Hdr,...medGaps.map(({cat,domain,q,sc,rec},i)=>{
           const fill=i%2===0?CARD:CARD2;
-          return [mkCell(`M-${String(i+1).padStart(2,"0")}`,fill,CY,{fontSize:9,bold:true}),mkCell(domain.id+" — "+domain.name.slice(0,28),fill,cat.color.replace("#",""),{fontSize:9,bold:true}),mkCell(rec?.action||q.slice(0,70),fill,WH,{fontSize:9}),mkCell(rec?.detail||"—",fill,TM,{fontSize:8}),mkCell(rec?.effort||"—",fill,TM,{fontSize:9})];
+          return [mkCell(`M-${String(i+1).padStart(2,"0")}`,fill,CY,{fontSize:9,bold:true}),mkCell(domain.id+"  -  "+domain.name.slice(0,28),fill,cat.color.replace("#",""),{fontSize:9,bold:true}),mkCell(rec?.action||q.slice(0,70),fill,WH,{fontSize:9}),mkCell(rec?.detail||" - ",fill,TM,{fontSize:8}),mkCell(rec?.effort||" - ",fill,TM,{fontSize:9})];
         })];
         s7.addTable(m7Rows,{ x:0.5, y:1.55, w:12.33, colW:[0.65,2.3,3.5,4.55,1.33], border:{ pt:0.4, color:BD } });
       }
 
-      // ── SLIDE 8 — Conclusion ──────────────────────────────────────────
+      // -- SLIDE 8  -  Conclusion ------------------------------------------
       const s8 = prs.addSlide(); bg(s8);
       s8.addShape(prs.ShapeType.rect, { x:0, y:0, w:0.38, h:7.5, fill:{ color:CY }, line:{ color:CY, width:0 } });
       s8.addText("CONCLUSION", { x:0.6, y:0.38, w:8, h:0.26, fontSize:8, color:CY, fontFace:"Calibri", bold:true, charSpacing:5 });
       s8.addText(client, { x:0.6, y:0.68, w:11, h:0.62, fontSize:24, color:WH, fontFace:"Calibri", bold:true });
       s8.addText(`Following a detailed assessment of ${client} against the NIST Cybersecurity Framework (CSF) 2.0, ${asses} has identified a current profile score of ${overall?parseFloat(overall).toFixed(2):"TBC"} (${tierStr(overall)}).`, { x:0.6, y:1.38, w:12.1, h:0.5, fontSize:11, color:TM, fontFace:"Calibri" });
-      s8.addText(`Current: ${overall?parseFloat(overall).toFixed(2):"TBC"} (${tierStr(overall)})   →   Target: ${overallTarget?parseFloat(overallTarget).toFixed(2):"TBC"} (${tierStr(overallTarget)})`, { x:0.6, y:2.0, w:10, h:0.45, fontSize:16, color:scoreCol(overall), fontFace:"Calibri", bold:true });
-      const strongAreas = fw.filter(cat=>{ const sc=catScore(cat); return sc&&parseFloat(sc)>=3; }).map(cat=>cat.id+" — "+cat.name).slice(0,3);
-      const improveAreas = fw.filter(cat=>{ const sc=catScore(cat); return sc&&parseFloat(sc)<2; }).map(cat=>cat.id+" — "+cat.name).concat(gaps.filter(g=>g.rec?.priority==="Critical").slice(0,3).map(g=>g.rec?.action||g.domain.name)).slice(0,5);
-      if(strongAreas.length>0) { s8.addText("What "+client+" does well:", { x:0.6, y:2.6, w:5.8, h:0.32, fontSize:11, color:LI, fontFace:"Calibri", bold:true }); strongAreas.forEach((a,i)=>s8.addText("• "+a, { x:0.6, y:2.95+i*0.38, w:5.8, h:0.35, fontSize:10, color:WH, fontFace:"Calibri" })); }
-      if(improveAreas.length>0) { s8.addText("Where "+client+" could improve:", { x:7.0, y:2.6, w:5.8, h:0.32, fontSize:11, color:"F87171", fontFace:"Calibri", bold:true }); improveAreas.forEach((a,i)=>s8.addText("• "+a, { x:7.0, y:2.95+i*0.38, w:5.8, h:0.35, fontSize:10, color:WH, fontFace:"Calibri" })); }
+      s8.addText(`Current: ${overall?parseFloat(overall).toFixed(2):"TBC"} (${tierStr(overall)})   ->   Target: ${overallTarget?parseFloat(overallTarget).toFixed(2):"TBC"} (${tierStr(overallTarget)})`, { x:0.6, y:2.0, w:10, h:0.45, fontSize:16, color:scoreCol(overall), fontFace:"Calibri", bold:true });
+      const strongAreas = fw.filter(cat=>{ const sc=catScore(cat); return sc&&parseFloat(sc)>=3; }).map(cat=>cat.id+"  -  "+cat.name).slice(0,3);
+      const improveAreas = fw.filter(cat=>{ const sc=catScore(cat); return sc&&parseFloat(sc)<2; }).map(cat=>cat.id+"  -  "+cat.name).concat(gaps.filter(g=>g.rec?.priority==="Critical").slice(0,3).map(g=>g.rec?.action||g.domain.name)).slice(0,5);
+      if(strongAreas.length>0) { s8.addText("What "+client+" does well:", { x:0.6, y:2.6, w:5.8, h:0.32, fontSize:11, color:LI, fontFace:"Calibri", bold:true }); strongAreas.forEach((a,i)=>s8.addText("* "+a, { x:0.6, y:2.95+i*0.38, w:5.8, h:0.35, fontSize:10, color:WH, fontFace:"Calibri" })); }
+      if(improveAreas.length>0) { s8.addText("Where "+client+" could improve:", { x:7.0, y:2.6, w:5.8, h:0.32, fontSize:11, color:"F87171", fontFace:"Calibri", bold:true }); improveAreas.forEach((a,i)=>s8.addText("* "+a, { x:7.0, y:2.95+i*0.38, w:5.8, h:0.35, fontSize:10, color:WH, fontFace:"Calibri" })); }
       s8.addText(`${asses} recommends ${critN+highN} High/Critical and ${medN} Medium priority workstreams. If implemented, ${client} should reach the target profile of ${overallTarget?parseFloat(overallTarget).toFixed(2):"the agreed target"}.`, { x:0.6, y:5.5, w:12.1, h:0.6, fontSize:11, color:TM, fontFace:"Calibri", italic:true });
       foot(s8);
 
-      // ── SLIDE 9 — Appendix: NIST CSF 2.0 Overview ────────────────────
-      const s9 = prs.addSlide(); bg(s9); hdr(s9,"APPENDIX 4 — NIST CSF OVERVIEW",TD); foot(s9);
-      s9.addText("NIST CSF 2.0 — Explained", { x:0.5, y:0.52, w:12, h:0.55, fontSize:22, color:WH, fontFace:"Calibri", bold:true });
+      // -- SLIDE 9  -  Appendix: NIST CSF 2.0 Overview --------------------
+      const s9 = prs.addSlide(); bg(s9); hdr(s9,"APPENDIX 4  -  NIST CSF OVERVIEW",TD); foot(s9);
+      s9.addText("NIST CSF 2.0  -  Explained", { x:0.5, y:0.52, w:12, h:0.55, fontSize:22, color:WH, fontFace:"Calibri", bold:true });
       s9.addText("The NIST CSF 2.0 framework scores across 6 Function Areas, 22 Categories and 106 Subcategories. Each subcategory is assessed and assigned an implementation tier from 0 to 4.", { x:0.5, y:1.12, w:12.33, h:0.5, fontSize:11, color:TM, fontFace:"Calibri" });
       const apHdr=[mkCell("Tier","1E3A6B",WH,{bold:true,fontSize:10}),mkCell("Label","1E3A6B",WH,{bold:true,fontSize:10}),mkCell("Description","1E3A6B",WH,{bold:true,fontSize:10})];
       const apRows=[apHdr,...[
@@ -1402,14 +1572,14 @@ export default function MaturityScorecard() {
       s9.addText("Function Summary:", { x:0.5, y:5.7, w:4, h:0.28, fontSize:10, color:TM, fontFace:"Calibri", bold:true });
       fw.forEach((cat,i) => s9.addText(`${cat.id}: ${cat.domains.length} categories, ${cat.domains.reduce((a,d)=>a+d.questions.length,0)} subcategories`, { x:0.5+(i%3)*4.11, y:6.05+Math.floor(i/3)*0.34, w:4.0, h:0.3, fontSize:9, color:TM, fontFace:"Calibri" }));
 
-      // ── SLIDE 10 — Appendix: Documentation Reviewed ──────────────────
-      const s10 = prs.addSlide(); bg(s10); hdr(s10,"APPENDIX 3 — DOCUMENTATION REVIEWED",TD); foot(s10);
+      // -- SLIDE 10  -  Appendix: Documentation Reviewed ------------------
+      const s10 = prs.addSlide(); bg(s10); hdr(s10,"APPENDIX 3  -  DOCUMENTATION REVIEWED",TD); foot(s10);
       s10.addText("Documentation Reviewed", { x:0.5, y:0.52, w:12, h:0.55, fontSize:22, color:WH, fontFace:"Calibri", bold:true });
 
       const docsReviewed = NIST_DOCS.filter(d => docsProvided[d.id]==="yes" || docsProvided[d.id]==="partial");
       const docsNotProvided = NIST_DOCS.filter(d => !docsProvided[d.id] || docsProvided[d.id]==="no");
 
-      s10.addText(`${docsReviewed.length} of ${NIST_DOCS.length} standard documents provided or partially provided. ${docsNotProvided.length} not provided — see table below.`, { x:0.5, y:1.12, w:12.33, h:0.4, fontSize:11, color:TM, fontFace:"Calibri" });
+      s10.addText(`${docsReviewed.length} of ${NIST_DOCS.length} standard documents provided or partially provided. ${docsNotProvided.length} not provided  -  see table below.`, { x:0.5, y:1.12, w:12.33, h:0.4, fontSize:11, color:TM, fontFace:"Calibri" });
 
       // Provided docs table
       if(docsReviewed.length > 0) {
@@ -1458,14 +1628,23 @@ export default function MaturityScorecard() {
   const avgByCat = fw.map(cat=>({ label:cat.id, value:catScore(cat)?parseFloat(catScore(cat)):0, color:getMC(catScore(cat)) }));
 
   return (
-    <div style={{ minHeight:"100vh", background:"#08111F", fontFamily:"'Outfit','Segoe UI',sans-serif", color:"#E2EAF4" }}>
-      <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800&display=swap" rel="stylesheet"/>
+    <div style={{ minHeight:"100vh", background:"#08111F", fontFamily:"'Outfit','Segoe UI',sans-serif", color:"#E2EAF4", position:"relative" }}>
+      <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800&family=IBM+Plex+Mono:wght@400;500;700&display=swap" rel="stylesheet"/>
+      {/* Noise texture overlay  -  SVG filter applied via pseudo approach */}
+      <svg style={{ position:"fixed", top:0, left:0, width:"100%", height:"100%", pointerEvents:"none", zIndex:0, opacity:0.028 }} xmlns="http://www.w3.org/2000/svg">
+        <filter id="noise"><feTurbulence type="fractalNoise" baseFrequency="0.72" numOctaves="4" stitchTiles="stitch"/><feColorMatrix type="saturate" values="0"/></filter>
+        <rect width="100%" height="100%" filter="url(#noise)"/>
+      </svg>
+      {/* Subtle radial gradient blooms */}
+      <div style={{ position:"fixed", top:"-20%", left:"-10%", width:"60%", height:"60%", background:"radial-gradient(ellipse, rgba(30,111,217,0.07) 0%, transparent 70%)", pointerEvents:"none", zIndex:0 }}/>
+      <div style={{ position:"fixed", bottom:"-20%", right:"-10%", width:"50%", height:"50%", background:"radial-gradient(ellipse, rgba(0,191,255,0.05) 0%, transparent 70%)", pointerEvents:"none", zIndex:0 }}/>
+      <div style={{ position:"relative", zIndex:1 }}>
       <input type="file" accept=".json" ref={fileInputRef} onChange={loadSession} style={{display:"none"}}/>
 
-      {/* ── Header ── */}
+      {/* -- Header -- */}
       <div style={{ background:"#060E1A", padding:"0 28px", display:"flex", alignItems:"center", justifyContent:"space-between", height:"62px", borderBottom:"1px solid #1B3A6B", boxShadow:"0 2px 20px rgba(0,0,0,0.5)" }}>
         <div style={{ display:"flex", alignItems:"center", gap:"14px" }}>
-          {/* LevelBlue logo mark — three diagonal stripes */}
+          {/* LevelBlue logo mark  -  three diagonal stripes */}
           <div style={{ width:"36px", height:"36px", borderRadius:"8px", background:"#0D1F3C", border:"1px solid #1B3A6B", display:"flex", alignItems:"center", justifyContent:"center", gap:"3px", padding:"7px", overflow:"hidden" }}>
             <div style={{ display:"flex", gap:"3px", transform:"skewX(-12deg)" }}>
               <div style={{ width:"5px", height:"18px", background:"#1E6FD9", borderRadius:"1px" }}/>
@@ -1475,7 +1654,7 @@ export default function MaturityScorecard() {
           </div>
           <div>
             <div style={{ color:"#FFFFFF", fontWeight:"800", fontSize:"14px", letterSpacing:"-0.01em" }}>LevelBlue</div>
-            <div style={{ color:"#4A6A8A", fontSize:"10px", fontWeight:"600", letterSpacing:"0.06em", textTransform:"uppercase", marginTop:"-1px" }}>Cyber Maturity Assessment Centre</div>
+            <div style={{ color:"#4A6A8A", fontSize:"12px", fontWeight:"600", letterSpacing:"0.06em", textTransform:"uppercase", marginTop:"-1px" }}>Cyber Maturity Assessment Centre</div>
           </div>
         </div>
         <div style={{ display:"flex", gap:"2px", background:"rgba(13,31,60,0.8)", padding:"4px", borderRadius:"6px", border:"1px solid #1B3A6B" }}>
@@ -1489,18 +1668,18 @@ export default function MaturityScorecard() {
           ].map(({v,label})=><button key={v} onClick={()=>setView(v)} style={navBtn(view===v)}>{label}</button>)}
         </div>
         <div style={{ display:"flex", alignItems:"center", gap:"10px" }}>
-          {overall && <span style={{ fontSize:"12px", fontWeight:"800", color:getMC(overall), background:"rgba(13,31,60,0.8)", padding:"4px 10px", borderRadius:"5px", border:"1px solid #1B3A6B" }}>{overall} / 4.0</span>}
-          <button onClick={saveSession} style={{ padding:"5px 12px", borderRadius:"5px", border:"1px solid #1B3A6B", background:"#0D1F3C", color:statusMsg.includes("saved")?"#C8F135":"#8BAAC8", fontSize:"11px", fontWeight:"700", cursor:"pointer", fontFamily:"inherit" }}>Save ↓</button>
-          <button onClick={()=>fileInputRef.current?.click()} style={{ padding:"5px 12px", borderRadius:"5px", border:"1px solid #1B3A6B", background:"#0D1F3C", color:statusMsg.includes("loaded")?"#C8F135":"#8BAAC8", fontSize:"11px", fontWeight:"700", cursor:"pointer", fontFamily:"inherit" }}>Load ↑</button>
-          <button onClick={exportExcel} style={{ padding:"5px 12px", borderRadius:"5px", border:"1px solid rgba(200,241,53,0.4)", background:"rgba(200,241,53,0.1)", color:"#C8F135", fontSize:"11px", fontWeight:"700", cursor:"pointer", fontFamily:"inherit" }}>Excel ↓</button>
-          {isNIST && <button onClick={exportPPTXReport} disabled={generatingReport} style={{ padding:"5px 12px", borderRadius:"5px", border:"1px solid rgba(0,191,255,0.4)", background:"rgba(0,191,255,0.1)", color:"#00BFFF", fontSize:"11px", fontWeight:"700", cursor:"pointer", fontFamily:"inherit", opacity:generatingReport?0.6:1 }}>{generatingReport?"Building…":"Report ↓"}</button>}
-          {statusMsg && <span style={{ fontSize:"11px", color:"#C8F135", fontWeight:"600" }}>{statusMsg}</span>}
+          {overall && <span style={{ fontSize:"14px", fontWeight:"800", color:getMC(overall), background:"rgba(13,31,60,0.8)", padding:"4px 10px", borderRadius:"5px", border:"1px solid #1B3A6B" }}>{overall} / 4.0</span>}
+          <button onClick={saveSession} style={{ padding:"5px 12px", borderRadius:"5px", border:"1px solid #1B3A6B", background:"#0D1F3C", color:statusMsg.includes("saved")?"#C8F135":"#8BAAC8", fontSize:"13px", fontWeight:"700", cursor:"pointer", fontFamily:"inherit" }}>Save ↓</button>
+          <button onClick={()=>fileInputRef.current?.click()} style={{ padding:"5px 12px", borderRadius:"5px", border:"1px solid #1B3A6B", background:"#0D1F3C", color:statusMsg.includes("loaded")?"#C8F135":"#8BAAC8", fontSize:"13px", fontWeight:"700", cursor:"pointer", fontFamily:"inherit" }}>Load ↑</button>
+          <button onClick={exportExcel} style={{ padding:"5px 12px", borderRadius:"5px", border:"1px solid rgba(200,241,53,0.4)", background:"rgba(200,241,53,0.1)", color:"#C8F135", fontSize:"13px", fontWeight:"700", cursor:"pointer", fontFamily:"inherit" }}>Excel ↓</button>
+          {isNIST && <button onClick={exportPPTXReport} disabled={generatingReport} style={{ padding:"5px 12px", borderRadius:"5px", border:"1px solid rgba(0,191,255,0.4)", background:"rgba(0,191,255,0.1)", color:"#00BFFF", fontSize:"13px", fontWeight:"700", cursor:"pointer", fontFamily:"inherit", opacity:generatingReport?0.6:1 }}>{generatingReport?"Building...":"Report v"}</button>}
+          {statusMsg && <span style={{ fontSize:"13px", color:"#C8F135", fontWeight:"600" }}>{statusMsg}</span>}
         </div>
       </div>
 
       <div style={{ maxWidth:"1140px", margin:"0 auto", padding:"26px 22px" }}>
 
-        {/* ── Progress tracker strip — only shown when not on home ── */}
+        {/* -- Progress tracker strip  -  only shown when not on home -- */}
         {view !== "home" && (()=>{
           const docsReviewedCount = NIST_DOCS.filter(d => docsProvided[d.id] === "yes" || docsProvided[d.id] === "partial" || docsProvided[d.id] === "no" || docsProvided[d.id] === "na").length;
           const workshopNotesCount = fw.flatMap(c=>c.domains).filter(d => workshopNotes[d.id]?.trim()).length;
@@ -1509,11 +1688,11 @@ export default function MaturityScorecard() {
           const stages = [
             { id:"setup",    label:"Setup",    icon:"⚙",
               done: !!(clientName && assessor),
-              detail: clientName ? `${clientName}${clientSector?" · "+clientSector:""}` : "Client details not entered",
+              detail: clientName ? `${clientName}${clientSector?" . "+clientSector:""}` : "Client details not entered",
               ok: !!(clientName && assessor) },
             { id:"docs",     label:"Docs",     icon:"📄",
               done: docsReviewedCount >= NIST_DOCS.length * 0.5,
-              detail: isNIST ? `${docsReviewedCount}/${NIST_DOCS.length} reviewed${missingDocs>0?" · "+missingDocs+" missing":""}` : "N/A for CIS",
+              detail: isNIST ? `${docsReviewedCount}/${NIST_DOCS.length} reviewed${missingDocs>0?" . "+missingDocs+" missing":""}` : "N/A for CIS",
               ok: isNIST ? docsReviewedCount >= NIST_DOCS.length * 0.5 : true },
             { id:"workshop", label:"Workshop", icon:"💬",
               done: workshopNotesCount >= Math.ceil(totalDomains * 0.5),
@@ -1521,7 +1700,7 @@ export default function MaturityScorecard() {
               ok: workshopNotesCount >= Math.ceil(totalDomains * 0.5) },
             { id:"score",    label:"Score",    icon:"📊",
               done: completion >= 80,
-              detail: `${completion}% scored${overall?" · "+overall+"/4.0":""}`,
+              detail: `${completion}% scored${overall?" . "+overall+"/4.0":""}`,
               ok: completion >= 80 },
             { id:"results",  label:"Results",  icon:"✓",
               done: completion >= 100,
@@ -1542,12 +1721,12 @@ export default function MaturityScorecard() {
                   return (
                     <button key={stage.id} onClick={()=>setView(stage.id)} style={{ flex:1, padding:"10px 8px", background:bg, border:"none", borderRight: i<4?"1px solid #1B3A6B":"none", cursor:"pointer", fontFamily:"inherit", textAlign:"left", borderTop: isCurrent?"2px solid #00BFFF":"2px solid transparent", transition:"all 0.15s" }}>
                       <div style={{ display:"flex", alignItems:"center", gap:"6px", marginBottom:"3px" }}>
-                        <span style={{ fontSize:"13px" }}>{stage.icon}</span>
-                        <span style={{ fontSize:"11px", fontWeight:"700", color:col }}>{stage.label}</span>
-                        {isDone && <span style={{ fontSize:"9px", color:"#C8F135", marginLeft:"auto" }}>✓</span>}
-                        {isCurrent && <span style={{ fontSize:"9px", color:"#00BFFF", marginLeft:"auto", fontWeight:"700" }}>ACTIVE</span>}
+                        <span style={{ fontSize:"15px" }}>{stage.icon}</span>
+                        <span style={{ fontSize:"13px", fontWeight:"700", color:col }}>{stage.label}</span>
+                        {isDone && <span style={{ fontSize:"11px", color:"#C8F135", marginLeft:"auto" }}>&#10003;</span>}
+                        {isCurrent && <span style={{ fontSize:"11px", color:"#00BFFF", marginLeft:"auto", fontWeight:"700" }}>ACTIVE</span>}
                       </div>
-                      <div style={{ fontSize:"10px", color:"#4A6A8A", lineHeight:"1.3", paddingLeft:"19px" }}>{stage.detail}</div>
+                      <div style={{ fontSize:"12px", color:"#4A6A8A", lineHeight:"1.5", paddingLeft:"19px" }}>{stage.detail}</div>
                     </button>
                   );
                 })}
@@ -1563,26 +1742,26 @@ export default function MaturityScorecard() {
           );
         })()}
 
-        {/* ── Recovery banner ── */}
+        {/* -- Recovery banner -- */}
         {recoveryAvailable && (
           <div style={{ marginBottom:"18px", padding:"14px 18px", borderRadius:"10px", background:"rgba(252,211,77,0.1)", border:"1px solid rgba(252,211,77,0.35)", display:"flex", alignItems:"center", justifyContent:"space-between", gap:"16px" }}>
             <div>
-              <div style={{ fontSize:"13px", fontWeight:"700", color:"#FCD34D", marginBottom:"3px" }}>⚡ Unsaved session detected</div>
-              <div style={{ fontSize:"12px", color:"#8BAAC8" }}>A previous session was interrupted before a JSON save. You can restore it or dismiss it.</div>
+              <div style={{ fontSize:"15px", fontWeight:"700", color:"#FCD34D", marginBottom:"3px" }}>! Unsaved session detected</div>
+              <div style={{ fontSize:"14px", color:"#8BAAC8" }}>A previous session was interrupted before a JSON save. You can restore it or dismiss it.</div>
             </div>
             <div style={{ display:"flex", gap:"8px", flexShrink:0 }}>
-              <button onClick={restoreRecovery} style={{ padding:"7px 16px", borderRadius:"6px", background:"rgba(252,211,77,0.2)", border:"1px solid rgba(252,211,77,0.5)", color:"#FCD34D", fontSize:"12px", fontWeight:"700", cursor:"pointer", fontFamily:"inherit" }}>Restore session</button>
-              <button onClick={dismissRecovery} style={{ padding:"7px 14px", borderRadius:"6px", background:"transparent", border:"1px solid #1B3A6B", color:"#4A6A8A", fontSize:"12px", fontWeight:"700", cursor:"pointer", fontFamily:"inherit" }}>Dismiss</button>
+              <button onClick={restoreRecovery} style={{ padding:"7px 16px", borderRadius:"6px", background:"rgba(252,211,77,0.2)", border:"1px solid rgba(252,211,77,0.5)", color:"#FCD34D", fontSize:"14px", fontWeight:"700", cursor:"pointer", fontFamily:"inherit" }}>Restore session</button>
+              <button onClick={dismissRecovery} style={{ padding:"7px 14px", borderRadius:"6px", background:"transparent", border:"1px solid #1B3A6B", color:"#4A6A8A", fontSize:"14px", fontWeight:"700", cursor:"pointer", fontFamily:"inherit" }}>Dismiss</button>
             </div>
           </div>
         )}
 
-        {/* ── HOME ── */}
+        {/* -- HOME -- */}
         {view==="home" && (
           <div>
-            {/* Hero — compact two-column layout */}
+            {/* Hero  -  compact two-column layout */}
             <div style={{ display:"grid", gridTemplateColumns:"1fr 380px", gap:"20px", marginBottom:"24px", alignItems:"stretch" }}>
-              {/* Left — title + description + CTA */}
+              {/* Left  -  title + description + CTA */}
               <div style={{ padding:"36px 40px", borderRadius:"16px", background:"linear-gradient(160deg, #0D1F3C 0%, #08111F 70%)", border:"1px solid #1B3A6B", position:"relative", overflow:"hidden", display:"flex", flexDirection:"column", justifyContent:"space-between" }}>
                 <div style={{ position:"absolute", top:0, right:0, width:"260px", height:"100%", opacity:0.05, background:"linear-gradient(135deg, transparent 40%, #1E6FD9 40%, #1E6FD9 45%, transparent 45%, transparent 55%, #00BFFF 55%, #00BFFF 60%, transparent 60%, transparent 70%, #C8F135 70%, #C8F135 75%, transparent 75%)" }}/>
                 {/* Logo mark */}
@@ -1592,84 +1771,84 @@ export default function MaturityScorecard() {
                   ))}
                 </div>
                 <div>
-                  <div style={{ fontSize:"11px", fontWeight:"700", color:"#4A6A8A", letterSpacing:"0.16em", textTransform:"uppercase", marginBottom:"8px" }}>LevelBlue Cyber Advisory</div>
+                  <div style={{ fontSize:"13px", fontWeight:"700", color:"#4A6A8A", letterSpacing:"0.16em", textTransform:"uppercase", marginBottom:"8px" }}>LevelBlue Cyber Advisory</div>
                   <div style={{ fontSize:"30px", fontWeight:"800", color:"#FFFFFF", lineHeight:1.2, marginBottom:"12px" }}>Cyber Maturity<br/><span style={{ color:"#00BFFF" }}>Assessment</span> Centre</div>
-                  <div style={{ fontSize:"13px", color:"#8BAAC8", lineHeight:1.7, marginBottom:"28px", maxWidth:"480px" }}>A structured, workshop-ready platform for delivering NIST CSF 2.0 and CIS Controls v8 assessments — from discovery through scoring to client-ready reports and AI-assisted narratives.</div>
+                  <div style={{ fontSize:"15px", color:"#8BAAC8", lineHeight:1.7, marginBottom:"28px", maxWidth:"480px" }}>A structured, workshop-ready platform for delivering NIST CSF 2.0 and CIS Controls v8 assessments  -  from discovery through scoring to client-ready reports and AI-assisted narratives.</div>
                   <div style={{ display:"flex", gap:"10px", flexWrap:"wrap" }}>
-                    <button onClick={()=>setView("setup")} style={{ padding:"12px 28px", borderRadius:"9px", background:"linear-gradient(135deg,#1E6FD9,#0EA5E9)", color:"#FFFFFF", border:"none", fontWeight:"700", fontSize:"13px", cursor:"pointer", fontFamily:"inherit" }}>Start Assessment →</button>
-                    <button onClick={()=>fileInputRef.current?.click()} style={{ padding:"12px 20px", borderRadius:"9px", background:"transparent", color:"#8BAAC8", border:"1px solid #1B3A6B", fontWeight:"600", fontSize:"12px", cursor:"pointer", fontFamily:"inherit" }}>Load Session ↑</button>
+                    <button onClick={()=>setView("setup")} style={{ padding:"12px 28px", borderRadius:"9px", background:"linear-gradient(135deg,#1E6FD9,#0EA5E9)", color:"#FFFFFF", border:"none", fontWeight:"700", fontSize:"15px", cursor:"pointer", fontFamily:"inherit" }}>{"->"} Start Assessment</button>
+                    <button onClick={()=>fileInputRef.current?.click()} style={{ padding:"12px 20px", borderRadius:"9px", background:"transparent", color:"#8BAAC8", border:"1px solid #1B3A6B", fontWeight:"600", fontSize:"14px", cursor:"pointer", fontFamily:"inherit" }}>Load Session ^</button>
                   </div>
                 </div>
               </div>
 
-              {/* Right — framework selector */}
+              {/* Right  -  framework selector */}
               <div style={{ display:"flex", flexDirection:"column", gap:"12px" }}>
-                <div style={{ fontSize:"10px", fontWeight:"700", color:"#4A6A8A", letterSpacing:"0.12em", textTransform:"uppercase" }}>Select Framework</div>
+                <div style={{ fontSize:"12px", fontWeight:"700", color:"#4A6A8A", letterSpacing:"0.12em", textTransform:"uppercase" }}>Select Framework</div>
                 {[
-                  { id:"NIST CSF 2.0", badge:"NIST CSF 2.0", badgeCol:"#1E6FD9", headline:"NIST CSF 2.0", sub:"6 functions · 22 categories · 106 subcategories", detail:"Full subcategory scoring, target profiles, 9-slide report, AI narrative", color:"#1E6FD9", glow:"rgba(30,111,217,0.15)" },
-                  { id:"CIS Controls v8", badge:"CIS Controls v8", badgeCol:"#00BFFF", headline:"CIS Controls v8", sub:"3 groups · 18 controls · IG1–IG3", detail:"Implementation group scoring, gap analysis, Excel export", color:"#00BFFF", glow:"rgba(0,191,255,0.12)" },
+                  { id:"NIST CSF 2.0", badge:"NIST CSF 2.0", badgeCol:"#1E6FD9", headline:"NIST CSF 2.0", sub:"6 functions . 22 categories . 106 subcategories", detail:"Full subcategory scoring, target profiles, 9-slide report, AI narrative", color:"#1E6FD9", glow:"rgba(30,111,217,0.15)" },
+                  { id:"CIS Controls v8", badge:"CIS Controls v8", badgeCol:"#00BFFF", headline:"CIS Controls v8", sub:"3 groups . 18 controls . IG1-IG3", detail:"Implementation group scoring, gap analysis, Excel export", color:"#00BFFF", glow:"rgba(0,191,255,0.12)" },
                 ].map(f=>(
                   <button key={f.id} onClick={()=>{ setFramework(f.id); setScores({}); setNotes({}); setWorkshopNotes({}); setTargetScores({}); }} style={{ flex:1, textAlign:"left", padding:"18px 20px", borderRadius:"12px", border:`2px solid ${framework===f.id ? f.color : "#1B3A6B"}`, background:framework===f.id ? f.glow : "#0A1932", cursor:"pointer", fontFamily:"inherit", position:"relative", overflow:"hidden" }}>
                     <div style={{ position:"absolute", top:0, left:0, right:0, height:"3px", background:framework===f.id ? f.color : "transparent", borderRadius:"12px 12px 0 0" }}/>
                     <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:"6px" }}>
                       <div style={{ fontSize:"14px", fontWeight:"800", color:"#FFFFFF" }}>{f.headline}</div>
-                      <span style={{ fontSize:"9px", fontWeight:"700", color:f.badgeCol, background:`${f.badgeCol}18`, padding:"2px 8px", borderRadius:"20px", border:`1px solid ${f.badgeCol}40`, whiteSpace:"nowrap" }}>{f.badge}</span>
+                      <span style={{ fontSize:"11px", fontWeight:"700", color:f.badgeCol, background:`${f.badgeCol}18`, padding:"2px 8px", borderRadius:"20px", border:`1px solid ${f.badgeCol}40`, whiteSpace:"nowrap" }}>{f.badge}</span>
                     </div>
-                    <div style={{ fontSize:"11px", color:framework===f.id ? f.color : "#4A6A8A", fontWeight:"600", marginBottom:"4px" }}>{f.sub}</div>
-                    <div style={{ fontSize:"11px", color:"#8BAAC8" }}>{f.detail}</div>
-                    {framework===f.id && <div style={{ marginTop:"10px", fontSize:"10px", fontWeight:"700", color:f.color }}>✓ Selected — framework info below</div>}
+                    <div style={{ fontSize:"13px", color:framework===f.id ? f.color : "#4A6A8A", fontWeight:"600", marginBottom:"4px" }}>{f.sub}</div>
+                    <div style={{ fontSize:"13px", color:"#8BAAC8" }}>{f.detail}</div>
+                    {framework===f.id && <div style={{ marginTop:"10px", fontSize:"12px", fontWeight:"700", color:f.color }}>&#10003; Selected  -  framework info below</div>}
                   </button>
                 ))}
 
                 {/* Stat pills */}
                 <div style={{ display:"grid", gridTemplateColumns:"repeat(2,1fr)", gap:"8px" }}>
                   {(framework==="NIST CSF 2.0"
-                    ? [["106","Subcategories","#1E6FD9"],["22","Categories","#00BFFF"],["0–4","Tier Scale","#C8F135"],["9","Report Slides","#A78BFA"]]
-                    : [["153","Controls","#00BFFF"],["18","Control Groups","#1E6FD9"],["3","Impl. Groups","#C8F135"],["1–4","Score Range","#A78BFA"]]
+                    ? [["106","Subcategories","#1E6FD9"],["22","Categories","#00BFFF"],["0-4","Tier Scale","#C8F135"],["9","Report Slides","#A78BFA"]]
+                    : [["153","Controls","#00BFFF"],["18","Control Groups","#1E6FD9"],["3","Impl. Groups","#C8F135"],["1-4","Score Range","#A78BFA"]]
                   ).map(([n,l,c])=>(
                     <div key={l} style={{ padding:"10px 12px", borderRadius:"8px", background:"rgba(0,0,0,0.3)", border:`1px solid ${c}25`, textAlign:"center" }}>
                       <div style={{ fontSize:"20px", fontWeight:"800", color:c }}>{n}</div>
-                      <div style={{ fontSize:"9px", color:"#4A6A8A", fontWeight:"600", textTransform:"uppercase", letterSpacing:"0.06em" }}>{l}</div>
+                      <div style={{ fontSize:"11px", color:"#4A6A8A", fontWeight:"600", textTransform:"uppercase", letterSpacing:"0.06em" }}>{l}</div>
                     </div>
                   ))}
                 </div>
               </div>
             </div>
 
-            {/* How it works + process — single compact row */}
+            {/* How it works + process  -  single compact row */}
             <div style={{ ...card, marginBottom:"20px" }}>
-              <div style={{ fontSize:"10px", fontWeight:"700", color:"#4A6A8A", letterSpacing:"0.12em", textTransform:"uppercase", marginBottom:"14px" }}>Assessment Process</div>
+              <div style={{ fontSize:"12px", fontWeight:"700", color:"#4A6A8A", letterSpacing:"0.12em", textTransform:"uppercase", marginBottom:"14px" }}>Assessment Process</div>
               <div style={{ display:"grid", gridTemplateColumns:"repeat(6,1fr)" }}>
                 {[
                   {n:"01", label:"Setup",    desc:"Client & framework",       col:"#1E6FD9", v:"setup"},
                   {n:"02", label:"Docs",     desc:"Documentation review",     col:"#0EA5E9", v:"docs"},
                   {n:"03", label:"Workshop", desc:"Discovery & notes",        col:"#00BFFF", v:"workshop"},
-                  {n:"04", label:"Score",    desc:"0–4 per subcategory",      col:"#C8F135", v:"score"},
+                  {n:"04", label:"Score",    desc:"0-4 per subcategory",      col:"#C8F135", v:"score"},
                   {n:"05", label:"Results",  desc:"Insights & gap analysis",  col:"#A78BFA", v:"results"},
                   {n:"06", label:"Report",   desc:"PPTX, Excel & narrative",  col:"#F87171", v:"results"},
                 ].map((s,i)=>(
                   <div key={s.n} style={{ padding:"12px 8px", position:"relative", cursor:"pointer" }} onClick={()=>s.v && setView(s.v)}>
                     <div style={{ fontSize:"18px", fontWeight:"800", color:s.col, marginBottom:"3px" }}>{s.n}</div>
-                    <div style={{ fontSize:"12px", fontWeight:"700", color:"#E2EAF4", marginBottom:"2px" }}>{s.label}</div>
-                    <div style={{ fontSize:"10px", color:"#4A6A8A", lineHeight:"1.4" }}>{s.desc}</div>
-                    {i<5 && <div style={{ position:"absolute", right:"-1px", top:"50%", transform:"translateY(-50%)", color:"#1B3A6B", fontSize:"14px" }}>›</div>}
+                    <div style={{ fontSize:"14px", fontWeight:"700", color:"#E2EAF4", marginBottom:"2px" }}>{s.label}</div>
+                    <div style={{ fontSize:"12px", color:"#4A6A8A", lineHeight:"1.6" }}>{s.desc}</div>
+                    {i<5 && <div style={{ position:"absolute", right:"-1px", top:"50%", transform:"translateY(-50%)", color:"#1B3A6B", fontSize:"14px" }}>{" > "}</div>}
                   </div>
                 ))}
               </div>
             </div>
 
-            {/* Framework breakdown — inline, no toggle needed, clean compact grid */}
+            {/* Framework breakdown  -  inline, no toggle needed, clean compact grid */}
             {framework === "NIST CSF 2.0" && (
               <div style={{ ...card, marginBottom:"20px" }}>
-                <div style={{ fontSize:"10px", fontWeight:"700", color:"#4A6A8A", letterSpacing:"0.12em", textTransform:"uppercase", marginBottom:"14px" }}>NIST CSF 2.0 — Functions & Categories</div>
+                <div style={{ fontSize:"12px", fontWeight:"700", color:"#4A6A8A", letterSpacing:"0.12em", textTransform:"uppercase", marginBottom:"14px" }}>NIST CSF 2.0  -  Functions & Categories</div>
                 <div style={{ display:"grid", gridTemplateColumns:"repeat(6,1fr)", gap:"8px", marginBottom:"14px" }}>
                   {FRAMEWORKS["NIST CSF 2.0"].map(cat=>(
                     <div key={cat.id} style={{ padding:"12px", borderRadius:"9px", background:cat.light, border:`1px solid ${cat.color}35` }}>
-                      <div style={{ fontSize:"11px", fontWeight:"800", color:cat.color, marginBottom:"3px" }}>{cat.id}</div>
-                      <div style={{ fontSize:"12px", fontWeight:"700", color:"#FFFFFF", marginBottom:"4px" }}>{cat.name}</div>
-                      <div style={{ fontSize:"10px", color:"#4A6A8A" }}>{cat.domains.reduce((a,d)=>a+d.questions.length,0)} subcategories</div>
+                      <div style={{ fontSize:"13px", fontWeight:"800", color:cat.color, marginBottom:"3px" }}>{cat.id}</div>
+                      <div style={{ fontSize:"14px", fontWeight:"700", color:"#FFFFFF", marginBottom:"4px" }}>{cat.name}</div>
+                      <div style={{ fontSize:"12px", color:"#4A6A8A" }}>{cat.domains.reduce((a,d)=>a+d.questions.length,0)} subcategories</div>
                       <div style={{ marginTop:"6px", display:"flex", flexWrap:"wrap", gap:"2px" }}>
-                        {cat.domains.map(d=><span key={d.id} style={{ fontSize:"9px", color:cat.color, background:`${cat.color}18`, padding:"1px 5px", borderRadius:"3px", fontWeight:"600" }}>{d.id}</span>)}
+                        {cat.domains.map(d=><span key={d.id} style={{ fontSize:"11px", color:cat.color, background:`${cat.color}18`, padding:"1px 5px", borderRadius:"3px", fontWeight:"600" }}>{d.id}</span>)}
                       </div>
                     </div>
                   ))}
@@ -1678,8 +1857,8 @@ export default function MaturityScorecard() {
                   {ML.map(m=>(
                     <div key={m.value} style={{ padding:"9px 11px", borderRadius:"7px", background:m.bg, border:`1px solid ${m.color}35` }}>
                       <div style={{ fontSize:"16px", fontWeight:"800", color:m.color }}>{m.value}</div>
-                      <div style={{ fontSize:"11px", fontWeight:"700", color:"#E2EAF4", marginTop:"2px" }}>{m.label}</div>
-                      <div style={{ fontSize:"10px", color:"#4A6A8A", marginTop:"2px", lineHeight:"1.3" }}>{ML_DESC[m.value]?.slice(0,50)}...</div>
+                      <div style={{ fontSize:"13px", fontWeight:"700", color:"#E2EAF4", marginTop:"2px" }}>{m.label}</div>
+                      <div style={{ fontSize:"12px", color:"#4A6A8A", marginTop:"2px", lineHeight:"1.5" }}>{ML_DESC[m.value]?.slice(0,50)}...</div>
                     </div>
                   ))}
                 </div>
@@ -1687,74 +1866,74 @@ export default function MaturityScorecard() {
             )}
             {framework === "CIS Controls v8" && (
               <div style={{ ...card, marginBottom:"20px" }}>
-                <div style={{ fontSize:"10px", fontWeight:"700", color:"#4A6A8A", letterSpacing:"0.12em", textTransform:"uppercase", marginBottom:"14px" }}>CIS Controls v8 — Implementation Groups</div>
+                <div style={{ fontSize:"12px", fontWeight:"700", color:"#4A6A8A", letterSpacing:"0.12em", textTransform:"uppercase", marginBottom:"14px" }}>CIS Controls v8  -  Implementation Groups</div>
                 <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:"12px", marginBottom:"12px" }}>
                   {FRAMEWORKS["CIS Controls v8"].map(grp=>(
                     <div key={grp.id} style={{ padding:"14px", borderRadius:"9px", background:grp.light, border:`1px solid ${grp.color}35` }}>
-                      <div style={{ fontSize:"11px", fontWeight:"800", color:grp.color, marginBottom:"2px" }}>{grp.id} — {grp.name}</div>
-                      <div style={{ fontSize:"11px", color:"#8BAAC8", marginBottom:"10px" }}>{grp.description}</div>
+                      <div style={{ fontSize:"13px", fontWeight:"800", color:grp.color, marginBottom:"2px" }}>{grp.id}  -  {grp.name}</div>
+                      <div style={{ fontSize:"13px", color:"#8BAAC8", marginBottom:"10px" }}>{grp.description}</div>
                       {grp.domains.map(d=>(
                         <div key={d.id} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"4px 7px", borderRadius:"5px", background:"rgba(0,0,0,0.2)", marginBottom:"3px" }}>
-                          <span style={{ fontSize:"10px", color:grp.color, fontWeight:"600" }}>{d.id}</span>
-                          <span style={{ fontSize:"10px", color:"#8BAAC8" }}>{d.name}</span>
+                          <span style={{ fontSize:"12px", color:grp.color, fontWeight:"600" }}>{d.id}</span>
+                          <span style={{ fontSize:"12px", color:"#8BAAC8" }}>{d.name}</span>
                         </div>
                       ))}
                     </div>
                   ))}
                 </div>
-                <div style={{ padding:"10px 14px", borderRadius:"7px", background:"rgba(0,191,255,0.06)", border:"1px solid rgba(0,191,255,0.18)", fontSize:"11px", color:"#8BAAC8" }}>
+                <div style={{ padding:"10px 14px", borderRadius:"7px", background:"rgba(0,191,255,0.06)", border:"1px solid rgba(0,191,255,0.18)", fontSize:"13px", color:"#8BAAC8" }}>
                   <strong style={{color:"#00BFFF"}}>IG1</strong> Basic hygiene.&nbsp;&nbsp;<strong style={{color:"#00BFFF"}}>IG2</strong> IT expertise supporting multiple departments.&nbsp;&nbsp;<strong style={{color:"#00BFFF"}}>IG3</strong> Dedicated security expertise. Each group builds on the previous.
                 </div>
               </div>
             )}
           </div>
         )}
-        {/* ── SETUP ── */}
+        {/* -- SETUP -- */}
         {view==="setup" && (
           <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"18px" }}>
             <div style={card}>
-              <div style={{ fontSize:"11px", fontWeight:"700", color:"#4A6A8A", letterSpacing:"0.1em", textTransform:"uppercase", marginBottom:"16px" }}>Engagement Details</div>
+              <div style={{ fontSize:"13px", fontWeight:"700", color:"#4A6A8A", letterSpacing:"0.1em", textTransform:"uppercase", marginBottom:"16px" }}>Engagement Details</div>
               {[{label:"Client Name",val:clientName,set:setClientName,ph:"e.g. Acme Pharma Ltd"},{label:"Assessor / Lead Consultant",val:assessor,set:setAssessor,ph:"Your name"},{label:"Sector",val:clientSector,set:setClientSector,ph:"e.g. Pharmaceuticals, Financial Services"}].map(({label,val,set,ph})=>(
                 <div key={label} style={{ marginBottom:"13px" }}>
-                  <label style={{ fontSize:"12px", fontWeight:"600", color:"#8BAAC8", display:"block", marginBottom:"5px" }}>{label}</label>
-                  <input value={val} onChange={e=>set(e.target.value)} placeholder={ph} style={{ width:"100%", padding:"9px 12px", borderRadius:"7px", border:"1px solid #1B3A6B", fontSize:"13px", fontFamily:"inherit", outline:"none", boxSizing:"border-box", background:"#0A1932", color:"#E2EAF4" }}/>
+                  <label style={{ fontSize:"14px", fontWeight:"600", color:"#8BAAC8", display:"block", marginBottom:"5px" }}>{label}</label>
+                  <input value={val} onChange={e=>set(e.target.value)} placeholder={ph} style={{ width:"100%", padding:"9px 12px", borderRadius:"7px", border:"1px solid #1B3A6B", fontSize:"15px", fontFamily:"inherit", outline:"none", boxSizing:"border-box", background:"#0A1932", color:"#E2EAF4" }}/>
                 </div>
               ))}
               <div style={{ marginBottom:"13px" }}>
-                <label style={{ fontSize:"12px", fontWeight:"600", color:"#8BAAC8", display:"block", marginBottom:"5px" }}>Business Context <span style={{color:"#4A6A8A",fontWeight:"400"}}>(used in report)</span></label>
-                <textarea value={clientContext} onChange={e=>setClientContext(e.target.value)} placeholder="Brief description of the organisation, key technology context and engagement background..." style={{ width:"100%", padding:"9px 12px", borderRadius:"7px", border:"1px solid #1B3A6B", fontSize:"12px", fontFamily:"inherit", outline:"none", boxSizing:"border-box", background:"#0A1932", color:"#E2EAF4", minHeight:"80px", resize:"vertical", lineHeight:"1.5" }}/>
+                <label style={{ fontSize:"14px", fontWeight:"600", color:"#8BAAC8", display:"block", marginBottom:"5px" }}>Business Context <span style={{color:"#4A6A8A",fontWeight:"400"}}>(used in report)</span></label>
+                <textarea value={clientContext} onChange={e=>setClientContext(e.target.value)} placeholder="Brief description of the organisation, key technology context and engagement background..." style={{ width:"100%", padding:"9px 12px", borderRadius:"7px", border:"1px solid #1B3A6B", fontSize:"14px", fontFamily:"inherit", outline:"none", boxSizing:"border-box", background:"#0A1932", color:"#E2EAF4", minHeight:"80px", resize:"vertical", lineHeight:"1.5" }}/>
               </div>
             </div>
             <div style={{ display:"flex", flexDirection:"column", gap:"14px" }}>
               <div style={card}>
-                <div style={{ fontSize:"11px", fontWeight:"700", color:"#4A6A8A", letterSpacing:"0.1em", textTransform:"uppercase", marginBottom:"10px" }}>Selected Framework</div>
+                <div style={{ fontSize:"13px", fontWeight:"700", color:"#4A6A8A", letterSpacing:"0.1em", textTransform:"uppercase", marginBottom:"10px" }}>Selected Framework</div>
                 <div style={{ padding:"14px", borderRadius:"9px", background:`${FRAMEWORKS[framework][0]?.color ? "rgba(30,111,217,0.1)" : "#0A1932"}`, border:`1px solid ${FRAMEWORKS[framework][0]?.color || "#1B3A6B"}40` }}>
                   <div style={{ fontSize:"15px", fontWeight:"800", color:"#FFFFFF", marginBottom:"3px" }}>{framework}</div>
-                  <div style={{ fontSize:"11px", color:"#8BAAC8" }}>{framework==="NIST CSF 2.0" ? "6 functions · 22 categories · 106 subcategories · 0–4 NIST tiers" : "3 groups · 18 controls · Implementation groups"}</div>
+                  <div style={{ fontSize:"13px", color:"#8BAAC8" }}>{framework==="NIST CSF 2.0" ? "6 functions . 22 categories . 106 subcategories . 0-4 NIST tiers" : "3 groups . 18 controls . Implementation groups"}</div>
                 </div>
-                <button onClick={()=>setView("home")} style={{ marginTop:"10px", fontSize:"11px", color:"#4A6A8A", background:"none", border:"none", cursor:"pointer", fontFamily:"inherit", textDecoration:"underline", padding:0 }}>← Change framework</button>
+                <button onClick={()=>setView("home")} style={{ marginTop:"10px", fontSize:"13px", color:"#4A6A8A", background:"none", border:"none", cursor:"pointer", fontFamily:"inherit", textDecoration:"underline", padding:0 }}>{"<-"} Change framework</button>
               </div>
               <div style={card}>
-                <div style={{ fontSize:"11px", fontWeight:"700", color:"#4A6A8A", letterSpacing:"0.1em", textTransform:"uppercase", marginBottom:"10px" }}>Session Persistence</div>
-                <div style={{ fontSize:"11px", color:"#8BAAC8", lineHeight:"1.6", marginBottom:"10px" }}>Use <strong style={{color:"#C8F135"}}>Save JSON</strong> to download progress at any time. Load it in any future session to resume exactly where you left off.</div>
+                <div style={{ fontSize:"13px", fontWeight:"700", color:"#4A6A8A", letterSpacing:"0.1em", textTransform:"uppercase", marginBottom:"10px" }}>Session Persistence</div>
+                <div style={{ fontSize:"13px", color:"#8BAAC8", lineHeight:"1.6", marginBottom:"10px" }}>Use <strong style={{color:"#C8F135"}}>Save JSON</strong> to download progress at any time. Load it in any future session to resume exactly where you left off.</div>
                 <div style={{ display:"flex", gap:"8px" }}>
-                  <button onClick={saveSession} style={{ flex:1, padding:"8px", borderRadius:"6px", border:"1px solid rgba(200,241,53,0.4)", background:"rgba(200,241,53,0.08)", color:"#C8F135", fontSize:"11px", fontWeight:"700", cursor:"pointer", fontFamily:"inherit" }}>Save JSON ↓</button>
-                  <button onClick={()=>fileInputRef.current?.click()} style={{ flex:1, padding:"8px", borderRadius:"6px", border:"1px solid #1B3A6B", background:"#0A1932", color:"#8BAAC8", fontSize:"11px", fontWeight:"700", cursor:"pointer", fontFamily:"inherit" }}>Load JSON ↑</button>
+                  <button onClick={saveSession} style={{ flex:1, padding:"8px", borderRadius:"6px", border:"1px solid rgba(200,241,53,0.4)", background:"rgba(200,241,53,0.08)", color:"#C8F135", fontSize:"13px", fontWeight:"700", cursor:"pointer", fontFamily:"inherit" }}>Save ↓</button>
+                  <button onClick={()=>fileInputRef.current?.click()} style={{ flex:1, padding:"8px", borderRadius:"6px", border:"1px solid #1B3A6B", background:"#0A1932", color:"#8BAAC8", fontSize:"13px", fontWeight:"700", cursor:"pointer", fontFamily:"inherit" }}>Load ↑</button>
                 </div>
               </div>
               <div style={{ ...card, borderTop:`3px solid #1E6FD9` }}>
-                <div style={{ fontSize:"12px", color:"#8BAAC8", marginBottom:"12px" }}>Once details are complete, proceed to review documentation provided by the client before the workshop.</div>
-                <button onClick={()=>setView("docs")} style={{ width:"100%", padding:"13px", borderRadius:"9px", background:"linear-gradient(135deg,#1E6FD9,#0EA5E9)", color:"white", border:"none", fontWeight:"700", fontSize:"13px", cursor:"pointer", fontFamily:"inherit" }}>Continue to Documentation Review →</button>
+                <div style={{ fontSize:"14px", color:"#8BAAC8", marginBottom:"12px" }}>Once details are complete, proceed to review documentation provided by the client before the workshop.</div>
+                <button onClick={()=>setView("docs")} style={{ width:"100%", padding:"13px", borderRadius:"9px", background:"linear-gradient(135deg,#1E6FD9,#0EA5E9)", color:"white", border:"none", fontWeight:"700", fontSize:"15px", cursor:"pointer", fontFamily:"inherit" }}>{"->"} Documentation Review</button>
               </div>
             </div>
             <div style={{ ...card, gridColumn:"1 / -1" }}>
-              <div style={{ fontSize:"11px", fontWeight:"700", color:"#4A6A8A", letterSpacing:"0.1em", textTransform:"uppercase", marginBottom:"14px" }}>NIST CSF 2.0 — Scoring Tiers Reference</div>
+              <div style={{ fontSize:"13px", fontWeight:"700", color:"#4A6A8A", letterSpacing:"0.1em", textTransform:"uppercase", marginBottom:"14px" }}>NIST CSF 2.0  -  Scoring Tiers Reference</div>
               <div style={{ display:"grid", gridTemplateColumns:"repeat(5,1fr)", gap:"10px" }}>
                 {ML.map(m=>(
                   <div key={m.value} style={{ padding:"12px", borderRadius:"8px", background:m.bg, border:`1px solid ${m.color}40` }}>
                     <div style={{ fontWeight:"800", fontSize:"22px", color:m.color }}>{m.value}</div>
-                    <div style={{ fontWeight:"700", fontSize:"12px", color:"#E2EAF4", marginTop:"3px" }}>{m.label}</div>
-                    <div style={{ fontSize:"11px", color:"#8BAAC8", marginTop:"3px", lineHeight:"1.4" }}>{ML_DESC[m.value]}</div>
+                    <div style={{ fontWeight:"700", fontSize:"14px", color:"#E2EAF4", marginTop:"3px" }}>{m.label}</div>
+                    <div style={{ fontSize:"13px", color:"#8BAAC8", marginTop:"3px", lineHeight:"1.6" }}>{ML_DESC[m.value]}</div>
                   </div>
                 ))}
               </div>
@@ -1762,7 +1941,7 @@ export default function MaturityScorecard() {
           </div>
         )}
 
-        {/* ── DOCS ── */}
+        {/* -- DOCS -- */}
         {view==="docs" && (()=>{
           const cats = [...new Set(NIST_DOCS.map(d=>d.cat))];
           const provided = NIST_DOCS.filter(d=>docsProvided[d.id]==="yes").length;
@@ -1774,13 +1953,13 @@ export default function MaturityScorecard() {
               <div style={{ marginBottom:"20px", padding:"16px 20px", borderRadius:"12px", background:"rgba(30,111,217,0.08)", border:"1px solid rgba(30,111,217,0.25)", display:"flex", alignItems:"center", justifyContent:"space-between" }}>
                 <div>
                   <div style={{ fontSize:"15px", fontWeight:"700", color:"#1E6FD9", marginBottom:"3px" }}>Documentation Review</div>
-                  <div style={{ fontSize:"12px", color:"#8BAAC8" }}>Record which documents the client has provided ahead of the workshop. This informs scoring confidence and appears in the report appendix.</div>
+                  <div style={{ fontSize:"14px", color:"#8BAAC8" }}>Record which documents the client has provided ahead of the workshop. This informs scoring confidence and appears in the report appendix.</div>
                 </div>
                 <div style={{ display:"flex", gap:"16px", flexShrink:0, marginLeft:"24px" }}>
                   {[["Provided", provided, "#C8F135"],["Partial", partial, "#FCD34D"],["Total Docs", totalDocs, "#8BAAC8"]].map(([l,n,c])=>(
                     <div key={l} style={{ textAlign:"center" }}>
                       <div style={{ fontSize:"22px", fontWeight:"800", color:c }}>{n}</div>
-                      <div style={{ fontSize:"10px", color:"#4A6A8A", fontWeight:"600" }}>{l}</div>
+                      <div style={{ fontSize:"12px", color:"#4A6A8A", fontWeight:"600" }}>{l}</div>
                     </div>
                   ))}
                 </div>
@@ -1791,7 +1970,7 @@ export default function MaturityScorecard() {
                 {[["yes","Provided","#C8F135","rgba(200,241,53,0.12)"],["partial","Partial / In Progress","#FCD34D","rgba(252,211,77,0.1)"],["no","Not Provided","#F87171","rgba(248,113,113,0.08)"],["na","Not Applicable","#4A6A8A","rgba(74,106,138,0.1)"]].map(([v,l,c,bg])=>(
                   <div key={v} style={{ display:"flex", alignItems:"center", gap:"6px", padding:"5px 12px", borderRadius:"20px", background:bg, border:`1px solid ${c}40` }}>
                     <div style={{ width:"8px", height:"8px", borderRadius:"2px", background:c }}/>
-                    <span style={{ fontSize:"11px", color:c, fontWeight:"600" }}>{l}</span>
+                    <span style={{ fontSize:"13px", color:c, fontWeight:"600" }}>{l}</span>
                   </div>
                 ))}
               </div>
@@ -1803,8 +1982,8 @@ export default function MaturityScorecard() {
                 return (
                   <div key={cat} style={{ ...card, marginBottom:"12px", borderLeft:`4px solid ${col}` }}>
                     <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"12px" }}>
-                      <div style={{ fontSize:"12px", fontWeight:"800", color:col, letterSpacing:"0.08em", textTransform:"uppercase" }}>{cat}</div>
-                      <div style={{ fontSize:"11px", color:"#4A6A8A" }}>{catDocs.filter(d=>docsProvided[d.id]==="yes").length} / {catDocs.length} provided</div>
+                      <div style={{ fontSize:"14px", fontWeight:"800", color:col, letterSpacing:"0.08em", textTransform:"uppercase" }}>{cat}</div>
+                      <div style={{ fontSize:"13px", color:"#4A6A8A" }}>{catDocs.filter(d=>docsProvided[d.id]==="yes").length} / {catDocs.length} provided</div>
                     </div>
                     <div style={{ display:"flex", flexDirection:"column", gap:"6px" }}>
                       {catDocs.map(doc=>{
@@ -1813,10 +1992,10 @@ export default function MaturityScorecard() {
                         return (
                           <div key={doc.id} style={{ borderRadius:"8px", background:status==="yes"?"rgba(200,241,53,0.06)":status==="partial"?"rgba(252,211,77,0.05)":status==="no"?"rgba(248,113,113,0.04)":"#0A1932", border:`1px solid ${status==="yes"?"rgba(200,241,53,0.2)":status==="partial"?"rgba(252,211,77,0.15)":status==="no"?"rgba(248,113,113,0.1)":"#1B3A6B"}`, overflow:"hidden" }}>
                             <div style={{ display:"flex", alignItems:"center", gap:"10px", padding:"10px 12px" }}>
-                              <div style={{ flex:1, fontSize:"12px", color:"#E2EAF4", fontWeight:"500" }}>{doc.label}</div>
+                              <div style={{ flex:1, fontSize:"14px", color:"#E2EAF4", fontWeight:"500" }}>{doc.label}</div>
                               <div style={{ display:"flex", gap:"4px" }}>
                                 {[["yes","✓ Provided","#C8F135","rgba(200,241,53,0.15)"],["partial","~ Partial","#FCD34D","rgba(252,211,77,0.12)"],["no","✗ Not Provided","#F87171","rgba(248,113,113,0.12)"],["na","N/A","#4A6A8A","rgba(74,106,138,0.12)"]].map(([v,l,c,bg])=>(
-                                  <button key={v} onClick={()=>setDocsProvided(p=>({...p,[doc.id]:p[doc.id]===v?"":v}))} style={{ padding:"4px 10px", borderRadius:"5px", border:`1px solid ${status===v?c:"#1B3A6B"}`, background:status===v?bg:"transparent", color:status===v?c:"#4A6A8A", fontSize:"10px", fontWeight:"700", cursor:"pointer", fontFamily:"inherit", whiteSpace:"nowrap" }}>{l}</button>
+                                  <button key={v} onClick={()=>setDocsProvided(p=>({...p,[doc.id]:p[doc.id]===v?"":v}))} style={{ padding:"4px 10px", borderRadius:"5px", border:`1px solid ${status===v?c:"#1B3A6B"}`, background:status===v?bg:"transparent", color:status===v?c:"#4A6A8A", fontSize:"12px", fontWeight:"700", cursor:"pointer", fontFamily:"inherit", whiteSpace:"nowrap" }}>{l}</button>
                                 ))}
                               </div>
                             </div>
@@ -1824,8 +2003,8 @@ export default function MaturityScorecard() {
                               <input
                                 value={note}
                                 onChange={e=>setDocNotes(p=>({...p,[doc.id]:e.target.value}))}
-                                placeholder="Notes — version, date received, gaps observed, quality comments..."
-                                style={{ width:"100%", padding:"6px 10px", borderRadius:"5px", border:"1px solid #1B3A6B", fontSize:"11px", fontFamily:"inherit", outline:"none", background:"rgba(0,0,0,0.25)", color:"#E2EAF4", boxSizing:"border-box", color: note?"#E2EAF4":"#4A6A8A" }}
+                                placeholder="Notes  -  version, date received, gaps observed, quality comments..."
+                                style={{ width:"100%", padding:"8px 12px", borderRadius:"5px", border:"1px solid #1B3A6B", fontSize:"13px", fontFamily:"inherit", outline:"none", background:"rgba(0,0,0,0.25)", color:"#E2EAF4", boxSizing:"border-box", color: note?"#E2EAF4":"#4A6A8A" }}
                               />
                             </div>
                           </div>
@@ -1838,55 +2017,55 @@ export default function MaturityScorecard() {
 
               {/* Custom documents */}
               <div style={{ ...card, marginBottom:"18px", borderLeft:"4px solid #8BAAC8" }}>
-                <div style={{ fontSize:"12px", fontWeight:"800", color:"#8BAAC8", letterSpacing:"0.08em", textTransform:"uppercase", marginBottom:"12px" }}>Additional / Custom Documents</div>
+                <div style={{ fontSize:"14px", fontWeight:"800", color:"#8BAAC8", letterSpacing:"0.08em", textTransform:"uppercase", marginBottom:"12px" }}>Additional / Custom Documents</div>
                 {customDocs.map((doc,i)=>{
                   const s = docsProvided[`custom_${i}`];
                   const note = docNotes[`custom_${i}`] || "";
                   return (
                     <div key={i} style={{ borderRadius:"8px", background:s==="yes"?"rgba(200,241,53,0.06)":s==="partial"?"rgba(252,211,77,0.05)":"#0A1932", border:"1px solid #1B3A6B", marginBottom:"6px", overflow:"hidden" }}>
                       <div style={{ display:"flex", alignItems:"center", gap:"10px", padding:"10px 12px" }}>
-                        <div style={{ flex:1, fontSize:"12px", color:"#E2EAF4" }}>{doc}</div>
+                        <div style={{ flex:1, fontSize:"14px", color:"#E2EAF4" }}>{doc}</div>
                         <div style={{ display:"flex", gap:"4px" }}>
-                          {[["yes","✓","#C8F135","rgba(200,241,53,0.15)"],["partial","~","#FCD34D","rgba(252,211,77,0.12)"],["no","✗","#F87171","rgba(248,113,113,0.12)"]].map(([v,l,c,bg])=>(
-                            <button key={v} onClick={()=>setDocsProvided(p=>({...p,[`custom_${i}`]:p[`custom_${i}`]===v?"":v}))} style={{ padding:"4px 8px", borderRadius:"5px", border:`1px solid ${s===v?c:"#1B3A6B"}`, background:s===v?bg:"transparent", color:s===v?c:"#4A6A8A", fontSize:"11px", fontWeight:"700", cursor:"pointer", fontFamily:"inherit" }}>{l}</button>
+                          {[["yes","v","#C8F135","rgba(200,241,53,0.15)"],["partial","~","#FCD34D","rgba(252,211,77,0.12)"],["no","x","#F87171","rgba(248,113,113,0.12)"]].map(([v,l,c,bg])=>(
+                            <button key={v} onClick={()=>setDocsProvided(p=>({...p,[`custom_${i}`]:p[`custom_${i}`]===v?"":v}))} style={{ padding:"4px 8px", borderRadius:"5px", border:`1px solid ${s===v?c:"#1B3A6B"}`, background:s===v?bg:"transparent", color:s===v?c:"#4A6A8A", fontSize:"13px", fontWeight:"700", cursor:"pointer", fontFamily:"inherit" }}>{l}</button>
                           ))}
                         </div>
-                        <button onClick={()=>setCustomDocs(p=>p.filter((_,j)=>j!==i))} style={{ fontSize:"16px", color:"#4A6A8A", background:"none", border:"none", cursor:"pointer", lineHeight:1, padding:"0 4px" }}>×</button>
+                        <button onClick={()=>setCustomDocs(p=>p.filter((_,j)=>j!==i))} style={{ fontSize:"16px", color:"#4A6A8A", background:"none", border:"none", cursor:"pointer", lineHeight:1, padding:"0 4px" }}>x</button>
                       </div>
                       <div style={{ padding:"0 12px 10px" }}>
                         <input
                           value={note}
                           onChange={e=>setDocNotes(p=>({...p,[`custom_${i}`]:e.target.value}))}
                           placeholder="Notes..."
-                          style={{ width:"100%", padding:"6px 10px", borderRadius:"5px", border:"1px solid #1B3A6B", fontSize:"11px", fontFamily:"inherit", outline:"none", background:"rgba(0,0,0,0.25)", color:"#E2EAF4", boxSizing:"border-box" }}
+                          style={{ width:"100%", padding:"8px 12px", borderRadius:"5px", border:"1px solid #1B3A6B", fontSize:"13px", fontFamily:"inherit", outline:"none", background:"rgba(0,0,0,0.25)", color:"#E2EAF4", boxSizing:"border-box" }}
                         />
                       </div>
                     </div>
                   );
                 })}
                 <div style={{ display:"flex", gap:"8px", marginTop:"8px" }}>
-                  <input value={customDocInput} onChange={e=>setCustomDocInput(e.target.value)} onKeyDown={e=>{ if(e.key==="Enter"&&customDocInput.trim()){ setCustomDocs(p=>[...p,customDocInput.trim()]); setCustomDocInput(""); }}} placeholder="Add a custom document and press Enter..." style={{ flex:1, padding:"9px 12px", borderRadius:"7px", border:"1px solid #1B3A6B", fontSize:"12px", fontFamily:"inherit", outline:"none", background:"#0A1932", color:"#E2EAF4" }}/>
-                  <button onClick={()=>{ if(customDocInput.trim()){ setCustomDocs(p=>[...p,customDocInput.trim()]); setCustomDocInput(""); }}} style={{ padding:"9px 16px", borderRadius:"7px", background:"rgba(30,111,217,0.2)", border:"1px solid rgba(30,111,217,0.4)", color:"#1E6FD9", fontWeight:"700", fontSize:"12px", cursor:"pointer", fontFamily:"inherit" }}>Add</button>
+                  <input value={customDocInput} onChange={e=>setCustomDocInput(e.target.value)} onKeyDown={e=>{ if(e.key==="Enter"&&customDocInput.trim()){ setCustomDocs(p=>[...p,customDocInput.trim()]); setCustomDocInput(""); }}} placeholder="Add a custom document and press Enter..." style={{ flex:1, padding:"9px 12px", borderRadius:"7px", border:"1px solid #1B3A6B", fontSize:"14px", fontFamily:"inherit", outline:"none", background:"#0A1932", color:"#E2EAF4" }}/>
+                  <button onClick={()=>{ if(customDocInput.trim()){ setCustomDocs(p=>[...p,customDocInput.trim()]); setCustomDocInput(""); }}} style={{ padding:"9px 16px", borderRadius:"7px", background:"rgba(30,111,217,0.2)", border:"1px solid rgba(30,111,217,0.4)", color:"#1E6FD9", fontWeight:"700", fontSize:"14px", cursor:"pointer", fontFamily:"inherit" }}>Add</button>
                 </div>
               </div>
 
               <div style={{ display:"flex", justifyContent:"flex-end", gap:"10px" }}>
-                <button onClick={()=>setView("setup")} style={{ padding:"11px 22px", borderRadius:"9px", background:"transparent", border:"1px solid #1B3A6B", color:"#8BAAC8", fontWeight:"700", fontSize:"12px", cursor:"pointer", fontFamily:"inherit" }}>← Back to Setup</button>
-                <button onClick={()=>{ setActiveSection(null); setView("workshop"); }} style={{ padding:"11px 26px", borderRadius:"9px", background:"linear-gradient(135deg,#1E6FD9,#0EA5E9)", color:"white", border:"none", fontWeight:"700", fontSize:"13px", cursor:"pointer", fontFamily:"inherit" }}>Proceed to Workshop →</button>
+                <button onClick={()=>setView("setup")} style={{ padding:"11px 22px", borderRadius:"9px", background:"transparent", border:"1px solid #1B3A6B", color:"#8BAAC8", fontWeight:"700", fontSize:"14px", cursor:"pointer", fontFamily:"inherit" }}>{"<-"} Back to Setup</button>
+                <button onClick={()=>{ setActiveSection(null); setView("workshop"); }} style={{ padding:"11px 26px", borderRadius:"9px", background:"linear-gradient(135deg,#1E6FD9,#0EA5E9)", color:"white", border:"none", fontWeight:"700", fontSize:"15px", cursor:"pointer", fontFamily:"inherit" }}>{"->"} Proceed to Workshop</button>
               </div>
             </div>
           );
         })()}
 
-        {/* ── WORKSHOP ── */}
+        {/* -- WORKSHOP -- */}
         {view==="workshop" && (
           <div>
             <div style={{ marginBottom:"18px", padding:"14px 18px", borderRadius:"10px", background:"rgba(0,191,255,0.08)", border:"1px solid rgba(0,191,255,0.2)", display:"flex", alignItems:"center", justifyContent:"space-between" }}>
               <div>
-                <div style={{ fontSize:"14px", fontWeight:"700", color:"#00BFFF", marginBottom:"3px" }}>Workshop Mode — Discovery & Evidence Capture</div>
-                <div style={{ fontSize:"12px", color:"#8BAAC8" }}>Use this screen in the client session. Ask the questions, capture responses and evidence notes. Scoring happens after the workshop.</div>
+                <div style={{ fontSize:"14px", fontWeight:"700", color:"#00BFFF", marginBottom:"3px" }}>Workshop Mode  -  Discovery & Evidence Capture</div>
+                <div style={{ fontSize:"14px", color:"#8BAAC8" }}>Use this screen in the client session. Ask the questions, capture responses and evidence notes. Scoring happens after the workshop.</div>
               </div>
-              <button onClick={()=>setView("score")} style={{ padding:"8px 18px", borderRadius:"7px", background:"linear-gradient(135deg,#1E6FD9,#0EA5E9)", color:"#FFFFFF", border:"none", fontWeight:"700", fontSize:"12px", cursor:"pointer", fontFamily:"inherit", flexShrink:0 }}>Move to Scoring →</button>
+              <button onClick={()=>setView("score")} style={{ padding:"8px 18px", borderRadius:"7px", background:"linear-gradient(135deg,#1E6FD9,#0EA5E9)", color:"#FFFFFF", border:"none", fontWeight:"700", fontSize:"14px", cursor:"pointer", fontFamily:"inherit", flexShrink:0 }}>{"->"} Move to Scoring</button>
             </div>
             <div style={{ display:"grid", gridTemplateColumns:"200px 1fr", gap:"18px" }}>
               <div style={{ display:"flex", flexDirection:"column", gap:"6px" }}>
@@ -1895,26 +2074,26 @@ export default function MaturityScorecard() {
                   return (
                     <button key={cat.id} onClick={()=>setActiveSection(cat.id===activeSection?null:cat.id)} style={{ padding:"11px 13px", borderRadius:"9px", textAlign:"left", border:`2px solid ${activeSection===cat.id?cat.color:"#1B3A6B"}`, background:activeSection===cat.id?cat.light:"#0A1932", cursor:"pointer", fontFamily:"inherit" }}>
                       <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-                        <span style={{ fontSize:"11px", fontWeight:"800", color:cat.color, letterSpacing:"0.08em" }}>{cat.id}</span>
-                        {wCaptured>0&&<span style={{ fontSize:"10px", color:"#C8F135", background:"rgba(200,241,53,0.15)", padding:"1px 6px", borderRadius:"3px" }}>{wCaptured} noted</span>}
+                        <span style={{ fontSize:"13px", fontWeight:"800", color:cat.color, letterSpacing:"0.08em" }}>{cat.id}</span>
+                        {wCaptured>0&&<span style={{ fontSize:"12px", color:"#C8F135", background:"rgba(200,241,53,0.15)", padding:"1px 6px", borderRadius:"3px" }}>{wCaptured} noted</span>}
                       </div>
-                      <div style={{ fontSize:"12px", fontWeight:"700", color:"#E2EAF4", marginTop:"2px" }}>{cat.name}</div>
+                      <div style={{ fontSize:"14px", fontWeight:"700", color:"#E2EAF4", marginTop:"2px" }}>{cat.name}</div>
                     </button>
                   );
                 })}
                 <div style={{ ...card, marginTop:"6px", padding:"13px" }}>
-                  <div style={{ fontSize:"11px", color:"#4A6A8A", marginBottom:"4px", fontWeight:"600" }}>NOTES CAPTURED</div>
+                  <div style={{ fontSize:"13px", color:"#4A6A8A", marginBottom:"4px", fontWeight:"600" }}>NOTES CAPTURED</div>
                   <div style={{ fontSize:"24px", fontWeight:"800", color:"#00BFFF" }}>{fw.flatMap(c=>c.domains).filter(d=>workshopNotes[d.id]&&workshopNotes[d.id].trim()).length}</div>
-                  <div style={{ fontSize:"11px", color:"#8BAAC8" }}>of {fw.flatMap(c=>c.domains).length} categories</div>
+                  <div style={{ fontSize:"13px", color:"#8BAAC8" }}>of {fw.flatMap(c=>c.domains).length} categories</div>
                 </div>
               </div>
 
               <div>
                 {!activeSection && (
                   <div style={{ ...card, textAlign:"center", padding:"56px" }}>
-                    <div style={{ fontSize:"34px", marginBottom:"12px" }}>←</div>
+                    <div style={{ fontSize:"34px", marginBottom:"12px" }}>{"<-"}</div>
                     <div style={{ fontSize:"15px", fontWeight:"700", color:"#E2EAF4" }}>Select a function to start</div>
-                    <div style={{ fontSize:"12px", color:"#4A6A8A", marginTop:"6px" }}>Run through each category, ask the questions, capture what the client tells you</div>
+                    <div style={{ fontSize:"14px", color:"#4A6A8A", marginTop:"6px" }}>Run through each category, ask the questions, capture what the client tells you</div>
                   </div>
                 )}
                 {activeSection && (()=>{
@@ -1922,8 +2101,8 @@ export default function MaturityScorecard() {
                   return (
                     <div>
                       <div style={{ ...card, marginBottom:"13px", borderLeft:`4px solid ${cat.color}` }}>
-                        <div style={{ fontSize:"11px", fontWeight:"800", color:cat.color, letterSpacing:"0.1em", textTransform:"uppercase" }}>{cat.id} — {cat.name}</div>
-                        <div style={{ fontSize:"12px", color:"#4A6A8A", marginTop:"2px" }}>{cat.description}</div>
+                        <div style={{ fontSize:"13px", fontWeight:"800", color:cat.color, letterSpacing:"0.1em", textTransform:"uppercase" }}>{cat.id}  -  {cat.name}</div>
+                        <div style={{ fontSize:"14px", color:"#4A6A8A", marginTop:"2px" }}>{cat.description}</div>
                       </div>
                       {cat.domains.map(domain => {
                         const isOpen = expandedDomains[domain.id] !== false;
@@ -1933,34 +2112,34 @@ export default function MaturityScorecard() {
                           <div key={domain.id} style={{ ...card, marginBottom:"10px", borderLeft: hasNotes?`3px solid #C8F135`:"3px solid transparent" }}>
                             <button onClick={()=>setExpandedDomains(p=>({...p,[domain.id]:!isOpen}))} style={{ width:"100%", background:"none", border:"none", cursor:"pointer", textAlign:"left", padding:0, display:"flex", justifyContent:"space-between", alignItems:"center", fontFamily:"inherit" }}>
                               <div>
-                                <span style={{ fontSize:"11px", fontWeight:"700", color:cat.color, letterSpacing:"0.08em" }}>{domain.id}</span>
-                                <span style={{ fontSize:"13px", fontWeight:"700", color:"#E2EAF4", marginLeft:"9px" }}>{domain.name}</span>
-                                <span style={{ fontSize:"10px", color:"#4A6A8A", marginLeft:"8px" }}>({wqs.length} questions)</span>
+                                <span style={{ fontSize:"13px", fontWeight:"700", color:cat.color, letterSpacing:"0.08em" }}>{domain.id}</span>
+                                <span style={{ fontSize:"15px", fontWeight:"700", color:"#E2EAF4", marginLeft:"9px" }}>{domain.name}</span>
+                                <span style={{ fontSize:"12px", color:"#4A6A8A", marginLeft:"8px" }}>({wqs.length} questions)</span>
                               </div>
                               <div style={{ display:"flex", alignItems:"center", gap:"8px" }}>
-                                {hasNotes && <span style={{ fontSize:"10px", color:"#C8F135", fontWeight:"700" }}>✓ Notes</span>}
-                                <span style={{ color:"#4A6A8A", fontSize:"11px" }}>{isOpen?"▲":"▼"}</span>
+                                {hasNotes && <span style={{ fontSize:"12px", color:"#C8F135", fontWeight:"700" }}>&#10003; Notes</span>}
+                                <span style={{ color:"#4A6A8A", fontSize:"13px" }}>{isOpen?"^":"v"}</span>
                               </div>
                             </button>
                             {isOpen && (
                               <div style={{ marginTop:"14px", borderTop:"1px solid #1B3A6B", paddingTop:"14px" }}>
                                 {wqs.length > 0 && (
                                   <div style={{ marginBottom:"16px" }}>
-                                    <div style={{ fontSize:"11px", fontWeight:"700", color:"#00BFFF", marginBottom:"10px", letterSpacing:"0.05em", textTransform:"uppercase" }}>Discovery Questions</div>
+                                    <div style={{ fontSize:"13px", fontWeight:"700", color:"#00BFFF", marginBottom:"10px", letterSpacing:"0.05em", textTransform:"uppercase" }}>Discovery Questions</div>
                                     {wqs.map((q,i) => (
                                       <div key={i} style={{ display:"flex", gap:"10px", marginBottom:"12px", alignItems:"flex-start", padding:"10px 12px", background:"rgba(0,191,255,0.05)", borderRadius:"7px", border:"1px solid rgba(0,191,255,0.12)" }}>
-                                        <span style={{ fontSize:"12px", fontWeight:"800", color:"#00BFFF", minWidth:"22px", marginTop:"1px", flexShrink:0 }}>{i+1}.</span>
-                                        <span style={{ fontSize:"13px", color:"#E2EAF4", lineHeight:"1.6" }}>{q}</span>
+                                        <span style={{ fontSize:"14px", fontWeight:"800", color:"#00BFFF", minWidth:"22px", marginTop:"1px", flexShrink:0 }}>{i+1}.</span>
+                                        <span style={{ fontSize:"15px", color:"#E2EAF4", lineHeight:"1.6" }}>{q}</span>
                                       </div>
                                     ))}
                                   </div>
                                 )}
-                                <div style={{ fontSize:"11px", fontWeight:"700", color:"#00BFFF", marginBottom:"7px", letterSpacing:"0.05em", textTransform:"uppercase" }}>Evidence & Workshop Notes</div>
+                                <div style={{ fontSize:"13px", fontWeight:"700", color:"#00BFFF", marginBottom:"7px", letterSpacing:"0.05em", textTransform:"uppercase" }}>Evidence & Workshop Notes</div>
                                 <textarea
                                   value={workshopNotes[domain.id]||""}
                                   onChange={e=>setWorkshopNotes(p=>({...p,[domain.id]:e.target.value}))}
                                   placeholder={`Capture client responses, examples and context for ${domain.name}. These notes will be visible alongside each subcategory when you move to scoring.`}
-                                  style={{ width:"100%", minHeight:"110px", padding:"10px 12px", borderRadius:"7px", border:`1px solid ${hasNotes?"rgba(200,241,53,0.35)":"#1B3A6B"}`, fontSize:"12px", fontFamily:"inherit", outline:"none", background:"#0A1932", color:"#E2EAF4", boxSizing:"border-box", lineHeight:"1.6", resize:"vertical" }}
+                                  style={{ width:"100%", minHeight:"110px", padding:"10px 12px", borderRadius:"7px", border:`1px solid ${hasNotes?"rgba(200,241,53,0.35)":"#1B3A6B"}`, fontSize:"14px", fontFamily:"inherit", outline:"none", background:"#0A1932", color:"#E2EAF4", boxSizing:"border-box", lineHeight:"1.6", resize:"vertical" }}
                                 />
                               </div>
                             )}
@@ -1975,17 +2154,17 @@ export default function MaturityScorecard() {
           </div>
         )}
 
-        {/* ── SCORE ── */}
+        {/* -- SCORE -- */}
         {view==="score" && (
           <div>
             <div style={{ marginBottom:"18px", padding:"14px 18px", borderRadius:"10px", background:"rgba(200,241,53,0.07)", border:"1px solid rgba(200,241,53,0.25)", display:"flex", alignItems:"center", justifyContent:"space-between" }}>
               <div>
-                <div style={{ fontSize:"14px", fontWeight:"700", color:"#C8F135", marginBottom:"3px" }}>Scoring Mode — Post-Workshop Assessment</div>
-                <div style={{ fontSize:"12px", color:"#8BAAC8" }}>Score each subcategory 0–4 using workshop notes and document evidence. Set a target score alongside the current score. Save JSON regularly.</div>
+                <div style={{ fontSize:"14px", fontWeight:"700", color:"#C8F135", marginBottom:"3px" }}>Scoring Mode  -  Post-Workshop Assessment</div>
+                <div style={{ fontSize:"14px", color:"#8BAAC8" }}>Score each subcategory 0-4 using workshop notes and document evidence. Set a target score alongside the current score. Save JSON regularly.</div>
               </div>
               <div style={{ display:"flex", gap:"8px", flexShrink:0 }}>
-                <button onClick={saveSession} style={{ padding:"8px 16px", borderRadius:"7px", background:"rgba(200,241,53,0.15)", border:"1px solid rgba(200,241,53,0.4)", color:"#C8F135", fontWeight:"700", fontSize:"12px", cursor:"pointer", fontFamily:"inherit" }}>Save JSON ↓</button>
-                <button onClick={()=>setView("results")} style={{ padding:"8px 16px", borderRadius:"7px", background:"rgba(0,191,255,0.12)", border:"1px solid rgba(0,191,255,0.3)", color:"#00BFFF", fontWeight:"700", fontSize:"12px", cursor:"pointer", fontFamily:"inherit" }}>View Results →</button>
+                <button onClick={saveSession} style={{ padding:"8px 16px", borderRadius:"7px", background:"rgba(200,241,53,0.15)", border:"1px solid rgba(200,241,53,0.4)", color:"#C8F135", fontWeight:"700", fontSize:"14px", cursor:"pointer", fontFamily:"inherit" }}>Save ↓</button>
+                <button onClick={()=>setView("results")} style={{ padding:"8px 16px", borderRadius:"7px", background:"rgba(0,191,255,0.12)", border:"1px solid rgba(0,191,255,0.3)", color:"#00BFFF", fontWeight:"700", fontSize:"14px", cursor:"pointer", fontFamily:"inherit" }}>{"->"} View Results</button>
               </div>
             </div>
             <div style={{ display:"grid", gridTemplateColumns:"220px 1fr", gap:"18px" }}>
@@ -1997,10 +2176,10 @@ export default function MaturityScorecard() {
                   return (
                     <button key={cat.id} onClick={()=>setActiveSection(cat.id===activeSection?null:cat.id)} style={{ padding:"11px 13px", borderRadius:"9px", textAlign:"left", border:`2px solid ${activeSection===cat.id?cat.color:"#1B3A6B"}`, background:activeSection===cat.id?cat.light:"#0A1932", cursor:"pointer", fontFamily:"inherit" }}>
                       <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-                        <span style={{ fontSize:"11px", fontWeight:"800", color:cat.color, letterSpacing:"0.08em" }}>{cat.id}</span>
-                        {sc && <span style={{ fontSize:"13px", fontWeight:"800", color:getMC(sc) }}>{sc}</span>}
+                        <span style={{ fontSize:"13px", fontWeight:"800", color:cat.color, letterSpacing:"0.08em" }}>{cat.id}</span>
+                        {sc && <span style={{ fontSize:"15px", fontWeight:"800", color:getMC(sc), fontFamily:MONO }}>{sc}</span>}
                       </div>
-                      <div style={{ fontSize:"12px", fontWeight:"700", color:"#E2EAF4", marginTop:"2px" }}>{cat.name}</div>
+                      <div style={{ fontSize:"14px", fontWeight:"700", color:"#E2EAF4", marginTop:"2px" }}>{cat.name}</div>
                       <div style={{ height:"3px", background:"#1B3A6B", borderRadius:"2px", marginTop:"6px", overflow:"hidden" }}>
                         <div style={{ width:`${(scoredCount/totalCount)*100}%`, height:"100%", background:cat.color, opacity:0.7 }}/>
                       </div>
@@ -2008,22 +2187,22 @@ export default function MaturityScorecard() {
                   );
                 })}
                 <div style={{ ...card, marginTop:"6px", padding:"13px" }}>
-                  <div style={{ fontSize:"11px", color:"#4A6A8A", marginBottom:"5px", fontWeight:"600" }}>OVERALL</div>
-                  <div style={{ fontSize:"26px", fontWeight:"800", color:getMC(overall) }}>{overall||"—"}</div>
-                  <div style={{ fontSize:"11px", color:"#8BAAC8" }}>{getML(overall)}</div>
+                  <div style={{ fontSize:"13px", color:"#4A6A8A", marginBottom:"5px", fontWeight:"600" }}>OVERALL</div>
+                  <div style={{ fontSize:"26px", fontWeight:"800", color:getMC(overall), fontFamily:MONO }}>{overall||" - "}</div>
+                  <div style={{ fontSize:"13px", color:"#8BAAC8" }}>{getML(overall)}</div>
                   {overallTarget && overall && (
-                    <div style={{ fontSize:"10px", color:"#00BFFF", marginTop:"3px" }}>Target: {overallTarget}</div>
+                    <div style={{ fontSize:"12px", color:"#00BFFF", marginTop:"3px" }}>Target: {overallTarget}</div>
                   )}
-                  <div style={{ fontSize:"10px", color:"#4A6A8A", marginTop:"3px" }}>{completion}% scored</div>
+                  <div style={{ fontSize:"12px", color:"#4A6A8A", marginTop:"3px" }}>{completion}% scored</div>
                 </div>
               </div>
 
               <div>
                 {!activeSection && (
                   <div style={{ ...card, textAlign:"center", padding:"56px" }}>
-                    <div style={{ fontSize:"34px", marginBottom:"12px" }}>←</div>
+                    <div style={{ fontSize:"34px", marginBottom:"12px" }}>{"<-"}</div>
                     <div style={{ fontSize:"15px", fontWeight:"700", color:"#E2EAF4" }}>Select a function to score</div>
-                    <div style={{ fontSize:"12px", color:"#4A6A8A", marginTop:"6px" }}>Workshop notes from Step 2 appear above each subcategory to inform your scoring</div>
+                    <div style={{ fontSize:"14px", color:"#4A6A8A", marginTop:"6px" }}>Workshop notes from Step 2 appear above each subcategory to inform your scoring</div>
                   </div>
                 )}
                 {activeSection && (()=>{
@@ -2033,12 +2212,12 @@ export default function MaturityScorecard() {
                       <div style={{ ...card, marginBottom:"13px", borderLeft:`4px solid ${cat.color}` }}>
                         <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
                           <div>
-                            <div style={{ fontSize:"11px", fontWeight:"800", color:cat.color, letterSpacing:"0.1em", textTransform:"uppercase" }}>{cat.id} — {cat.name}</div>
-                            <div style={{ fontSize:"12px", color:"#4A6A8A", marginTop:"2px" }}>{cat.description}</div>
+                            <div style={{ fontSize:"13px", fontWeight:"800", color:cat.color, letterSpacing:"0.1em", textTransform:"uppercase" }}>{cat.id}  -  {cat.name}</div>
+                            <div style={{ fontSize:"14px", color:"#4A6A8A", marginTop:"2px" }}>{cat.description}</div>
                           </div>
                           {catScore(cat) && <div style={{ textAlign:"right" }}>
                             <div style={{ fontSize:"22px", fontWeight:"800", color:getMC(catScore(cat)) }}>{catScore(cat)}</div>
-                            <div style={{ fontSize:"11px", color:"#8BAAC8" }}>{getML(catScore(cat))}</div>
+                            <div style={{ fontSize:"13px", color:"#8BAAC8" }}>{getML(catScore(cat))}</div>
                           </div>}
                         </div>
                       </div>
@@ -2052,48 +2231,48 @@ export default function MaturityScorecard() {
                           <div key={domain.id} style={{ ...card, marginBottom:"10px" }}>
                             <button onClick={()=>setExpandedDomains(p=>({...p,[domain.id]:!isOpen}))} style={{ width:"100%", background:"none", border:"none", cursor:"pointer", textAlign:"left", padding:0, display:"flex", justifyContent:"space-between", alignItems:"center", fontFamily:"inherit" }}>
                               <div>
-                                <span style={{ fontSize:"11px", fontWeight:"700", color:cat.color, letterSpacing:"0.08em" }}>{domain.id}</span>
-                                <span style={{ fontSize:"13px", fontWeight:"700", color:"#E2EAF4", marginLeft:"9px" }}>{domain.name}</span>
-                                <span style={{ fontSize:"10px", color:"#4A6A8A", marginLeft:"8px" }}>({domain.questions.length} subcategories)</span>
+                                <span style={{ fontSize:"13px", fontWeight:"700", color:cat.color, letterSpacing:"0.08em" }}>{domain.id}</span>
+                                <span style={{ fontSize:"15px", fontWeight:"700", color:"#E2EAF4", marginLeft:"9px" }}>{domain.name}</span>
+                                <span style={{ fontSize:"12px", color:"#4A6A8A", marginLeft:"8px" }}>({domain.questions.length} subcategories)</span>
                               </div>
                               <div style={{ display:"flex", alignItems:"center", gap:"10px" }}>
-                                {ds && <span style={{ fontSize:"14px", fontWeight:"800", color:getMC(ds) }}>{ds}{dt&&dt!==ds?<span style={{ fontSize:"11px", color:"#00BFFF" }}> → {dt}</span>:null}</span>}
-                                <span style={{ color:"#4A6A8A", fontSize:"11px" }}>{isOpen?"▲":"▼"}</span>
+                                {ds && <span style={{ fontSize:"14px", fontWeight:"800", color:getMC(ds) }}>{ds}{dt&&dt!==ds?<span style={{ fontSize:"13px", color:"#00BFFF" }}>{"->"} {dt}</span>:null}</span>}
+                                <span style={{ color:"#4A6A8A", fontSize:"13px" }}>{isOpen?"^":"v"}</span>
                               </div>
                             </button>
 
                             {isOpen && (
                               <div style={{ marginTop:"14px", borderTop:"1px solid #1B3A6B", paddingTop:"14px" }}>
-                                {/* Workshop notes from Step 2 — visible here to inform scoring */}
+                                {/* Workshop notes from Step 2  -  visible here to inform scoring */}
                                 {wNote && (
                                   <div style={{ marginBottom:"16px", padding:"12px 14px", borderRadius:"8px", background:"rgba(200,241,53,0.06)", border:"1px solid rgba(200,241,53,0.2)" }}>
-                                    <div style={{ fontSize:"10px", fontWeight:"700", color:"#C8F135", marginBottom:"5px", letterSpacing:"0.06em", textTransform:"uppercase" }}>Workshop Notes</div>
-                                    <div style={{ fontSize:"12px", color:"#8BAAC8", lineHeight:"1.6", whiteSpace:"pre-wrap" }}>{wNote}</div>
+                                    <div style={{ fontSize:"12px", fontWeight:"700", color:"#C8F135", marginBottom:"5px", letterSpacing:"0.06em", textTransform:"uppercase" }}>Workshop Notes</div>
+                                    <div style={{ fontSize:"14px", color:"#8BAAC8", lineHeight:"1.6", whiteSpace:"pre-wrap" }}>{wNote}</div>
                                   </div>
                                 )}
 
                                 {domain.questions.map((q, qi) => {
                                   const key = `${domain.id}_q${qi}`;
                                   const cur = scores[key];
-                                  const [subId, ...rest] = q.split(" — ");
-                                  const qText = rest.join(" — ") || q;
+                                  const [subId, ...rest] = q.split("  -  ");
+                                  const qText = rest.join("  -  ") || q;
                                   return (
                                     <div key={qi} style={{ marginBottom:"18px", paddingBottom:"18px", borderBottom: qi<domain.questions.length-1?"1px solid #0D1F3C":"none" }}>
                                       <div style={{ display:"flex", gap:"8px", marginBottom:"8px", alignItems:"flex-start" }}>
-                                        {isNIST && <span style={{ fontSize:"10px", fontWeight:"800", color:cat.color, whiteSpace:"nowrap", marginTop:"2px", background:cat.light, padding:"2px 6px", borderRadius:"4px", flexShrink:0 }}>{subId}</span>}
-                                        <span style={{ fontSize:"13px", color:"#E2EAF4", lineHeight:"1.5", fontWeight:"500" }}>{isNIST ? qText : q}</span>
+                                        {isNIST && <span style={{ fontSize:"12px", fontWeight:"800", color:cat.color, whiteSpace:"nowrap", marginTop:"2px", background:cat.light, padding:"2px 6px", borderRadius:"4px", flexShrink:0 }}>{subId}</span>}
+                                        <span style={{ fontSize:"15px", color:"#E2EAF4", lineHeight:"1.5", fontWeight:"500" }}>{isNIST ? qText : q}</span>
                                       </div>
 
-                                      {/* Evidence note from workshop — shown above scoring if captured */}
+                                      {/* Evidence note from workshop  -  shown above scoring if captured */}
                                       {notes[key] && (
-                                        <div style={{ marginBottom:"8px", padding:"7px 10px", borderRadius:"5px", background:"rgba(0,191,255,0.06)", border:"1px solid rgba(0,191,255,0.15)", fontSize:"11px", color:"#8BAAC8", fontStyle:"italic" }}>
-                                          📝 {notes[key]}
+                                        <div style={{ marginBottom:"8px", padding:"9px 12px", borderRadius:"5px", background:"rgba(0,191,255,0.06)", border:"1px solid rgba(0,191,255,0.15)", fontSize:"13px", color:"#8BAAC8", fontStyle:"italic" }}>
+                                          Doc {notes[key]}
                                         </div>
                                       )}
 
-                                      {/* Doc status flags — warn if relevant docs missing */}
+                                      {/* Doc status flags  -  warn if relevant docs missing */}
                                       {isNIST && (()=>{
-                                        const subcatId = (isNIST ? q.split(" — ")[0] : null);
+                                        const subcatId = (isNIST ? q.split("  -  ")[0] : null);
                                         const docStatuses = subcatId ? getSubcatDocStatus(subcatId) : [];
                                         const missing  = docStatuses.filter(x => x.status==="no" || x.status==="not-set");
                                         const partial  = docStatuses.filter(x => x.status==="partial");
@@ -2102,14 +2281,14 @@ export default function MaturityScorecard() {
                                           <div style={{ marginBottom:"8px" }}>
                                             {missing.map(({doc}) => (
                                               <div key={doc.id} style={{ display:"flex", alignItems:"center", gap:"7px", padding:"5px 10px", borderRadius:"5px", background:"rgba(248,113,113,0.07)", border:"1px solid rgba(248,113,113,0.2)", marginBottom:"4px" }}>
-                                                <span style={{ fontSize:"11px" }}>⚠</span>
-                                                <span style={{ fontSize:"11px", color:"#F87171" }}>Doc not provided: <strong>{doc.label}</strong> — scoring confidence reduced</span>
+                                                <span style={{ fontSize:"13px" }}>!</span>
+                                                <span style={{ fontSize:"13px", color:"#F87171" }}>Doc not provided: <strong>{doc.label}</strong>  -  scoring confidence reduced</span>
                                               </div>
                                             ))}
                                             {partial.map(({doc}) => (
                                               <div key={doc.id} style={{ display:"flex", alignItems:"center", gap:"7px", padding:"5px 10px", borderRadius:"5px", background:"rgba(252,211,77,0.06)", border:"1px solid rgba(252,211,77,0.18)", marginBottom:"4px" }}>
-                                                <span style={{ fontSize:"11px" }}>~</span>
-                                                <span style={{ fontSize:"11px", color:"#FCD34D" }}>Doc partial: <strong>{doc.label}</strong></span>
+                                                <span style={{ fontSize:"13px" }}>~</span>
+                                                <span style={{ fontSize:"13px", color:"#FCD34D" }}>Doc partial: <strong>{doc.label}</strong></span>
                                               </div>
                                             ))}
                                           </div>
@@ -2118,38 +2297,38 @@ export default function MaturityScorecard() {
 
                                       {/* Current score */}
                                       <div style={{ marginBottom:"6px" }}>
-                                        <div style={{ fontSize:"10px", fontWeight:"700", color:"#4A6A8A", textTransform:"uppercase", letterSpacing:"0.06em", marginBottom:"5px" }}>Current Score</div>
+                                        <div style={{ fontSize:"12px", fontWeight:"700", color:"#4A6A8A", textTransform:"uppercase", letterSpacing:"0.06em", marginBottom:"5px" }}>Current Score</div>
                                         <div style={{ display:"flex", gap:"4px", flexWrap:"wrap", alignItems:"center" }}>
-                                          <button onClick={()=>setScores(p=>({...p,[key]:-1}))} style={{ padding:"5px 11px", borderRadius:"5px", border:`2px solid ${cur===-1?"#4A6A8A":"#1B3A6B"}`, background:cur===-1?"rgba(74,106,138,0.3)":"#0A1932", color:cur===-1?"#8BAAC8":"#4A6A8A", fontSize:"11px", fontWeight:"700", cursor:"pointer", fontFamily:"inherit" }}>N/A</button>
+                                          <button onClick={()=>setScores(p=>({...p,[key]:-1}))} style={{ padding:"5px 11px", borderRadius:"5px", border:`2px solid ${cur===-1?"#4A6A8A":"#1B3A6B"}`, background:cur===-1?"rgba(74,106,138,0.3)":"#0A1932", color:cur===-1?"#8BAAC8":"#4A6A8A", fontSize:"13px", fontWeight:"700", cursor:"pointer", fontFamily:"inherit" }}>N/A</button>
                                           {ML.map(m=>(
-                                            <button key={m.value} onClick={()=>setScores(p=>({...p,[key]:m.value}))} style={{ padding:"5px 11px", borderRadius:"5px", border:`2px solid ${cur===m.value?m.color:"#1B3A6B"}`, background:cur===m.value?m.bg:"#0A1932", color:cur===m.value?m.color:"#4A6A8A", fontSize:"12px", fontWeight:"700", cursor:"pointer", fontFamily:"inherit" }}>{m.value}</button>
+                                            <button key={m.value} onClick={()=>setScores(p=>({...p,[key]:m.value}))} style={{ padding:"5px 11px", borderRadius:"5px", border:`2px solid ${cur===m.value?m.color:"#1B3A6B"}`, background:cur===m.value?m.bg:"#0A1932", color:cur===m.value?m.color:"#4A6A8A", fontSize:"15px", fontWeight:"700", cursor:"pointer", fontFamily:MONO }}>{m.value}</button>
                                           ))}
-                                          {cur!==-1&&cur!==undefined&&<span style={{ fontSize:"11px", color:"#8BAAC8", marginLeft:"4px" }}>{ML.find(m=>m.value===cur)?.label}</span>}
-                                          {cur===-1&&<span style={{ fontSize:"11px", color:"#4A6A8A", marginLeft:"4px" }}>N/A — excluded</span>}
+                                          {cur!==-1&&cur!==undefined&&<span style={{ fontSize:"13px", color:"#8BAAC8", marginLeft:"4px" }}>{ML.find(m=>m.value===cur)?.label}</span>}
+                                          {cur===-1&&<span style={{ fontSize:"13px", color:"#4A6A8A", marginLeft:"4px" }}>N/A  -  excluded</span>}
                                         </div>
                                       </div>
 
                                       {/* Target score */}
                                       {isNIST && (
                                         <div style={{ marginBottom:"8px" }}>
-                                          <div style={{ fontSize:"10px", fontWeight:"700", color:"#00BFFF", textTransform:"uppercase", letterSpacing:"0.06em", marginBottom:"5px" }}>Target Score</div>
+                                          <div style={{ fontSize:"12px", fontWeight:"700", color:"#00BFFF", textTransform:"uppercase", letterSpacing:"0.06em", marginBottom:"5px" }}>Target Score</div>
                                           <div style={{ display:"flex", gap:"4px", flexWrap:"wrap", alignItems:"center" }}>
-                                            <button onClick={()=>setTargetScores(p=>({...p,[key]:-1}))} style={{ padding:"5px 11px", borderRadius:"5px", border:`2px solid ${targetScores[key]===-1?"#4A6A8A":"#1B3A6B"}`, background:targetScores[key]===-1?"rgba(74,106,138,0.2)":"transparent", color:targetScores[key]===-1?"#8BAAC8":"#4A6A8A", fontSize:"11px", fontWeight:"700", cursor:"pointer", fontFamily:"inherit" }}>N/A</button>
+                                            <button onClick={()=>setTargetScores(p=>({...p,[key]:-1}))} style={{ padding:"5px 11px", borderRadius:"5px", border:`2px solid ${targetScores[key]===-1?"#4A6A8A":"#1B3A6B"}`, background:targetScores[key]===-1?"rgba(74,106,138,0.2)":"transparent", color:targetScores[key]===-1?"#8BAAC8":"#4A6A8A", fontSize:"13px", fontWeight:"700", cursor:"pointer", fontFamily:"inherit" }}>N/A</button>
                                             {ML.map(m=>{ const tgt=targetScores[key]; return (
-                                              <button key={m.value} onClick={()=>setTargetScores(p=>({...p,[key]:m.value}))} style={{ padding:"5px 11px", borderRadius:"5px", border:`2px solid ${tgt===m.value?"#00BFFF":"#1B3A6B"}`, background:tgt===m.value?"rgba(0,191,255,0.15)":"transparent", color:tgt===m.value?"#00BFFF":"#4A6A8A", fontSize:"12px", fontWeight:"700", cursor:"pointer", fontFamily:"inherit" }}>{m.value}</button>
+                                              <button key={m.value} onClick={()=>setTargetScores(p=>({...p,[key]:m.value}))} style={{ padding:"5px 11px", borderRadius:"5px", border:`2px solid ${tgt===m.value?"#00BFFF":"#1B3A6B"}`, background:tgt===m.value?"rgba(0,191,255,0.15)":"transparent", color:tgt===m.value?"#00BFFF":"#4A6A8A", fontSize:"15px", fontWeight:"700", cursor:"pointer", fontFamily:MONO }}>{m.value}</button>
                                             );})}
-                                            {targetScores[key]!==undefined&&targetScores[key]!==-1&&<span style={{ fontSize:"11px", color:"#00BFFF", marginLeft:"4px" }}>{ML.find(m=>m.value===targetScores[key])?.label}</span>}
-                                            {targetScores[key]===undefined&&cur!==undefined&&cur!==-1&&<span style={{ fontSize:"10px", color:"#4A6A8A", marginLeft:"4px", fontStyle:"italic" }}>defaults to current ({cur})</span>}
+                                            {targetScores[key]!==undefined&&targetScores[key]!==-1&&<span style={{ fontSize:"13px", color:"#00BFFF", marginLeft:"4px" }}>{ML.find(m=>m.value===targetScores[key])?.label}</span>}
+                                            {targetScores[key]===undefined&&cur!==undefined&&cur!==-1&&<span style={{ fontSize:"12px", color:"#4A6A8A", marginLeft:"4px", fontStyle:"italic" }}>defaults to current ({cur})</span>}
                                           </div>
                                         </div>
                                       )}
 
                                       {/* Evidence note field */}
                                       <input
-                                        placeholder="Evidence note — document references, verbatim quotes, observations..."
+                                        placeholder="Evidence note  -  document references, verbatim quotes, observations..."
                                         value={notes[key]||""}
                                         onChange={e=>setNotes(p=>({...p,[key]:e.target.value}))}
-                                        style={{ width:"100%", padding:"7px 10px", borderRadius:"6px", border:"1px solid #1B3A6B", fontSize:"12px", fontFamily:"inherit", outline:"none", background:"#0A1932", color:"#E2EAF4", boxSizing:"border-box" }}
+                                        style={{ width:"100%", padding:"9px 12px", borderRadius:"6px", border:"1px solid #1B3A6B", fontSize:"14px", fontFamily:"inherit", outline:"none", background:"#0A1932", color:"#E2EAF4", boxSizing:"border-box" }}
                                       />
                                     </div>
                                   );
@@ -2167,165 +2346,201 @@ export default function MaturityScorecard() {
           </div>
         )}
 
-        {/* ── RESULTS ── */}
+        {/* -- RESULTS -- */}
         {view==="results" && (
           <div>
             <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"18px" }}>
               <div>
-                <div style={{ fontSize:"18px", fontWeight:"800", color:"#FFFFFF" }}>{clientName||"Client"} — Maturity Results</div>
-                <div style={{ fontSize:"12px", color:"#4A6A8A", marginTop:"2px" }}>{framework} · {assessor||"Assessor"} · {new Date().toLocaleDateString("en-GB")}{isNIST?" · Scale: 0–4 NIST Tiers":""}</div>
+                <div style={{ fontSize:"18px", fontWeight:"800", color:"#FFFFFF" }}>{clientName||"Client"}  -  Maturity Results</div>
+                <div style={{ fontSize:"14px", color:"#4A6A8A", marginTop:"2px" }}>{framework} . {assessor||"Assessor"} . {new Date().toLocaleDateString("en-GB")}{isNIST?" . Scale: 0-4 NIST Tiers":""}</div>
               </div>
               <div style={{ display:"flex", gap:"8px" }}>
-                <button onClick={exportExcel} style={{ padding:"9px 18px", borderRadius:"8px", border:"1px solid rgba(200,241,53,0.4)", background:"rgba(200,241,53,0.1)", fontSize:"12px", fontWeight:"700", cursor:"pointer", fontFamily:"inherit", color:"#C8F135" }}>Export Excel ↓</button>
-                {isNIST && <button onClick={exportPPTXReport} disabled={generatingReport} style={{ padding:"9px 18px", borderRadius:"8px", border:"1px solid rgba(0,191,255,0.4)", background:"rgba(0,191,255,0.1)", fontSize:"12px", fontWeight:"700", cursor:"pointer", fontFamily:"inherit", color:"#00BFFF", opacity:generatingReport?0.6:1 }}>{generatingReport?"Building…":"Generate Report ↓"}</button>}
+                <button onClick={exportExcel} style={{ padding:"9px 18px", borderRadius:"8px", border:"1px solid rgba(200,241,53,0.4)", background:"rgba(200,241,53,0.1)", fontSize:"14px", fontWeight:"700", cursor:"pointer", fontFamily:"inherit", color:"#C8F135" }}>Export Excel v</button>
+                {isNIST && <button onClick={exportPPTXReport} disabled={generatingReport} style={{ padding:"9px 18px", borderRadius:"8px", border:"1px solid rgba(0,191,255,0.4)", background:"rgba(0,191,255,0.1)", fontSize:"14px", fontWeight:"700", cursor:"pointer", fontFamily:"inherit", color:"#00BFFF", opacity:generatingReport?0.6:1 }}>{generatingReport?"Building...":"Generate Report v"}</button>}
               </div>
             </div>
 
             <div style={{ display:"flex", gap:"3px", marginBottom:"18px", background:"#0A1932", padding:"4px", borderRadius:"8px", width:"fit-content", border:"1px solid #1B3A6B" }}>
               {["overview","insights","recommendations","narrative","workshop"].map(t=>(
-                <button key={t} onClick={()=>setResultsTab(t)} style={{ padding:"7px 16px", borderRadius:"6px", border:"none", background:resultsTab===t?"#1B3A6B":"transparent", color:resultsTab===t?"#FFFFFF":"#4A6A8A", fontSize:"12px", fontWeight:"700", cursor:"pointer", fontFamily:"inherit" }}>
-                  {t==="overview"?"Scorecard":t==="insights"?"Insights":t==="recommendations"?`Recommendations${(getAllGaps().length+getDocGaps().length)>0?` (${getAllGaps().length+getDocGaps().length})`:""}`:t==="narrative"?"✦ Narrative":"Workshop Notes"}
+                <button key={t} onClick={()=>setResultsTab(t)} style={{ padding:"7px 16px", borderRadius:"6px", border:"none", background:resultsTab===t?"#1B3A6B":"transparent", color:resultsTab===t?"#FFFFFF":"#4A6A8A", fontSize:"14px", fontWeight:"700", cursor:"pointer", fontFamily:"inherit" }}>
+                  {t==="overview"?"Scorecard":t==="insights"?"Insights":t==="recommendations"?`Recommendations${(getAllGaps().length+getDocGaps().length)>0?` (${getAllGaps().length+getDocGaps().length})`:""}`:t==="narrative"?"* Narrative":"Workshop Notes"}
                 </button>
               ))}
             </div>
 
             {/* SCORECARD OVERVIEW */}
-            {resultsTab==="overview" && (
+            {resultsTab==="overview" && (()=>{
+              const displayScore  = animScore  !== null ? parseFloat(animScore).toFixed(2)  : " - ";
+              const displayTarget = animTarget !== null ? parseFloat(animTarget).toFixed(2) : " - ";
+              return (
               <div>
-                <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"18px", marginBottom:"18px" }}>
+                <div style={{ display:"grid", gridTemplateColumns:"2fr 3fr", gap:"18px", marginBottom:"18px" }}>
                   <div style={card}>
-                    <div style={{ fontSize:"11px", fontWeight:"700", color:"#4A6A8A", letterSpacing:"0.1em", textTransform:"uppercase", marginBottom:"14px" }}>Overall Maturity — Current vs Target</div>
+                    <div style={{ fontSize:"13px", fontWeight:"700", color:"#4A6A8A", letterSpacing:"0.1em", textTransform:"uppercase", marginBottom:"14px" }}>Overall Maturity  -  Current vs Target</div>
                     <div style={{ display:"flex", alignItems:"center", gap:"18px", marginBottom:"16px" }}>
                       <div style={{ textAlign:"center" }}>
-                        <div style={{ fontSize:"11px", color:"#4A6A8A", marginBottom:"4px", fontWeight:"600" }}>CURRENT</div>
+                        <div style={{ fontSize:"13px", color:"#4A6A8A", marginBottom:"4px", fontWeight:"600" }}>CURRENT</div>
                         <div style={{ width:"88px", height:"88px", borderRadius:"50%", background:`conic-gradient(${getMC(overall)} ${(parseFloat(overall||0)/4)*360}deg, #1B3A6B 0deg)`, display:"flex", alignItems:"center", justifyContent:"center" }}>
                           <div style={{ width:"64px", height:"64px", borderRadius:"50%", background:"#0D1F3C", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center" }}>
-                            <div style={{ fontSize:"20px", fontWeight:"800", color:getMC(overall), lineHeight:1 }}>{overall||"—"}</div>
-                            <div style={{ fontSize:"9px", color:"#4A6A8A", fontWeight:"600" }}>/4.0</div>
+                            <div style={{ fontSize:"20px", fontWeight:"800", color:getMC(overall), lineHeight:1, fontFamily:MONO }}>{displayScore}</div>
+                            <div style={{ fontSize:"11px", color:"#4A6A8A", fontWeight:"600", fontFamily:MONO }}>/4.0</div>
                           </div>
                         </div>
-                        <div style={{ fontSize:"11px", fontWeight:"700", color:getMC(overall), marginTop:"5px" }}>{getML(overall)}</div>
+                        <div style={{ fontSize:"13px", fontWeight:"700", color:getMC(overall), marginTop:"5px" }}>{getML(overall)}</div>
                       </div>
                       <div style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:"4px" }}>
-                        <div style={{ fontSize:"20px", color:"#1B3A6B" }}>→</div>
-                        {overall&&overallTarget&&<div style={{ fontSize:"11px", fontWeight:"800", color:"#C8F135", background:"rgba(200,241,53,0.1)", padding:"2px 8px", borderRadius:"4px" }}>+{(parseFloat(overallTarget)-parseFloat(overall)).toFixed(2)}</div>}
+                        <div style={{ fontSize:"20px", color:"#1B3A6B" }}>{"->"}</div>
+                        {overall&&overallTarget&&<div style={{ fontSize:"13px", fontWeight:"800", color:"#C8F135", background:"rgba(200,241,53,0.1)", padding:"2px 8px", borderRadius:"4px", fontFamily:MONO }}>+{(parseFloat(overallTarget)-parseFloat(overall)).toFixed(2)}</div>}
                       </div>
                       <div style={{ textAlign:"center" }}>
-                        <div style={{ fontSize:"11px", color:"#00BFFF", marginBottom:"4px", fontWeight:"600" }}>TARGET</div>
+                        <div style={{ fontSize:"13px", color:"#00BFFF", marginBottom:"4px", fontWeight:"600" }}>TARGET</div>
                         <div style={{ width:"88px", height:"88px", borderRadius:"50%", background:`conic-gradient(#00BFFF ${(parseFloat(overallTarget||0)/4)*360}deg, #1B3A6B 0deg)`, display:"flex", alignItems:"center", justifyContent:"center" }}>
                           <div style={{ width:"64px", height:"64px", borderRadius:"50%", background:"#0D1F3C", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center" }}>
-                            <div style={{ fontSize:"20px", fontWeight:"800", color:"#00BFFF", lineHeight:1 }}>{overallTarget||"—"}</div>
-                            <div style={{ fontSize:"9px", color:"#4A6A8A", fontWeight:"600" }}>/4.0</div>
+                            <div style={{ fontSize:"20px", fontWeight:"800", color:"#00BFFF", lineHeight:1, fontFamily:MONO }}>{displayTarget}</div>
+                            <div style={{ fontSize:"11px", color:"#4A6A8A", fontWeight:"600", fontFamily:MONO }}>/4.0</div>
                           </div>
                         </div>
-                        <div style={{ fontSize:"11px", fontWeight:"700", color:"#00BFFF", marginTop:"5px" }}>{getML(overallTarget)}</div>
+                        <div style={{ fontSize:"13px", fontWeight:"700", color:"#00BFFF", marginTop:"5px" }}>{getML(overallTarget)}</div>
                       </div>
                     </div>
                     <div style={{ display:"flex", flexDirection:"column", gap:"7px" }}>
                       {fw.map(cat=>{ const sc=catScore(cat); const tgt=catTarget(cat); const pctC=sc?(parseFloat(sc)/4)*100:0; const pctT=tgt?(parseFloat(tgt)/4)*100:0; return (
                         <div key={cat.id}>
                           <div style={{ display:"flex", justifyContent:"space-between", marginBottom:"3px" }}>
-                            <span style={{ fontSize:"11px", fontWeight:"600", color:"#8BAAC8" }}>{cat.id} — {cat.name}</span>
-                            <span style={{ fontSize:"11px", fontWeight:"800", color:getMC(sc) }}>{sc||"—"}{tgt&&tgt!==sc?<span style={{ color:"#00BFFF", marginLeft:"4px" }}>→ {tgt}</span>:null}</span>
+                            <span style={{ fontSize:"13px", fontWeight:"600", color:"#8BAAC8" }}>{cat.id}  -  {cat.name}</span>
+                            <span style={{ fontSize:"13px", fontWeight:"800", color:getMC(sc), fontFamily:MONO }}>{sc||" - "}{tgt&&tgt!==sc?<span style={{ color:"#00BFFF", marginLeft:"4px" }}>{"->"} {tgt}</span>:null}</span>
                           </div>
                           <div style={{ height:"6px", background:"#1B3A6B", borderRadius:"3px", overflow:"hidden", position:"relative" }}>
                             {pctT>0&&<div style={{ position:"absolute", left:0, width:`${pctT}%`, height:"100%", background:"rgba(0,191,255,0.25)", borderRadius:"3px" }}/>}
-                            <div style={{ position:"absolute", left:0, width:`${pctC}%`, height:"100%", background:getMC(sc), borderRadius:"3px", transition:"width 0.5s" }}/>
+                            <div style={{ position:"absolute", left:0, width:`${pctC}%`, height:"100%", background:getMC(sc), borderRadius:"3px", transition:"width 0.8s cubic-bezier(0.34,1.56,0.64,1)" }}/>
                           </div>
                         </div>
                       );})}
                     </div>
-                    <div style={{ marginTop:"12px", display:"flex", gap:"12px", fontSize:"10px", color:"#4A6A8A" }}>
+                    <div style={{ marginTop:"12px", display:"flex", gap:"12px", fontSize:"12px", color:"#4A6A8A" }}>
                       <span style={{ display:"flex", alignItems:"center", gap:"4px" }}><span style={{ width:"10px", height:"4px", background:"#1E6FD9", borderRadius:"2px", display:"inline-block" }}/> Current</span>
                       <span style={{ display:"flex", alignItems:"center", gap:"4px" }}><span style={{ width:"10px", height:"4px", background:"rgba(0,191,255,0.25)", borderRadius:"2px", display:"inline-block" }}/> Target</span>
                     </div>
                   </div>
-                  <div style={{ ...card, display:"flex", flexDirection:"column", alignItems:"center" }}>
-                    <div style={{ fontSize:"11px", fontWeight:"700", color:"#4A6A8A", letterSpacing:"0.1em", textTransform:"uppercase", marginBottom:"8px", alignSelf:"flex-start" }}>Radar View</div>
-                    <RadarChart scores={radarScores} framework={framework}/>
+
+                  {/* Hex Map  -  right panel */}
+                  <div style={{ ...card, position:"relative", overflow:"hidden", display:"flex", flexDirection:"column" }}>
+                    <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"4px" }}>
+                      <div>
+                        <div style={{ fontSize:"13px", fontWeight:"700", color:"#4A6A8A", letterSpacing:"0.1em", textTransform:"uppercase" }}>NIST Function Map</div>
+                        <div style={{ fontSize:"13px", color:"#4A6A8A", marginTop:"3px" }}>Click a function to see detail</div>
+                      </div>
+                      {activeHex && (()=>{
+                        const cat = fw.find(c=>c.id===activeHex);
+                        const sc  = catScore(cat);
+                        return (
+                          <div style={{ padding:"10px 16px", borderRadius:"9px", background:"rgba(8,17,31,0.92)", border:`1px solid ${cat?.color||"#1B3A6B"}80`, backdropFilter:"blur(8px)", display:"flex", alignItems:"center", gap:"14px" }}>
+                            <div>
+                              <span style={{ fontSize:"14px", fontWeight:"800", color:cat?.color, fontFamily:MONO }}>{activeHex}</span>
+                              <span style={{ fontSize:"13px", color:"#8BAAC8", marginLeft:"8px" }}>{cat?.name}</span>
+                            </div>
+                            <div style={{ display:"flex", alignItems:"baseline", gap:"5px" }}>
+                              <span style={{ fontSize:"22px", fontWeight:"800", color:getMC(sc), fontFamily:MONO }}>{sc||" - "}</span>
+                              <span style={{ fontSize:"13px", color:"#4A6A8A" }}>{getML(sc)}</span>
+                            </div>
+                          </div>
+                        );
+                      })()}
+                    </div>
+                    <div style={{ flex:1, minHeight:"400px", display:"flex", alignItems:"center", justifyContent:"center" }}>
+                      <HexMap
+                        fw={fw}
+                        catScoreFn={catScore}
+                        getMC={getMC}
+                        getML={getML}
+                        onClick={setActiveHex}
+                        activeId={activeHex}
+                      />
+                    </div>
                   </div>
                 </div>
                 {fw.map(cat=>(
                   <div key={cat.id} style={{ ...card, marginBottom:"10px", borderLeft:`4px solid ${cat.color}` }}>
                     <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"12px" }}>
-                      <div><span style={{ fontSize:"11px", fontWeight:"800", color:cat.color, letterSpacing:"0.1em" }}>{cat.id}</span><span style={{ fontSize:"14px", fontWeight:"800", color:"#FFFFFF", marginLeft:"9px" }}>{cat.name}</span></div>
-                      <div style={{ textAlign:"right" }}><span style={{ fontSize:"19px", fontWeight:"800", color:getMC(catScore(cat)) }}>{catScore(cat)||"—"}</span><div style={{ fontSize:"11px", color:"#8BAAC8" }}>{getML(catScore(cat))}</div></div>
+                      <div><span style={{ fontSize:"13px", fontWeight:"800", color:cat.color, letterSpacing:"0.1em", fontFamily:MONO }}>{cat.id}</span><span style={{ fontSize:"14px", fontWeight:"800", color:"#FFFFFF", marginLeft:"9px" }}>{cat.name}</span></div>
+                      <div style={{ textAlign:"right" }}><span style={{ fontSize:"19px", fontWeight:"800", color:getMC(catScore(cat)), fontFamily:MONO }}>{catScore(cat)||" - "}</span><div style={{ fontSize:"13px", color:"#8BAAC8" }}>{getML(catScore(cat))}</div></div>
                     </div>
                     <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(185px,1fr))", gap:"8px" }}>
                       {cat.domains.map(domain=>{ const ds=domainScore(domain); const dt=domainTarget(domain); return (
-                        <div key={domain.id} style={{ padding:"10px 12px", borderRadius:"8px", background:"#0A1932", border:"1px solid #1B3A6B" }}>
-                          <div style={{ fontSize:"10px", fontWeight:"700", color:cat.color, letterSpacing:"0.08em" }}>{domain.id}</div>
-                          <div style={{ fontSize:"11px", fontWeight:"700", color:"#E2EAF4", marginTop:"2px" }}>{domain.name}</div>
+                        <div key={domain.id} style={{ padding:"10px 12px", borderRadius:"8px", background:"rgba(8,17,31,0.6)", border:"1px solid rgba(27,58,107,0.7)" }}>
+                          <div style={{ fontSize:"12px", fontWeight:"700", color:cat.color, letterSpacing:"0.08em", fontFamily:MONO }}>{domain.id}</div>
+                          <div style={{ fontSize:"13px", fontWeight:"700", color:"#E2EAF4", marginTop:"2px" }}>{domain.name}</div>
                           <div style={{ display:"flex", alignItems:"baseline", gap:"6px", marginTop:"5px" }}>
-                            <span style={{ fontSize:"20px", fontWeight:"800", color:getMC(ds) }}>{ds||"—"}</span>
-                            {dt&&dt!==ds&&<span style={{ fontSize:"12px", color:"#00BFFF" }}>→ {dt}</span>}
+                            <span style={{ fontSize:"20px", fontWeight:"800", color:getMC(ds), fontFamily:MONO }}>{ds||" - "}</span>
+                            {dt&&dt!==ds&&<span style={{ fontSize:"14px", color:"#00BFFF", fontFamily:MONO }}>{"->"} {dt}</span>}
                           </div>
-                          <div style={{ fontSize:"10px", color:"#8BAAC8" }}>{getML(ds)}{dt&&dt!==ds?<span style={{ color:"#00BFFF" }}> · Target: {getML(dt)}</span>:null}</div>
+                          <div style={{ fontSize:"12px", color:"#8BAAC8" }}>{getML(ds)}{dt&&dt!==ds?<span style={{ color:"#00BFFF" }}> . Target: {getML(dt)}</span>:null}</div>
                         </div>
                       );})}
                     </div>
                   </div>
                 ))}
               </div>
-            )}
+              );
+            })()}
 
             {/* INSIGHTS */}
             {resultsTab==="insights" && (
               completion<10?(
                 <div style={{ ...card, textAlign:"center", padding:"56px" }}>
-                  <div style={{ fontSize:"30px", marginBottom:"12px" }}>📊</div>
+                  <div style={{ fontSize:"30px", marginBottom:"12px" }}>Chart</div>
                   <div style={{ fontSize:"15px", fontWeight:"700", color:"#E2EAF4" }}>Score more controls to unlock insights</div>
-                  <div style={{ fontSize:"12px", color:"#4A6A8A", marginTop:"7px" }}>At least 10% completion needed for meaningful analysis</div>
+                  <div style={{ fontSize:"14px", color:"#4A6A8A", marginTop:"7px" }}>At least 10% completion needed for meaningful analysis</div>
                 </div>
               ):(
                 <div>
-                  {/* Row 1 — Score distribution + Avg by function */}
+                  {/* Row 1  -  Score distribution + Avg by function */}
                   <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"14px", marginBottom:"14px" }}>
                     <div style={card}>
-                      <div style={{ fontSize:"13px", fontWeight:"700", color:"#E2EAF4", marginBottom:"3px" }}>Score Distribution</div>
-                      <div style={{ fontSize:"11px", color:"#4A6A8A", marginBottom:"16px" }}>Number of controls at each maturity level</div>
+                      <div style={{ fontSize:"15px", fontWeight:"700", color:"#E2EAF4", marginBottom:"3px" }}>Score Distribution</div>
+                      <div style={{ fontSize:"13px", color:"#4A6A8A", marginBottom:"16px" }}>Number of controls at each maturity level</div>
                       <HBarChart data={[1,2,3,4,5].map(v=>({ label:ML.find(m=>m.value===v)?.label||String(v), value:Object.values(scores).filter(sc=>sc===v).length, color:ML.find(m=>m.value===v)?.color||"#9CA3AF" }))} />
                       <div style={{ display:"flex", flexWrap:"wrap", gap:"8px", marginTop:"14px", paddingTop:"12px", borderTop:"1px solid #1B3A6B" }}>
                         {[1,2,3,4,5].map(v=>{ const m=ML.find(x=>x.value===v); return (
                           <div key={v} style={{ display:"flex", alignItems:"center", gap:"5px" }}>
                             <div style={{ width:"8px", height:"8px", borderRadius:"2px", background:m?.color, flexShrink:0 }}/>
-                            <span style={{ fontSize:"10px", color:"#8BAAC8" }}>{v} — {m?.label}</span>
+                            <span style={{ fontSize:"12px", color:"#8BAAC8" }}>{v}  -  {m?.label}</span>
                           </div>
                         );})}
                       </div>
                     </div>
                     <div style={card}>
-                      <div style={{ fontSize:"13px", fontWeight:"700", color:"#E2EAF4", marginBottom:"3px" }}>Average Score by Function</div>
-                      <div style={{ fontSize:"11px", color:"#4A6A8A", marginBottom:"16px" }}>Maturity across each function — lower values indicate greatest need (max 5.0)</div>
+                      <div style={{ fontSize:"15px", fontWeight:"700", color:"#E2EAF4", marginBottom:"3px" }}>Average Score by Function</div>
+                      <div style={{ fontSize:"13px", color:"#4A6A8A", marginBottom:"16px" }}>Maturity across each function  -  lower values indicate greatest need (max 5.0)</div>
                       <HBarChart data={fw.map(cat=>({ label:cat.id, value:catScore(cat)?parseFloat(catScore(cat)):0, color:getMC(catScore(cat)) }))} maxVal={5} />
                       <div style={{ display:"flex", flexWrap:"wrap", gap:"8px", marginTop:"14px", paddingTop:"12px", borderTop:"1px solid #1B3A6B" }}>
                         {fw.map(cat=>(
                           <div key={cat.id} style={{ display:"flex", alignItems:"center", gap:"5px" }}>
                             <div style={{ width:"8px", height:"8px", borderRadius:"2px", background:cat.color, flexShrink:0 }}/>
-                            <span style={{ fontSize:"10px", color:"#8BAAC8" }}>{cat.id} — {cat.name}</span>
+                            <span style={{ fontSize:"12px", color:"#8BAAC8" }}>{cat.id}  -  {cat.name}</span>
                           </div>
                         ))}
                       </div>
                     </div>
                   </div>
 
-                  {/* Row 2 — Gaps by function + Priority breakdown */}
+                  {/* Row 2  -  Gaps by function + Priority breakdown */}
                   <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"14px", marginBottom:"14px" }}>
                     <div style={card}>
-                      <div style={{ fontSize:"13px", fontWeight:"700", color:"#E2EAF4", marginBottom:"3px" }}>Gaps by Function</div>
-                      <div style={{ fontSize:"11px", color:"#4A6A8A", marginBottom:"16px" }}>Controls scoring below 3 per function — guides remediation workstream scoping</div>
+                      <div style={{ fontSize:"15px", fontWeight:"700", color:"#E2EAF4", marginBottom:"3px" }}>Gaps by Function</div>
+                      <div style={{ fontSize:"13px", color:"#4A6A8A", marginBottom:"16px" }}>Controls scoring below 3 per function  -  guides remediation workstream scoping</div>
                       <HBarChart data={fw.map(cat=>({ label:cat.id, value:getAllGaps().filter(g=>g.cat.id===cat.id).length, color:cat.color }))} />
                       {(()=>{ const worst=fw.map(cat=>({id:cat.id,name:cat.name,color:cat.color,n:getAllGaps().filter(g=>g.cat.id===cat.id).length})).sort((a,b)=>b.n-a.n)[0]; return worst?.n>0?(
-                        <div style={{ marginTop:"12px", padding:"9px 12px", borderRadius:"6px", background:"rgba(0,0,0,0.2)", border:"1px solid #1B3A6B", fontSize:"11px", color:"#8BAAC8" }}>
-                          <span style={{ fontWeight:"700", color:worst.color }}>{worst.id} — {worst.name}</span>{" "}has the most gaps ({worst.n} controls below threshold)
+                        <div style={{ marginTop:"12px", padding:"9px 12px", borderRadius:"6px", background:"rgba(0,0,0,0.2)", border:"1px solid #1B3A6B", fontSize:"13px", color:"#8BAAC8" }}>
+                          <span style={{ fontWeight:"700", color:worst.color }}>{worst.id}  -  {worst.name}</span>{" "}has the most gaps ({worst.n} controls below threshold)
                         </div>
                       ):null; })()}
                     </div>
                     <div style={card}>
-                      <div style={{ fontSize:"13px", fontWeight:"700", color:"#E2EAF4", marginBottom:"3px" }}>Gap Priority Breakdown</div>
-                      <div style={{ fontSize:"11px", color:"#4A6A8A", marginBottom:"16px" }}>Urgency profile across all identified gaps</div>
+                      <div style={{ fontSize:"15px", fontWeight:"700", color:"#E2EAF4", marginBottom:"3px" }}>Gap Priority Breakdown</div>
+                      <div style={{ fontSize:"13px", color:"#4A6A8A", marginBottom:"16px" }}>Urgency profile across all identified gaps</div>
                       {totalGaps===0?(
-                        <div style={{ color:"#4A6A8A", fontSize:"12px", padding:"20px 0" }}>No gaps identified yet</div>
+                        <div style={{ color:"#4A6A8A", fontSize:"14px", padding:"20px 0" }}>No gaps identified yet</div>
                       ):(
                         <>
                           <div style={{ display:"flex", alignItems:"center", gap:"20px", marginBottom:"16px" }}>
@@ -2333,16 +2548,16 @@ export default function MaturityScorecard() {
                               <DonutChart segments={priSegments} size={110} thickness={24}/>
                               <div style={{ position:"absolute", top:"50%", left:"50%", transform:"translate(-50%,-50%)", textAlign:"center" }}>
                                 <div style={{ fontSize:"22px", fontWeight:"800", color:"#FFFFFF", lineHeight:1 }}>{totalGaps}</div>
-                                <div style={{ fontSize:"10px", color:"#4A6A8A", fontWeight:"600", marginTop:"2px" }}>total</div>
+                                <div style={{ fontSize:"12px", color:"#4A6A8A", fontWeight:"600", marginTop:"2px" }}>total</div>
                               </div>
                             </div>
                             <div style={{ flex:1 }}>
                               {priSegments.map(seg=>(
                                 <div key={seg.label} style={{ display:"flex", alignItems:"center", gap:"8px", marginBottom:"10px" }}>
                                   <div style={{ width:"10px", height:"10px", borderRadius:"50%", background:seg.color, flexShrink:0 }}/>
-                                  <span style={{ fontSize:"12px", color:"#E2EAF4", fontWeight:"600", flex:1 }}>{seg.label}</span>
+                                  <span style={{ fontSize:"14px", color:"#E2EAF4", fontWeight:"600", flex:1 }}>{seg.label}</span>
                                   <span style={{ fontSize:"18px", fontWeight:"800", color:seg.color, minWidth:"26px", textAlign:"right" }}>{seg.value}</span>
-                                  <span style={{ fontSize:"11px", color:"#4A6A8A", minWidth:"34px" }}>{totalGaps?Math.round((seg.value/totalGaps)*100):0}%</span>
+                                  <span style={{ fontSize:"13px", color:"#4A6A8A", minWidth:"34px" }}>{totalGaps?Math.round((seg.value/totalGaps)*100):0}%</span>
                                 </div>
                               ))}
                             </div>
@@ -2357,16 +2572,16 @@ export default function MaturityScorecard() {
                     </div>
                   </div>
 
-                  {/* Row 3 — Effort profile */}
+                  {/* Row 3  -  Effort profile */}
                   <div style={card}>
-                    <div style={{ fontSize:"13px", fontWeight:"700", color:"#E2EAF4", marginBottom:"3px" }}>Remediation Effort Profile</div>
-                    <div style={{ fontSize:"11px", color:"#4A6A8A", marginBottom:"16px" }}>Distribution of effort required to close all identified gaps — use for resource planning</div>
+                    <div style={{ fontSize:"15px", fontWeight:"700", color:"#E2EAF4", marginBottom:"3px" }}>Remediation Effort Profile</div>
+                    <div style={{ fontSize:"13px", color:"#4A6A8A", marginBottom:"16px" }}>Distribution of effort required to close all identified gaps  -  use for resource planning</div>
                     <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:"10px", marginBottom:"12px" }}>
                       {effortBreakdown.map(e=>{ const cfg=EFFORT_CFG[e.label]; const pct=getAllGaps().length?Math.round((e.value/getAllGaps().length)*100):0; return (
                         <div key={e.label} style={{ padding:"16px", borderRadius:"9px", background:"rgba(0,0,0,0.2)", border:`1px solid ${cfg.color}40` }}>
                           <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"8px" }}>
-                            <div style={{ fontSize:"11px", fontWeight:"700", color:cfg.color, textTransform:"uppercase", letterSpacing:"0.08em" }}>{e.label} Effort</div>
-                            <span style={{ fontSize:"11px", color:"#4A6A8A" }}>{pct}%</span>
+                            <div style={{ fontSize:"13px", fontWeight:"700", color:cfg.color, textTransform:"uppercase", letterSpacing:"0.08em" }}>{e.label} Effort</div>
+                            <span style={{ fontSize:"13px", color:"#4A6A8A" }}>{pct}%</span>
                           </div>
                           <div style={{ fontSize:"30px", fontWeight:"800", color:cfg.color, lineHeight:1, marginBottom:"10px" }}>{e.value}</div>
                           <div style={{ height:"4px", background:"#1B3A6B", borderRadius:"2px", overflow:"hidden" }}>
@@ -2376,7 +2591,7 @@ export default function MaturityScorecard() {
                       );})}
                     </div>
                     {getAllGaps().filter(g=>g.rec?.effort==="Low").length>0&&(
-                      <div style={{ padding:"11px 14px", borderRadius:"8px", background:"rgba(200,241,53,0.08)", border:"1px solid rgba(200,241,53,0.25)", fontSize:"12px", display:"flex", gap:"8px", alignItems:"flex-start" }}>
+                      <div style={{ padding:"11px 14px", borderRadius:"8px", background:"rgba(200,241,53,0.08)", border:"1px solid rgba(200,241,53,0.25)", fontSize:"14px", display:"flex", gap:"8px", alignItems:"flex-start" }}>
                         <span style={{ fontWeight:"800", color:"#C8F135", flexShrink:0 }}>Quick wins</span>
                         <span style={{ color:"#8BAAC8" }}>{getAllGaps().filter(g=>g.rec?.effort==="Low").length} gap{getAllGaps().filter(g=>g.rec?.effort==="Low").length>1?"s":""} can be addressed with low effort. Prioritise these first to demonstrate early progress to the client.</span>
                       </div>
@@ -2390,9 +2605,9 @@ export default function MaturityScorecard() {
             {resultsTab==="recommendations" && (
               (getAllGaps().length===0 && getDocGaps().length===0) ? (
                 <div style={{ ...card, textAlign:"center", padding:"56px" }}>
-                  <div style={{ fontSize:"30px", marginBottom:"12px" }}>✓</div>
+                  <div style={{ fontSize:"30px", marginBottom:"12px" }}>&#10003;</div>
                   <div style={{ fontSize:"15px", fontWeight:"700", color:"#E2EAF4" }}>No gaps identified yet</div>
-                  <div style={{ fontSize:"12px", color:"#4A6A8A", marginTop:"7px" }}>Complete the assessment and documentation review to see recommendations</div>
+                  <div style={{ fontSize:"14px", color:"#4A6A8A", marginTop:"7px" }}>Complete the assessment and documentation review to see recommendations</div>
                 </div>
               ) : (
                 <div>
@@ -2401,12 +2616,12 @@ export default function MaturityScorecard() {
                     {["Critical","High","Medium"].map(p=>{ const count=getAllGaps().filter(g=>g.rec?.priority===p).length; const cfg=PRI_CFG[p]; return (
                       <div key={p} style={{ ...card, borderLeft:`4px solid ${cfg.color}`, padding:"14px 16px" }}>
                         <div style={{ fontSize:"22px", fontWeight:"800", color:cfg.color }}>{count}</div>
-                        <div style={{ fontSize:"11px", color:"#8BAAC8", marginTop:"2px", fontWeight:"600" }}>{p} Control Gaps</div>
+                        <div style={{ fontSize:"13px", color:"#8BAAC8", marginTop:"2px", fontWeight:"600" }}>{p} Control Gaps</div>
                       </div>
                     );})}
                     <div style={{ ...card, borderLeft:"4px solid #F59E0B", padding:"14px 16px" }}>
                       <div style={{ fontSize:"22px", fontWeight:"800", color:"#F59E0B" }}>{getDocGaps().length}</div>
-                      <div style={{ fontSize:"11px", color:"#8BAAC8", marginTop:"2px", fontWeight:"600" }}>Missing Documents</div>
+                      <div style={{ fontSize:"13px", color:"#8BAAC8", marginTop:"2px", fontWeight:"600" }}>Missing Documents</div>
                     </div>
                   </div>
 
@@ -2415,12 +2630,12 @@ export default function MaturityScorecard() {
                     <div style={{ marginBottom:"24px" }}>
                       <div style={{ display:"flex", alignItems:"center", gap:"8px", marginBottom:"10px" }}>
                         <div style={{ width:"9px", height:"9px", borderRadius:"50%", background:"#F59E0B" }}/>
-                        <span style={{ fontSize:"13px", fontWeight:"800", color:"#FFFFFF" }}>Documentation Gaps</span>
-                        <span style={{ fontSize:"12px", color:"#4A6A8A" }}>— {getDocGaps().length} document{getDocGaps().length>1?"s":""} not provided</span>
-                        <span style={{ fontSize:"11px", color:"#F59E0B", background:"rgba(245,158,11,0.12)", padding:"2px 8px", borderRadius:"4px", border:"1px solid rgba(245,158,11,0.25)", marginLeft:"4px" }}>Reduces scoring confidence</span>
+                        <span style={{ fontSize:"15px", fontWeight:"800", color:"#FFFFFF" }}>Documentation Gaps</span>
+                        <span style={{ fontSize:"14px", color:"#4A6A8A" }}> -  {getDocGaps().length} document{getDocGaps().length>1?"s":""} not provided</span>
+                        <span style={{ fontSize:"13px", color:"#F59E0B", background:"rgba(245,158,11,0.12)", padding:"2px 8px", borderRadius:"4px", border:"1px solid rgba(245,158,11,0.25)", marginLeft:"4px" }}>Reduces scoring confidence</span>
                       </div>
                       <div style={{ ...card, borderLeft:"4px solid #F59E0B", padding:"16px 20px" }}>
-                        <div style={{ fontSize:"12px", color:"#8BAAC8", marginBottom:"14px", lineHeight:"1.6" }}>
+                        <div style={{ fontSize:"14px", color:"#8BAAC8", marginBottom:"14px", lineHeight:"1.6" }}>
                           The following documents were not provided during the documentation review. Their absence reduces confidence in the associated subcategory scores. Obtaining and reviewing these documents is recommended before finalising the assessment.
                         </div>
                         {["Critical","High","Medium"].map(pri => {
@@ -2429,18 +2644,18 @@ export default function MaturityScorecard() {
                           const cfg = PRI_CFG[pri] || { color:"#8BAAC8", bg:"rgba(139,170,200,0.12)" };
                           return (
                             <div key={pri} style={{ marginBottom:"12px" }}>
-                              <div style={{ fontSize:"10px", fontWeight:"700", color:cfg.color, textTransform:"uppercase", letterSpacing:"0.08em", marginBottom:"7px" }}>{pri} Priority</div>
+                              <div style={{ fontSize:"12px", fontWeight:"700", color:cfg.color, textTransform:"uppercase", letterSpacing:"0.08em", marginBottom:"7px" }}>{pri} Priority</div>
                               {priDocs.map(({doc}) => (
                                 <div key={doc.id} style={{ display:"flex", alignItems:"flex-start", gap:"12px", padding:"10px 12px", borderRadius:"8px", background:"rgba(245,158,11,0.05)", border:"1px solid rgba(245,158,11,0.15)", marginBottom:"6px" }}>
                                   <div style={{ flex:1 }}>
-                                    <div style={{ fontSize:"12px", fontWeight:"700", color:"#E2EAF4", marginBottom:"4px" }}>{doc.label}</div>
-                                    <div style={{ fontSize:"11px", color:"#4A6A8A" }}>
+                                    <div style={{ fontSize:"14px", fontWeight:"700", color:"#E2EAF4", marginBottom:"4px" }}>{doc.label}</div>
+                                    <div style={{ fontSize:"13px", color:"#4A6A8A" }}>
                                       Relevant to: {doc.subcats.join(", ")}
                                     </div>
                                   </div>
                                   <div style={{ display:"flex", gap:"4px", flexShrink:0 }}>
-                                    <span style={{ fontSize:"10px", fontWeight:"700", color:DOC_CAT_COLORS[doc.cat]||"#8BAAC8", background:`${DOC_CAT_COLORS[doc.cat]||"#8BAAC8"}18`, padding:"2px 8px", borderRadius:"4px", border:`1px solid ${DOC_CAT_COLORS[doc.cat]||"#8BAAC8"}40` }}>{doc.cat}</span>
-                                    <span style={{ fontSize:"10px", fontWeight:"700", color:cfg.color, background:cfg.bg, padding:"2px 8px", borderRadius:"4px" }}>{pri}</span>
+                                    <span style={{ fontSize:"12px", fontWeight:"700", color:DOC_CAT_COLORS[doc.cat]||"#8BAAC8", background:`${DOC_CAT_COLORS[doc.cat]||"#8BAAC8"}18`, padding:"2px 8px", borderRadius:"4px", border:`1px solid ${DOC_CAT_COLORS[doc.cat]||"#8BAAC8"}40` }}>{doc.cat}</span>
+                                    <span style={{ fontSize:"12px", fontWeight:"700", color:cfg.color, background:cfg.bg, padding:"2px 8px", borderRadius:"4px" }}>{pri}</span>
                                   </div>
                                 </div>
                               ))}
@@ -2456,8 +2671,8 @@ export default function MaturityScorecard() {
                     <div>
                       <div style={{ display:"flex", alignItems:"center", gap:"8px", marginBottom:"10px" }}>
                         <div style={{ width:"9px", height:"9px", borderRadius:"50%", background:"#F87171" }}/>
-                        <span style={{ fontSize:"13px", fontWeight:"800", color:"#FFFFFF" }}>Control Gaps</span>
-                        <span style={{ fontSize:"12px", color:"#4A6A8A" }}>— {getAllGaps().length} subcategor{getAllGaps().length>1?"ies":"y"} below threshold</span>
+                        <span style={{ fontSize:"15px", fontWeight:"800", color:"#FFFFFF" }}>Control Gaps</span>
+                        <span style={{ fontSize:"14px", color:"#4A6A8A" }}> -  {getAllGaps().length} subcategor{getAllGaps().length>1?"ies":"y"} below threshold</span>
                       </div>
                       {["Critical","High","Medium"].map(priority=>{
                         const gaps=getAllGaps().filter(g=>g.rec?.priority===priority);
@@ -2467,40 +2682,40 @@ export default function MaturityScorecard() {
                           <div key={priority} style={{ marginBottom:"20px" }}>
                             <div style={{ display:"flex", alignItems:"center", gap:"8px", marginBottom:"9px" }}>
                               <div style={{ width:"7px", height:"7px", borderRadius:"50%", background:cfg.color }}/>
-                              <span style={{ fontSize:"12px", fontWeight:"700", color:"#FFFFFF" }}>{priority} Priority</span>
-                              <span style={{ fontSize:"11px", color:"#4A6A8A" }}>— {gaps.length} finding{gaps.length>1?"s":""}</span>
+                              <span style={{ fontSize:"14px", fontWeight:"700", color:"#FFFFFF" }}>{priority} Priority</span>
+                              <span style={{ fontSize:"13px", color:"#4A6A8A" }}> -  {gaps.length} finding{gaps.length>1?"s":""}</span>
                             </div>
                             {gaps.map(({cat,domain,q,sc,key,rec},idx)=>{
-                              const subcatId = q.split(" — ")[0];
+                              const subcatId = q.split("  -  ")[0];
                               const missingDocStatuses = getSubcatDocStatus(subcatId).filter(x => x.status==="no"||x.status==="not-set");
                               return (
                                 <div key={idx} style={{ ...card, marginBottom:"7px", borderLeft:`4px solid ${cat.color}`, padding:"16px 20px" }}>
                                   <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:"9px" }}>
                                     <div style={{ flex:1 }}>
                                       <div style={{ display:"flex", alignItems:"center", gap:"7px", marginBottom:"4px", flexWrap:"wrap" }}>
-                                        <span style={{ fontSize:"10px", fontWeight:"800", color:cat.color, letterSpacing:"0.08em" }}>{domain.id}</span>
-                                        <span style={{ fontSize:"10px", color:"#4A6A8A" }}>·</span>
-                                        <span style={{ fontSize:"11px", color:"#8BAAC8", fontWeight:"600" }}>{domain.name}</span>
-                                        {missingDocStatuses.length>0 && <span style={{ fontSize:"10px", color:"#F59E0B", background:"rgba(245,158,11,0.1)", padding:"1px 7px", borderRadius:"3px", border:"1px solid rgba(245,158,11,0.25)" }}>⚠ {missingDocStatuses.length} doc{missingDocStatuses.length>1?"s":""} missing</span>}
+                                        <span style={{ fontSize:"12px", fontWeight:"800", color:cat.color, letterSpacing:"0.08em" }}>{domain.id}</span>
+                                        <span style={{ fontSize:"12px", color:"#4A6A8A" }}>.</span>
+                                        <span style={{ fontSize:"13px", color:"#8BAAC8", fontWeight:"600" }}>{domain.name}</span>
+                                        {missingDocStatuses.length>0 && <span style={{ fontSize:"12px", color:"#F59E0B", background:"rgba(245,158,11,0.1)", padding:"1px 7px", borderRadius:"3px", border:"1px solid rgba(245,158,11,0.25)" }}>! {missingDocStatuses.length} doc{missingDocStatuses.length>1?"s":""} missing</span>}
                                       </div>
-                                      <div style={{ fontSize:"13px", fontWeight:"600", color:"#E2EAF4", marginBottom:"3px" }}>{q}</div>
-                                      {notes[key]&&<div style={{ fontSize:"11px", color:"#8BAAC8", fontStyle:"italic" }}>"{notes[key]}"</div>}
+                                      <div style={{ fontSize:"15px", fontWeight:"600", color:"#E2EAF4", marginBottom:"3px" }}>{q}</div>
+                                      {notes[key]&&<div style={{ fontSize:"13px", color:"#8BAAC8", fontStyle:"italic" }}>"{notes[key]}"</div>}
                                     </div>
-                                    <div style={{ padding:"3px 9px", borderRadius:"5px", background:ML.find(m=>m.value===sc)?.bg, fontWeight:"800", fontSize:"12px", color:getMC(sc), marginLeft:"12px", whiteSpace:"nowrap" }}>
-                                      {sc} — {ML.find(m=>m.value===sc)?.label}
+                                    <div style={{ padding:"3px 9px", borderRadius:"5px", background:ML.find(m=>m.value===sc)?.bg, fontWeight:"800", fontSize:"14px", color:getMC(sc), marginLeft:"12px", whiteSpace:"nowrap" }}>
+                                      {sc}  -  {ML.find(m=>m.value===sc)?.label}
                                     </div>
                                   </div>
                                   {rec&&(
                                     <div style={{ background:"#0A1932", borderRadius:"8px", padding:"12px 14px", border:"1px solid #1B3A6B" }}>
                                       <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:"6px" }}>
-                                        <div style={{ fontSize:"13px", fontWeight:"700", color:"#00BFFF" }}>→ {rec.action}</div>
+                                        <div style={{ fontSize:"15px", fontWeight:"700", color:"#00BFFF" }}>{"->"} {rec.action}</div>
                                         <div style={{ display:"flex", gap:"5px", marginLeft:"10px", flexShrink:0 }}>
                                           {rec.priority&&<span style={tagSty(PRI_CFG[rec.priority])}>{rec.priority}</span>}
                                           {rec.effort&&<span style={tagSty(EFFORT_CFG[rec.effort])}>Effort: {rec.effort}</span>}
                                         </div>
                                       </div>
-                                      <div style={{ fontSize:"12px", color:"#8BAAC8", lineHeight:"1.6", marginBottom:"6px" }}>{rec.detail}</div>
-                                      <div style={{ fontSize:"11px", color:"#4A6A8A", fontWeight:"600" }}>{rec.ref}</div>
+                                      <div style={{ fontSize:"14px", color:"#8BAAC8", lineHeight:"1.6", marginBottom:"6px" }}>{rec.detail}</div>
+                                      <div style={{ fontSize:"13px", color:"#4A6A8A", fontWeight:"600" }}>{rec.ref}</div>
                                     </div>
                                   )}
                                 </div>
@@ -2524,28 +2739,28 @@ export default function MaturityScorecard() {
                   {/* Header */}
                   <div style={{ marginBottom:"18px", padding:"16px 20px", borderRadius:"12px", background:"linear-gradient(135deg, rgba(30,111,217,0.12), rgba(0,191,255,0.08))", border:"1px solid rgba(0,191,255,0.25)", display:"flex", alignItems:"flex-start", justifyContent:"space-between", gap:"20px" }}>
                     <div>
-                      <div style={{ fontSize:"15px", fontWeight:"800", color:"#FFFFFF", marginBottom:"4px" }}>✦ AI-Assisted Report Narrative</div>
-                      <div style={{ fontSize:"12px", color:"#8BAAC8", lineHeight:"1.6", maxWidth:"600px" }}>
-                        Draft narrative generated entirely from your scored data — no client information was transmitted externally. Review, edit and refine before including in any client deliverable.
+                      <div style={{ fontSize:"15px", fontWeight:"800", color:"#FFFFFF", marginBottom:"4px" }}>* AI-Assisted Report Narrative</div>
+                      <div style={{ fontSize:"14px", color:"#8BAAC8", lineHeight:"1.6", maxWidth:"600px" }}>
+                        Draft narrative generated entirely from your scored data  -  no client information was transmitted externally. Review, edit and refine before including in any client deliverable.
                       </div>
                       <div style={{ marginTop:"8px", display:"flex", gap:"8px", flexWrap:"wrap" }}>
-                        <span style={{ fontSize:"10px", color:"#C8F135", background:"rgba(200,241,53,0.1)", padding:"2px 10px", borderRadius:"20px", border:"1px solid rgba(200,241,53,0.25)", fontWeight:"700" }}>✓ 100% Client-Side</span>
-                        <span style={{ fontSize:"10px", color:"#00BFFF", background:"rgba(0,191,255,0.1)", padding:"2px 10px", borderRadius:"20px", border:"1px solid rgba(0,191,255,0.2)", fontWeight:"700" }}>✓ No Data Transmitted</span>
-                        <span style={{ fontSize:"10px", color:"#8BAAC8", background:"rgba(139,170,200,0.1)", padding:"2px 10px", borderRadius:"20px", border:"1px solid rgba(139,170,200,0.2)", fontWeight:"700" }}>Draft — Requires Review</span>
+                        <span style={{ fontSize:"12px", color:"#C8F135", background:"rgba(200,241,53,0.1)", padding:"2px 10px", borderRadius:"20px", border:"1px solid rgba(200,241,53,0.25)", fontWeight:"700" }}>&#10003; 100% Client-Side</span>
+                        <span style={{ fontSize:"12px", color:"#00BFFF", background:"rgba(0,191,255,0.1)", padding:"2px 10px", borderRadius:"20px", border:"1px solid rgba(0,191,255,0.2)", fontWeight:"700" }}>&#10003; No Data Transmitted</span>
+                        <span style={{ fontSize:"12px", color:"#8BAAC8", background:"rgba(139,170,200,0.1)", padding:"2px 10px", borderRadius:"20px", border:"1px solid rgba(139,170,200,0.2)", fontWeight:"700" }}>Draft  -  Requires Review</span>
                       </div>
                     </div>
                     <div style={{ display:"flex", gap:"8px", flexShrink:0 }}>
                       <button
                         onClick={()=>{ navigator.clipboard.writeText(narrative).then(()=>{ setNarrativeCopied(true); setTimeout(()=>setNarrativeCopied(false),2500); }); }}
-                        style={{ padding:"9px 18px", borderRadius:"8px", border:"1px solid rgba(0,191,255,0.4)", background:"rgba(0,191,255,0.1)", color:"#00BFFF", fontSize:"12px", fontWeight:"700", cursor:"pointer", fontFamily:"inherit" }}>
-                        {narrativeCopied ? "Copied ✓" : "Copy to Clipboard"}
+                        style={{ padding:"9px 18px", borderRadius:"8px", border:"1px solid rgba(0,191,255,0.4)", background:"rgba(0,191,255,0.1)", color:"#00BFFF", fontSize:"14px", fontWeight:"700", cursor:"pointer", fontFamily:"inherit" }}>
+                        {narrativeCopied ? "Copied v" : "Copy to Clipboard"}
                       </button>
                     </div>
                   </div>
 
                   {completion < 20 && (
-                    <div style={{ marginBottom:"14px", padding:"12px 16px", borderRadius:"8px", background:"rgba(252,211,77,0.08)", border:"1px solid rgba(252,211,77,0.25)", fontSize:"12px", color:"#FCD34D" }}>
-                      ⚠ Only {completion}% of controls have been scored. The narrative will be more complete and accurate once scoring is further progressed.
+                    <div style={{ marginBottom:"14px", padding:"12px 16px", borderRadius:"8px", background:"rgba(252,211,77,0.08)", border:"1px solid rgba(252,211,77,0.25)", fontSize:"14px", color:"#FCD34D" }}>
+                      ! Only {completion}% of controls have been scored. The narrative will be more complete and accurate once scoring is further progressed.
                     </div>
                   )}
 
@@ -2553,29 +2768,29 @@ export default function MaturityScorecard() {
                   <div style={{ display:"flex", flexDirection:"column", gap:"12px" }}>
                     {sections.map((section, i) => {
                       const isHeading = section.startsWith("EXECUTIVE SUMMARY") || section.startsWith("FUNCTION ASSESSMENT") || section.startsWith("RECOMMENDATIONS OVERVIEW") || section.startsWith("CONCLUSION");
-                      const isFooter  = section.startsWith("─");
-                      const isFuncSection = fw.some(cat => section.startsWith(`${cat.id} —`));
-                      const funcCat = isFuncSection ? fw.find(cat => section.startsWith(`${cat.id} —`)) : null;
+                      const isFooter  = section.startsWith("-");
+                      const isFuncSection = fw.some(cat => section.startsWith(`${cat.id}  - `));
+                      const funcCat = isFuncSection ? fw.find(cat => section.startsWith(`${cat.id}  - `)) : null;
 
                       if(isHeading) return (
                         <div key={i} style={{ padding:"10px 16px", borderRadius:"8px", background:"rgba(30,111,217,0.12)", border:"1px solid rgba(30,111,217,0.25)" }}>
-                          <div style={{ fontSize:"11px", fontWeight:"800", color:"#00BFFF", letterSpacing:"0.12em" }}>{section.split("\n")[0]}</div>
+                          <div style={{ fontSize:"13px", fontWeight:"800", color:"#00BFFF", letterSpacing:"0.12em" }}>{section.split("\n")[0]}</div>
                         </div>
                       );
                       if(isFooter) return (
                         <div key={i} style={{ padding:"10px 16px", borderRadius:"8px", background:"#0A1932", border:"1px solid #1B3A6B" }}>
-                          <div style={{ fontSize:"10px", color:"#4A6A8A", lineHeight:"1.6", whiteSpace:"pre-line" }}>{section}</div>
+                          <div style={{ fontSize:"12px", color:"#4A6A8A", lineHeight:"1.6", whiteSpace:"pre-line" }}>{section}</div>
                         </div>
                       );
                       if(funcCat) return (
                         <div key={i} style={{ ...card, borderLeft:`4px solid ${funcCat.color}`, padding:"16px 20px" }}>
-                          <div style={{ fontSize:"12px", fontWeight:"800", color:funcCat.color, marginBottom:"8px" }}>{section.split("\n")[0]}</div>
-                          <div style={{ fontSize:"13px", color:"#E2EAF4", lineHeight:"1.7", whiteSpace:"pre-line" }}>{section.split("\n").slice(2).join("\n")}</div>
+                          <div style={{ fontSize:"14px", fontWeight:"800", color:funcCat.color, marginBottom:"8px" }}>{section.split("\n")[0]}</div>
+                          <div style={{ fontSize:"15px", color:"#E2EAF4", lineHeight:"1.7", whiteSpace:"pre-line" }}>{section.split("\n").slice(2).join("\n")}</div>
                         </div>
                       );
                       return (
                         <div key={i} style={{ ...card, padding:"16px 20px" }}>
-                          <div style={{ fontSize:"13px", color:"#E2EAF4", lineHeight:"1.8", whiteSpace:"pre-line" }}>{section}</div>
+                          <div style={{ fontSize:"15px", color:"#E2EAF4", lineHeight:"1.8", whiteSpace:"pre-line" }}>{section}</div>
                         </div>
                       );
                     })}
@@ -2587,12 +2802,12 @@ export default function MaturityScorecard() {
             {/* WORKSHOP NOTES */}
             {resultsTab==="workshop" && (
               <div>
-                <div style={{ marginBottom:"16px", padding:"12px 16px", borderRadius:"8px", background:"rgba(0,191,255,0.08)", border:"1px solid rgba(0,191,255,0.2)", fontSize:"12px", color:"#00BFFF" }}>
+                <div style={{ marginBottom:"16px", padding:"12px 16px", borderRadius:"8px", background:"rgba(0,191,255,0.08)", border:"1px solid rgba(0,191,255,0.2)", fontSize:"14px", color:"#00BFFF" }}>
                   Workshop notes captured during the engagement. These are included in the Excel export on a dedicated sheet.
                 </div>
                 {fw.map(cat=>(
                   <div key={cat.id} style={{ ...card, marginBottom:"10px", borderLeft:`4px solid ${cat.color}` }}>
-                    <div style={{ fontSize:"11px", fontWeight:"800", color:cat.color, letterSpacing:"0.1em", marginBottom:"12px" }}>{cat.id} — {cat.name}</div>
+                    <div style={{ fontSize:"13px", fontWeight:"800", color:cat.color, letterSpacing:"0.1em", marginBottom:"12px" }}>{cat.id}  -  {cat.name}</div>
                     {cat.domains.map(domain=>{
                       const wqs=WORKSHOP_QS[domain.id]||[];
                       const wn=workshopNotes[domain.id];
@@ -2600,22 +2815,22 @@ export default function MaturityScorecard() {
                         <div key={domain.id} style={{ marginBottom:"14px", paddingBottom:"14px", borderBottom:"1px solid #1B3A6B" }}>
                           <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:"8px" }}>
                             <div>
-                              <span style={{ fontSize:"10px", fontWeight:"700", color:cat.color, letterSpacing:"0.08em" }}>{domain.id}</span>
-                              <span style={{ fontSize:"13px", fontWeight:"700", color:"#E2EAF4", marginLeft:"8px" }}>{domain.name}</span>
+                              <span style={{ fontSize:"12px", fontWeight:"700", color:cat.color, letterSpacing:"0.08em" }}>{domain.id}</span>
+                              <span style={{ fontSize:"15px", fontWeight:"700", color:"#E2EAF4", marginLeft:"8px" }}>{domain.name}</span>
                             </div>
-                            {wn&&<span style={{ fontSize:"10px", color:"#C8F135", fontWeight:"700", background:"rgba(200,241,53,0.12)", padding:"2px 8px", borderRadius:"4px" }}>Notes captured</span>}
+                            {wn&&<span style={{ fontSize:"12px", color:"#C8F135", fontWeight:"700", background:"rgba(200,241,53,0.12)", padding:"2px 8px", borderRadius:"4px" }}>Notes captured</span>}
                           </div>
                           {wqs.length>0&&(
-                            <div style={{ fontSize:"11px", color:"#4A6A8A", marginBottom:"8px" }}>
-                              {wqs.slice(0,2).map((q,i)=><div key={i} style={{ marginBottom:"2px" }}>• {q}</div>)}
+                            <div style={{ fontSize:"13px", color:"#4A6A8A", marginBottom:"8px" }}>
+                              {wqs.slice(0,2).map((q,i)=><div key={i} style={{ marginBottom:"2px" }}>* {q}</div>)}
                               {wqs.length>2&&<div style={{ color:"#4A6A8A" }}>+ {wqs.length-2} more questions</div>}
                             </div>
                           )}
                           <textarea
                             value={workshopNotes[domain.id]||""}
                             onChange={e=>setWorkshopNotes(p=>({...p,[domain.id]:e.target.value}))}
-                            placeholder="No notes captured yet — add them here or during the assessment..."
-                            style={{ width:"100%", minHeight:"70px", padding:"8px 10px", borderRadius:"6px", border:"1px solid #1B3A6B", fontSize:"12px", fontFamily:"inherit", outline:"none", background:"#0A1932", color:"#E2EAF4", boxSizing:"border-box", lineHeight:"1.5", resize:"vertical" }}
+                            placeholder="No notes captured yet  -  add them here or during the assessment..."
+                            style={{ width:"100%", minHeight:"70px", padding:"8px 10px", borderRadius:"6px", border:"1px solid #1B3A6B", fontSize:"14px", fontFamily:"inherit", outline:"none", background:"#0A1932", color:"#E2EAF4", boxSizing:"border-box", lineHeight:"1.5", resize:"vertical" }}
                           />
                         </div>
                       );
@@ -2626,6 +2841,7 @@ export default function MaturityScorecard() {
             )}
           </div>
         )}
+      </div>
       </div>
     </div>
   );
