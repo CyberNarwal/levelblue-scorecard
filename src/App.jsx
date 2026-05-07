@@ -1902,7 +1902,10 @@ export default function MaturityScorecard() {
 
                 
                 <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"10px", flexShrink:0 }}>
-                  {[["106","NIST Subcategories","#1E6FD9"],["22","NIST Categories","#00BFFF"],["0-4","Tier Scale","#C8F135"],["9","Report Slides","#A78BFA"]].map(([n,l,c])=>(
+                  {(isNIST
+                    ? [["106","Subcategories","#1E6FD9"],["22","Categories","#00BFFF"],["0-4","Tier Scale","#C8F135"],["9","Report Slides","#A78BFA"]]
+                    : [["54","Controls","#00BFFF"],["18","Control Areas","#1E6FD9"],["3","Impl. Groups","#C8F135"],["4","Excel Sheets","#A78BFA"]]
+                  ).map(([n,l,c])=>(
                     <div key={l} style={{ padding:"16px 18px", borderRadius:"12px", background:"rgba(0,0,0,0.35)", border:`1px solid ${c}30`, textAlign:"center", minWidth:"100px" }}>
                       <div style={{ fontSize:"26px", fontWeight:"800", color:c, fontFamily:MONO }}>{n}</div>
                       <div style={{ fontSize:"11px", color:"#4A6A8A", fontWeight:"600", textTransform:"uppercase", letterSpacing:"0.06em", marginTop:"3px" }}>{l}</div>
