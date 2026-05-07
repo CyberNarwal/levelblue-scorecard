@@ -4,6 +4,14 @@ import * as XLSX from "xlsx";
 // --- MONO FONT  -  used for all scores, IDs and data values --------------------
 const MONO = "'IBM Plex Mono', 'JetBrains Mono', 'Courier New', monospace";
 
+
+// Pluralisation helpers - avoids > operator inside template literals
+const pl    = (n) => n !== 1 ? "s" : "";
+const plIes = (n) => n !== 1 ? "ies" : "y";
+// Helper: replace whitespace with hyphens - no regex, no forward slashes
+const slugify = (s) => (s||"untitled").trim().split(" ").join("-");
+
+
 // --- useCountUp  -  animates a number from 0 to target over duration ms --------
 function useCountUp(target, duration = 900, deps = []) {
   const [val, setVal] = useState(null);
@@ -74,7 +82,7 @@ function HexMap({ fw, catScoreFn, getMC, getML, onClick, activeId }) {
         ))}
       </defs>
 
-      {/* Connecting lines */}
+      
       {hexes.map((h, i) => {
         const next = hexes[(i+1) % hexes.length];
         return (
@@ -85,13 +93,13 @@ function HexMap({ fw, catScoreFn, getMC, getML, onClick, activeId }) {
         );
       })}
 
-      {/* Center label */}
+      
       <circle cx={CX} cy={CY} r="52" fill="rgba(13,31,60,0.95)" stroke="#1B3A6B" strokeWidth="1.5"/>
       <circle cx={CX} cy={CY} r="48" fill="none" stroke="rgba(0,191,255,0.2)" strokeWidth="1"/>
       <text x={CX} y={CY-8} textAnchor="middle" fontSize="13" fill="#4A6A8A" fontFamily={MONO} letterSpacing="0.08em">NIST CSF</text>
       <text x={CX} y={CY+10} textAnchor="middle" fontSize="13" fill="#4A6A8A" fontFamily={MONO} letterSpacing="0.08em">2.0</text>
 
-      {/* Hexagons */}
+      
       {hexes.map(({cat, hx, hy, sc, scV, fillOpacity}) => {
         const isActive = activeId === cat.id;
         const col      = cat.color;
@@ -114,7 +122,7 @@ function HexMap({ fw, catScoreFn, getMC, getML, onClick, activeId }) {
               strokeWidth={isActive ? 2.5 : 1.5}
               strokeOpacity={isActive ? 1 : 0.6}
             />
-            {/* Score arc */}
+            
             {sc && (()=>{
               const startAngle = -90 * Math.PI / 180;
               const sweep      = (scV / 4) * 2 * Math.PI;
@@ -134,25 +142,25 @@ function HexMap({ fw, catScoreFn, getMC, getML, onClick, activeId }) {
                 />
               );
             })()}
-            {/* Function ID */}
+            
             <text x={hx} y={hy - 22}
               textAnchor="middle" fontSize="14" fontWeight="800"
               fill={col} fontFamily={MONO} letterSpacing="0.04em">
               {cat.id}
             </text>
-            {/* Function name */}
+            
             <text x={hx} y={hy - 6}
               textAnchor="middle" fontSize="12" fill="rgba(226,234,244,0.9)"
               fontFamily="'Outfit',sans-serif" fontWeight="600">
               {cat.name.length > 10 ? cat.name.slice(0,10)+"..." : cat.name}
             </text>
-            {/* Score */}
+            
             <text x={hx} y={hy + 16}
               textAnchor="middle" fontSize="20" fontWeight="700"
               fill={sc ? getMC(sc) : "#4A6A8A"} fontFamily={MONO}>
               {sc ? parseFloat(sc).toFixed(1) : " - "}
             </text>
-            {/* Tier label */}
+            
             <text x={hx} y={hy + 32}
               textAnchor="middle" fontSize="11" fill="#8BAAC8"
               fontFamily="'Outfit',sans-serif">
@@ -802,15 +810,22 @@ function BarChart({ data, height = 150 }) {
   const w = 100 / data.length;
   return (
     <svg width="100%" height={height} viewBox={`0 0 100 ${height}`} preserveAspectRatio="none">
-      {[1,2,3,4].map(v => { const y = height - (v/max)*(height-20)-4; return <line key={v} x1="0" y1={y} x2="100" y2={y} stroke="#1B3A6B" strokeWidth="0.5"/>; })}
+      {[1,2,3,4].map(v => {
+        const ratio = v / max;
+        const y = height - ratio * (height - 20) - 4;
+        return (<line key={v} x1="0" y1={y} x2="100" y2={y} stroke="#1B3A6B" strokeWidth="0.5"/>);
+      })}
       {data.map((d, i) => {
-        const bh = d.value ? (d.value/max)*(height-20) : 0;
-        const x = i*w + w*0.15; const bw = w*0.7; const y = height-bh-4;
-        return (<g key={i}>
-          <rect x={x} y={y} width={bw} height={bh} fill={d.color} rx="1" opacity="0.85"/>
-          <text x={x+bw/2} y={height-1} textAnchor="middle" fontSize="3.5" fill="#4A6A8A" fontFamily="Outfit,sans-serif">{d.label}</text>
-          {d.value>0 && <text x={x+bw/2} y={y-2} textAnchor="middle" fontSize="4" fill={d.color} fontWeight="700" fontFamily="Outfit,sans-serif">{d.value}</text>}
-        </g>);
+        const ratio2 = d.value ? d.value / max : 0;
+        const bh = ratio2 * (height - 20);
+        const x = i * w + w * 0.15; const bw = w * 0.7; const y = height - bh - 4;
+        return (
+          <g key={i}>
+            <rect x={x} y={y} width={bw} height={bh} fill={d.color} rx="1" opacity="0.85"/>
+            <text x={x + bw / 2} y={height - 1} textAnchor="middle" fontSize="3.5" fill="#4A6A8A" fontFamily="Outfit,sans-serif">{d.label}</text>
+            {d.value > 0 && (<text x={x + bw / 2} y={y - 2} textAnchor="middle" fontSize="4" fill={d.color} fontWeight="700" fontFamily="Outfit,sans-serif">{d.value}</text>)}
+          </g>
+        );
       })}
     </svg>
   );
@@ -826,7 +841,7 @@ function HBarChart({ data, maxVal }) {
           <div style={{ width:"42px", fontSize:"11px", fontWeight:"700", color:"#8BAAC8", textAlign:"right", flexShrink:0, fontFamily:"Outfit,sans-serif" }}>{d.label}</div>
           <div style={{ flex:1, height:"22px", background:"#0A1932", borderRadius:"4px", overflow:"hidden", position:"relative" }}>
             <div style={{
-              width: d.value > 0 ? `${(d.value/max)*100}%` : "0%",
+              width: d.value > 0 ? String((d.value/max)*100) + "%" : "0%",
               height:"100%",
               background: d.color,
               borderRadius:"4px",
@@ -844,37 +859,79 @@ function HBarChart({ data, maxVal }) {
 }
 
 function RadarChart({ scores, framework }) {
-  const cats = FRAMEWORKS[framework]; const n = cats.length;
-  const cx=150, cy=150, r=110; const step=(2*Math.PI)/n;
-  const pt=(i,v)=>{ const a=i*step-Math.PI/2; const d=(v/4)*r; return {x:cx+d*Math.cos(a),y:cy+d*Math.sin(a)}; };
-  const lp=(i)=>{ const a=i*step-Math.PI/2; return {x:cx+(r+22)*Math.cos(a),y:cy+(r+22)*Math.sin(a)}; };
+  const cats = FRAMEWORKS[framework];
+  const n = cats.length;
+  const cx = 150; const cy = 150; const r = 110;
+  const tau = 2 * Math.PI;
+  const step = tau / n;
+  const halfPi = Math.PI / 2;
+  const pt = (i, v) => {
+    const a = i * step - halfPi;
+    const dist = (v / 4) * r;
+    return { x: cx + dist * Math.cos(a), y: cy + dist * Math.sin(a) };
+  };
+  const lp = (i) => {
+    const a = i * step - halfPi;
+    return { x: cx + (r + 22) * Math.cos(a), y: cy + (r + 22) * Math.sin(a) };
+  };
   return (
     <svg width="300" height="300" viewBox="0 0 300 300">
-      {[1,2,3,4].map(lv=>{ const pts=cats.map((_,i)=>pt(i,lv)); const d=pts.map((p,i)=>`${i===0?"M":"L"}${p.x},${p.y}`).join(" ")+"Z"; return <path key={lv} d={d} fill="none" stroke="#1B3A6B" strokeWidth="0.8"/>; })}
-      {cats.map((_,i)=>{ const o=pt(i,5); return <line key={i} x1={cx} y1={cy} x2={o.x} y2={o.y} stroke="#1B3A6B" strokeWidth="0.8"/>; })}
-      {(()=>{ const pts=cats.map((c,i)=>pt(i,scores[c.id]||0)); const d=pts.map((p,i)=>`${i===0?"M":"L"}${p.x},${p.y}`).join(" ")+"Z"; return (<><path d={d} fill="rgba(0,191,255,0.12)" stroke="#00BFFF" strokeWidth="1.5"/>{pts.map((p,i)=><circle key={i} cx={p.x} cy={p.y} r="3.5" fill="#00BFFF"/>)}</>); })()}
-      {cats.map((c,i)=>{ const l=lp(i); return <text key={i} x={l.x} y={l.y} textAnchor="middle" dominantBaseline="middle" fontSize="9.5" fontWeight="700" fill="#8BAAC8" fontFamily="Outfit,sans-serif">{c.id}</text>; })}
-    </svg>
-  );
-}
-
-function DonutChart({ segments, size=120, thickness=26 }) {
-  const r=(size/2)-thickness/2; const circ=2*Math.PI*r;
-  const total=segments.reduce((a,s)=>a+s.value,0);
-  let offset=0; const cx=size/2, cy=size/2;
-  return (
-    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
-      <circle cx={cx} cy={cy} r={r} fill="none" stroke="#1B3A6B" strokeWidth={thickness}/>
-      {segments.filter(s=>s.value>0).map((seg,i)=>{
-        const dash=(seg.value/total)*circ; const gap=circ-dash;
-        const el=<circle key={i} cx={cx} cy={cy} r={r} fill="none" stroke={seg.color} strokeWidth={thickness} strokeDasharray={`${dash} ${gap}`} strokeDashoffset={-offset} style={{transform:"rotate(-90deg)",transformOrigin:"center"}}/>;
-        offset+=dash; return el;
+      {[1,2,3,4].map(lv => {
+        const pts = cats.map((_, i) => pt(i, lv));
+        const d = pts.map((p, i) => (i === 0 ? "M" : "L") + p.x + "," + p.y).join(" ") + "Z";
+        return (<path key={lv} d={d} fill="none" stroke="#1B3A6B" strokeWidth="0.8"/>);
+      })}
+      {cats.map((_, i) => {
+        const o = pt(i, 5);
+        return (<line key={i} x1={cx} y1={cy} x2={o.x} y2={o.y} stroke="#1B3A6B" strokeWidth="0.8"/>);
+      })}
+      {(()=>{
+        const pts = cats.map((c, i) => pt(i, scores[c.id] || 0));
+        const d = pts.map((p, i) => (i === 0 ? "M" : "L") + p.x + "," + p.y).join(" ") + "Z";
+        return (
+          <>
+            <path d={d} fill="rgba(0,191,255,0.12)" stroke="#00BFFF" strokeWidth="1.5"/>
+            {pts.map((p, i) => (<circle key={i} cx={p.x} cy={p.y} r="3.5" fill="#00BFFF"/>))}
+          </>
+        );
+      })()}
+      {cats.map((c, i) => {
+        const l = lp(i);
+        return (<text key={i} x={l.x} y={l.y} textAnchor="middle" dominantBaseline="middle" fontSize="9.5" fontWeight="700" fill="#8BAAC8" fontFamily="Outfit,sans-serif">{c.id}</text>);
       })}
     </svg>
   );
 }
 
-const card    = { background:"rgba(13,31,60,0.72)", backdropFilter:"blur(14px)", WebkitBackdropFilter:"blur(14px)", borderRadius:"14px", border:"1px solid rgba(27,58,107,0.9)", padding:"20px", boxShadow:"0 4px 28px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.035)" };
+function DonutChart({ segments, size=120, thickness=26 }) {
+  const half = size / 2;
+  const r = half - thickness / 2;
+  const tau = 2 * Math.PI;
+  const circ = tau * r;
+  const total = segments.reduce((a, s) => a + s.value, 0);
+  let offset = 0;
+  const cx = half; const cy = half;
+  return (
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+      <circle cx={cx} cy={cy} r={r} fill="none" stroke="#1B3A6B" strokeWidth={thickness}/>
+      {segments.filter(s => s.value > 0).map((seg, i) => {
+        const ratio = seg.value / total;
+        const dash = ratio * circ;
+        const gap = circ - dash;
+        const el = (
+          <circle key={i} cx={cx} cy={cy} r={r} fill="none" stroke={seg.color}
+            strokeWidth={thickness} strokeDasharray={`${dash} ${gap}`}
+            strokeDashoffset={-offset}
+            style={{ transform:"rotate(-90deg)", transformOrigin:"center" }}/>
+        );
+        offset += dash;
+        return el;
+      })}
+    </svg>
+  );
+}
+
+const card    = { background:"rgba(13,31,60,0.95)", borderRadius:"14px", border:"1px solid rgba(27,58,107,0.9)", padding:"20px", boxShadow:"0 4px 28px rgba(0,0,0,0.45)" };
 const navBtn  = (active) => ({ padding:"6px 16px", borderRadius:"4px", border:"none", background:active?"#1E6FD9":"transparent", color:active?"#FFFFFF":"#4A6A8A", fontSize:"14px", fontWeight:"600", cursor:"pointer", fontFamily:"inherit", transition:"all 0.15s" });
 const tagSty  = (cfg) => ({ padding:"3px 8px", borderRadius:"4px", fontSize:"12px", fontWeight:"700", background:cfg.bg, color:cfg.color, whiteSpace:"nowrap", letterSpacing:"0.04em", fontFamily:MONO });
 
@@ -959,9 +1016,24 @@ export default function MaturityScorecard() {
   const getML = (s) => { if(s===null||s===undefined) return "Not assessed"; const v=parseFloat(s); if(v<0.5) return "Not Present"; if(v<1.5) return "Partial"; if(v<2.5) return "Risk-Informed"; if(v<3.5) return "Repeatable"; return "Adaptive"; };
 
   // Current scoring  -  N/A = -1, excluded from averages
-  const domainScore = (d) => { const vals=d.questions.map((_,qi)=>scores[`${d.id}_q${qi}`]).filter(v=>v!==undefined&&v!==-1); return vals.length?(vals.reduce((a,b)=>a+b,0)/vals.length).toFixed(2):null; };
-  const catScore = (cat) => { const ds=cat.domains.map(d=>domainScore(d)).filter(v=>v!==null); return ds.length?(ds.reduce((a,b)=>a+parseFloat(b),0)/ds.length).toFixed(2):null; };
-  const overall = (()=>{ const cs=fw.map(c=>catScore(c)).filter(v=>v!==null); return cs.length?(cs.reduce((a,b)=>a+parseFloat(b),0)/cs.length).toFixed(2):null; })();
+  const domainScore = (d) => {
+    const vals = d.questions.map((_,qi) => scores[`${d.id}_q${qi}`]).filter(v => v !== undefined && v !== -1);
+    if (!vals.length) return null;
+    const sum = vals.reduce((a,b) => a+b, 0);
+    return (sum / vals.length).toFixed(2);
+  };
+  const catScore = (cat) => {
+    const ds = cat.domains.map(d => domainScore(d)).filter(v => v !== null);
+    if (!ds.length) return null;
+    const sum = ds.reduce((a,b) => a + parseFloat(b), 0);
+    return (sum / ds.length).toFixed(2);
+  };
+  const overall = (()=>{
+    const cs = fw.map(c => catScore(c)).filter(v => v !== null);
+    if (!cs.length) return null;
+    const sum = cs.reduce((a,b) => a + parseFloat(b), 0);
+    return (sum / cs.length).toFixed(2);
+  })();
 
   // Target scoring  -  defaults to current score if not explicitly set
   const domainTarget = (d) => {
@@ -973,16 +1045,33 @@ export default function MaturityScorecard() {
       const v = t !== undefined ? t : c;
       return (v !== undefined && v !== -1) ? v : undefined;
     }).filter(v => v !== undefined);
-    return vals.length ? (vals.reduce((a,b)=>a+b,0)/vals.length).toFixed(2) : null;
+    if (!vals.length) return null;
+    const sumT = vals.reduce((a,b) => a+b, 0);
+    return (sumT / vals.length).toFixed(2);
   };
-  const catTarget = (cat) => { const ds=cat.domains.map(d=>domainTarget(d)).filter(v=>v!==null); return ds.length?(ds.reduce((a,b)=>a+parseFloat(b),0)/ds.length).toFixed(2):null; };
-  const overallTarget = (()=>{ const cs=fw.map(c=>catTarget(c)).filter(v=>v!==null); return cs.length?(cs.reduce((a,b)=>a+parseFloat(b),0)/cs.length).toFixed(2):null; })();
+  const catTarget = (cat) => {
+    const ds = cat.domains.map(d => domainTarget(d)).filter(v => v !== null);
+    if (!ds.length) return null;
+    const sumC = ds.reduce((a,b) => a + parseFloat(b), 0);
+    return (sumC / ds.length).toFixed(2);
+  };
+  const overallTarget = (()=>{
+    const cs = fw.map(c => catTarget(c)).filter(v => v !== null);
+    if (!cs.length) return null;
+    const sumO = cs.reduce((a,b) => a + parseFloat(b), 0);
+    return (sumO / cs.length).toFixed(2);
+  })();
 
   // Animated score counters - must be declared after overall/overallTarget are computed
   const animScore  = useCountUp(overall,        900, [overall]);
   const animTarget = useCountUp(overallTarget,   900, [overallTarget]);
 
-  const completion = (()=>{ const total=fw.flatMap(c=>c.domains.flatMap(d=>d.questions)).length; const done=Object.values(scores).filter(v=>v!==undefined).length; return Math.round((done/total)*100); })();
+  const completion = (()=>{
+    const total = fw.flatMap(c=>c.domains.flatMap(d=>d.questions)).length;
+    const done  = Object.values(scores).filter(v=>v!==undefined).length;
+    if (!total) return 0;
+    return Math.round(done * 100 / total);
+  })();
   const radarScores = {}; fw.forEach(cat=>{ const sc=catScore(cat); radarScores[cat.id]=sc?parseFloat(sc):0; });
 
   // Gaps: current score below 3 (Repeatable), excluding N/A
@@ -1018,7 +1107,7 @@ export default function MaturityScorecard() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `${(clientName||"session").replace(/\s+/g,"-")}-scorecard-${new Date().toISOString().slice(0,10)}.json`;
+    a.download = `${slugify(clientName||"session")}-scorecard-${new Date().toISOString().slice(0,10)}.json`;
     a.click();
     try { localStorage.removeItem("lb_scorecard_recovery"); } catch(e) {}
     setRecoveryAvailable(false);
@@ -1091,7 +1180,8 @@ export default function MaturityScorecard() {
     const effortCounts = { Low:gaps.filter(g=>g.rec?.effort==="Low").length, Medium:gaps.filter(g=>g.rec?.effort==="Medium").length, High:gaps.filter(g=>g.rec?.effort==="High").length };
     const quickWins = gaps.filter(g=>g.rec?.effort==="Low" && (g.rec?.priority==="Critical"||g.rec?.priority==="High"));
     const scored = Object.values(scores).filter(v=>v!==-1&&v!==undefined);
-    const avgScore = scored.length ? (scored.reduce((a,b)=>a+b,0)/scored.length).toFixed(2) : null;
+    const avgScoreSum = scored.length ? scored.reduce((a,b) => a+b, 0) : 0;
+    const avgScore = scored.length ? (avgScoreSum / scored.length).toFixed(2) : null;
 
     // -- Per-function narrative -----------------------------------------------
     const funcNarratives = fw.map(cat => {
@@ -1135,20 +1225,20 @@ export default function MaturityScorecard() {
       }
 
       const gapNote = catGaps.length > 0
-        ? ` ${catGaps.length} subcategor${catGaps.length>1?"ies":"y"} scored below the Repeatable threshold.`
+        ? ` ${catGaps.length} subcategor${plIes(catGaps.length)} scored below the Repeatable threshold.`
         : ` No subcategories fell below the Repeatable threshold.`;
       const scoreNote = sc2
-        ? ` Score: ${parseFloat(sc2).toFixed(2)} / 4.0 (${tierAdj(sc2)})${tgtV > scV ? `. Target: ${tgtV.toFixed(2)} (+${gap}).` : "."}`
+        ? ` Score: ${parseFloat(sc2).toFixed(2)} out of 4.0 (${tierAdj(sc2)})` + (tgtV && parseFloat(tgtV) > parseFloat(scV) ? ". Target: " + tgtV.toFixed(2) + " (+" + gap + ")." : ".")
         : ` This function has not yet been fully assessed.`;
       const docNote = catMissingDocs.length > 0
-        ? `\n\nDocumentation note: ${catMissingDocs.length} document${catMissingDocs.length>1?"s":""} relevant to this function were not provided (${catMissingDocs.slice(0,3).map(d=>d.label).join("; ")}${catMissingDocs.length>3?"; and others":""}). This reduces scoring confidence for associated subcategories.`
+        ? ("\n\nDocumentation note: " + catMissingDocs.length + " document" + pl(catMissingDocs.length) + " relevant to this function were not provided (" + catMissingDocs.slice(0,3).map(d=>d.label).join("; ") + (catMissingDocs.length > 3 ? "; and others" : "") + "). This reduces scoring confidence for associated subcategories.")
         : "";
       // Top 2 recommendations for this function with full detail
       const topRecs = catGaps.slice(0,2).map((g,i) => {
         const note = g.rec ? `${i+1}. ${g.rec.action}  -  ${g.rec.detail.slice(0,120)}... (${g.rec.priority}, ${g.rec.effort} effort, ${g.rec.ref})` : `${i+1}. ${g.q.slice(0,80)}`;
         return note;
       });
-      const recNote = topRecs.length > 0 ? `\n\nRecommendations:\n${topRecs.join("\n")}` : "";
+      const recNote = topRecs.length > 0 ? "\n\nRecommendations:\n" + topRecs.join("\n") : "";
 
       return { cat, sc2, scV, commentary, gapNote, scoreNote, docNote, recNote, catGaps, catWorkshopNotes };
     });
@@ -1157,7 +1247,7 @@ export default function MaturityScorecard() {
     const docConfidence = (() => {
       const reviewed = NIST_DOCS.filter(d=>docsProvided[d.id]==="yes"||docsProvided[d.id]==="partial").length;
       const total = NIST_DOCS.length;
-      const pct = Math.round((reviewed/total)*100);
+      const pct = total > 0 ? Math.round(reviewed * 100 / total) : 0;
       if(pct >= 80) return `The assessment was supported by a strong documentation base, with ${reviewed} of ${total} standard documents provided or partially provided.`;
       if(pct >= 50) return `The assessment was supported by ${reviewed} of ${total} standard documents. ${total-reviewed} documents were not available for review, which has been noted in the confidence ratings for relevant subcategories.`;
       return `A limited documentation base was available for this assessment, with only ${reviewed} of ${total} standard documents provided. Scoring confidence is reduced across a number of subcategories as a result.`;
@@ -1169,7 +1259,7 @@ export default function MaturityScorecard() {
     sections.push(`EXECUTIVE SUMMARY\n${"-".repeat(60)}`);
 
     sections.push([
-      `LevelBlue was engaged by ${client} to provide a view of cyber security maturity in line with the ${framework}. This assessment evaluates the organisation's security posture across ${fw.length} function areas, ${fw.flatMap(c=>c.domains).length} categories and ${fw.flatMap(c=>c.domains.flatMap(d=>d.questions)).length} individual controls.`,
+      "LevelBlue was engaged by " + client + " to provide a view of cyber security maturity in line with the " + framework + ". This assessment evaluates the organisation's security posture across " + fw.length + " function areas, " + fw.flatMap(c=>c.domains).length + " categories and " + fw.flatMap(c=>c.domains.flatMap(d=>d.questions)).length + " individual controls.",
       overall
         ? `${client} achieved an overall current profile score of ${sc.toFixed(2)}, placing the organisation at a ${tierAdj(sc)} maturity level. ${tierSentence(sc)}`
         : `The assessment is ${completion}% complete.`,
@@ -1182,13 +1272,13 @@ export default function MaturityScorecard() {
     // Key findings with insights
     if(gaps.length > 0 || docGaps.length > 0) {
       const findingLines = [];
-      if(critGaps.length > 0)       findingLines.push(`${critGaps.length} Critical priority control gap${critGaps.length>1?"s":""} requiring immediate attention`);
-      if(highGaps.length > 0)        findingLines.push(`${highGaps.length} High priority gap${highGaps.length>1?"s":""} to be addressed within 3-6 months`);
-      if(medGaps.length > 0)         findingLines.push(`${medGaps.length} Medium priority gap${medGaps.length>1?"s":""} forming the 6-12 month roadmap`);
-      if(missingCritDocs.length > 0) findingLines.push(`${missingCritDocs.length} Critical document${missingCritDocs.length>1?"s":""} not provided, reducing scoring confidence`);
-      if(missingHighDocs.length > 0) findingLines.push(`${missingHighDocs.length} High priority document${missingHighDocs.length>1?"s":""} not provided`);
+      if(critGaps.length > 0)       findingLines.push(`${critGaps.length} Critical priority control gap${pl(critGaps.length)} requiring immediate attention`);
+      if(highGaps.length > 0)        findingLines.push(`${highGaps.length} High priority gap${pl(highGaps.length)} to be addressed within 3-6 months`);
+      if(medGaps.length > 0)         findingLines.push(`${medGaps.length} Medium priority gap${pl(medGaps.length)} forming the 6-12 month roadmap`);
+      if(missingCritDocs.length > 0) findingLines.push(`${missingCritDocs.length} Critical document${pl(missingCritDocs.length)} not provided, reducing scoring confidence`);
+      if(missingHighDocs.length > 0) findingLines.push(`${missingHighDocs.length} High priority document${pl(missingHighDocs.length)} not provided`);
       if(worstCat?.n > 0)            findingLines.push(`${worstCat.id}  -  ${worstCat.name} has the highest gap concentration (${worstCat.n} controls below threshold)`);
-      sections.push(`Key Findings:\n${findingLines.map(l=>`* ${l}`).join("\n")}`);
+      sections.push("Key Findings:\n" + findingLines.map(l=>`* ${l}`).join("\n"));
     }
 
     // Score distribution insight
@@ -1202,7 +1292,7 @@ export default function MaturityScorecard() {
     sections.push(`\nFUNCTION ASSESSMENT\n${"-".repeat(60)}`);
 
     funcNarratives.forEach(({cat, sc2, commentary, gapNote, scoreNote, docNote, recNote}) => {
-      sections.push(`${cat.id}  -  ${cat.name}${sc2 ? ` [${parseFloat(sc2).toFixed(2)} / 4.0  -  ${tierAdj(sc2)}]` : " [Not yet assessed]"}\n\n${commentary}${gapNote}${scoreNote}${docNote}${recNote}`);
+      sections.push(cat.id + " - " + cat.name + (sc2 ? " [" + parseFloat(sc2).toFixed(2) + " out of 4.0 - " + tierAdj(sc2) + "]" : " [Not yet assessed]") + "\n\n" + commentary + gapNote + scoreNote + docNote + recNote);
     });
 
     // -- RECOMMENDATIONS OVERVIEW ---------------------------------------------
@@ -1210,43 +1300,47 @@ export default function MaturityScorecard() {
       sections.push(`\nRECOMMENDATIONS OVERVIEW\n${"-".repeat(60)}`);
 
       // Effort profile insight
-      const effortInsight = `Remediation effort profile: ${effortCounts.Low} Low effort gap${effortCounts.Low!==1?"s":""}, ${effortCounts.Medium} Medium, ${effortCounts.High} High. ${quickWins.length > 0 ? `${quickWins.length} quick win${quickWins.length>1?"s":""} identified  -  high impact at low effort: ${quickWins.slice(0,3).map(g=>g.rec?.action||g.domain.name).join("; ")}.` : ""}`;
+      const effortQuickWins = quickWins.length > 0 ? " " + quickWins.length + " quick win" + pl(quickWins.length) + " identified  -  high impact at low effort: " + quickWins.slice(0,3).map(g=>g.rec?.action||g.domain.name).join("; ") + "." : "";
+      const effortInsight = "Remediation effort profile: " + effortCounts.Low + " Low effort gap" + pl(effortCounts.Low) + ", " + effortCounts.Medium + " Medium, " + effortCounts.High + " High." + effortQuickWins;
       sections.push(effortInsight);
 
-      sections.push(`To move ${client} from ${sc.toFixed(2)} to the target profile of ${overallTarget ? parseFloat(overallTarget).toFixed(2) : "the agreed target"}, LevelBlue has identified ${gaps.length} improvement workstreams across ${[critGaps.length>0?"Critical":"", highGaps.length>0?"High":"", medGaps.length>0?"Medium":""].filter(Boolean).join(", ")} priority levels.`);
+      const priorityLevels = [critGaps.length > 0 ? "Critical" : "", highGaps.length > 0 ? "High" : "", medGaps.length > 0 ? "Medium" : ""].filter(Boolean).join(", ");
+      sections.push("To move " + client + " from " + sc.toFixed(2) + " to the target profile of " + (overallTarget ? parseFloat(overallTarget).toFixed(2) : "the agreed target") + ", LevelBlue has identified " + gaps.length + " improvement workstreams across " + priorityLevels + " priority levels.");
 
       if(critGaps.length > 0) {
-        sections.push(`Critical Priority (${critGaps.length}):\n${critGaps.slice(0,5).map((g,i)=>`${i+1}. [${g.domain.id}] ${g.rec?.action||g.domain.name}\n   ${g.rec?.detail?.slice(0,130)||""}...\n   Effort: ${g.rec?.effort||" - "} . Ref: ${g.rec?.ref||" - "}`).join("\n\n")}${critGaps.length>5?`\n\n...and ${critGaps.length-5} further Critical workstreams.`:""}`);
+        sections.push("Critical Priority (" + critGaps.length + "):\n" + (critGaps.slice(0,5).map((g,i)=>(i+1) + ". [" + g.domain.id + "] " + (g.rec?.action||g.domain.name) + "\n   " + (g.rec?.detail?.slice(0,130)||"") + "...\n   Effort: " + (g.rec?.effort||" - ") + " . Ref: " + (g.rec?.ref||" - ")).join("\n\n")) + (critGaps.length > 5 ? "\n\n...and " + (critGaps.length - 5) + " further Critical workstreams." : ""));
       }
       if(highGaps.length > 0) {
-        sections.push(`High Priority (${highGaps.length}):\n${highGaps.slice(0,5).map((g,i)=>`${i+1}. [${g.domain.id}] ${g.rec?.action||g.domain.name} (${g.rec?.effort||" - "} effort)`).join("\n")}${highGaps.length>5?`\n...and ${highGaps.length-5} further High workstreams.`:""}`);
+        sections.push("High Priority (" + highGaps.length + "):\n" + (highGaps.slice(0,5).map((g,i)=>(i+1) + ". [" + g.domain.id + "] " + (g.rec?.action||g.domain.name) + " (" + (g.rec?.effort||" - ") + " effort)").join("\n")) + (highGaps.length > 5 ? "\n...and " + (highGaps.length - 5) + " further High workstreams." : ""));
       }
       if(medGaps.length > 0) {
-        sections.push(`Medium Priority (${medGaps.length}):\n${medGaps.slice(0,5).map((g,i)=>`${i+1}. [${g.domain.id}] ${g.rec?.action||g.domain.name}`).join("\n")}${medGaps.length>5?`\n...and ${medGaps.length-5} further Medium workstreams.`:""}`);
+        sections.push("Medium Priority (" + medGaps.length + "):\n" + (medGaps.slice(0,5).map((g,i)=>(i+1) + ". [" + g.domain.id + "] " + (g.rec?.action||g.domain.name)).join("\n")) + (medGaps.length > 5 ? "\n...and " + (medGaps.length - 5) + " further Medium workstreams." : ""));
       }
 
       // Missing docs as recommendations
       if(docGaps.length > 0) {
         const critDocRecs = [...missingCritDocs, ...missingHighDocs].slice(0,5);
         if(critDocRecs.length > 0) {
-          sections.push(`Documentation Gaps (obtain before finalising assessment):\n${critDocRecs.map((({doc},i)=>`${i+1}. ${doc.label} (${doc.priority} priority)  -  relevant to: ${doc.subcats.join(", ")}`)).join("\n")}`);
-        }
+          sections.push("Documentation Gaps (obtain before finalising assessment):\n" + critDocRecs.map(function(item, idx) { return (idx+1) + ". " + item.doc.label + " (" + item.doc.priority + " priority)  -  relevant to: " + item.doc.subcats.join(", "); }).join("\n"));        }
       }
 
       // Roadmap
       const immediateItems = critGaps.slice(0,3).map(g=>g.rec?.action||g.domain.name);
       const shortTermItems = highGaps.slice(0,3).map(g=>g.rec?.action||g.domain.name);
       const medTermItems   = medGaps.slice(0,3).map(g=>g.rec?.action||g.domain.name);
-      sections.push(`Recommended Implementation Roadmap:\n\n* 0-3 months (Immediate): Address all Critical workstreams.${immediateItems.length>0?" Priority actions: "+immediateItems.join("; ").slice(0,150)+".":""}\n* 3-6 months (Short-term): Progress High priority workstreams.${shortTermItems.length>0?" Including: "+shortTermItems.join("; ").slice(0,150)+".":""}\n* 6-12 months (Medium-term): Complete Medium priority workstreams. Embed continuous improvement and prepare for re-assessment.${medTermItems.length>0?" Including: "+medTermItems.join("; ").slice(0,120)+".":""}`);
+      const roadmapImmediate = immediateItems.length > 0 ? " Priority actions: " + immediateItems.join("; ").slice(0,150) + "." : "";
+      const roadmapShort    = shortTermItems.length > 0 ? " Including: " + shortTermItems.join("; ").slice(0,150) + "." : "";
+      const roadmapMed      = medTermItems.length > 0   ? " Including: " + medTermItems.join("; ").slice(0,120) + "." : "";
+      sections.push("Recommended Implementation Roadmap:\n\n* 0-3 months (Immediate): Address all Critical workstreams." + roadmapImmediate + "\n* 3-6 months (Short-term): Progress High priority workstreams." + roadmapShort + "\n* 6-12 months (Medium-term): Complete Medium priority workstreams. Embed continuous improvement and prepare for re-assessment." + roadmapMed);
     }
 
     // -- CONCLUSION -----------------------------------------------------------
     sections.push(`\nCONCLUSION\n${"-".repeat(60)}`);
     const strongFunctions = funcNarratives.filter(f=>f.scV>=3.0).map(f=>f.cat.name);
     const weakFunctions   = funcNarratives.filter(f=>f.sc2&&f.scV<2.0).map(f=>f.cat.name);
-    const strongNote = strongFunctions.length > 0 ? `${client} demonstrates particular strength in ${strongFunctions.join(", ")}, where controls are consistently applied and repeatable or better practice is evidenced.` : "";
-    const weakNote   = weakFunctions.length > 0 ? ` The most significant opportunities for improvement lie in ${weakFunctions.join(", ")}, where targeted investment will deliver the greatest uplift.` : "";
-    sections.push(`${strongNote}${weakNote}\n\nLevelBlue recommends ${critGaps.length+highGaps.length} high/critical priority workstream${critGaps.length+highGaps.length!==1?"s":""} to move ${client} toward the agreed target profile of ${overallTarget?parseFloat(overallTarget).toFixed(2):"the agreed target"}. Security maturity is cumulative  -  each improvement strengthens the overall posture. LevelBlue is well-positioned to support ${client} in progressing this roadmap.`);
+    const strongNote = strongFunctions.length > 0 ? client + " demonstrates particular strength in " + strongFunctions.join(", ") + ", where controls are consistently applied and repeatable or better practice is evidenced." : "";
+    const weakNote   = weakFunctions.length > 0 ? " The most significant opportunities for improvement lie in " + weakFunctions.join(", ") + ", where targeted investment will deliver the greatest uplift." : "";
+    sections.push(strongNote + weakNote + "\n\nLevelBlue recommends " + (critGaps.length+highGaps.length) + " high/critical priority workstream" + (critGaps.length+highGaps.length!==1?"s":"") + " to move " + client + " toward the agreed target profile of " + (overallTarget?parseFloat(overallTarget).toFixed(2):"the agreed target") + ". Security maturity is cumulative  -  each improvement strengthens the overall posture. LevelBlue is well-positioned to support " + client + " in progressing this roadmap.");
 
     sections.push(`\n${"-".repeat(60)}\nDraft narrative generated by the LevelBlue Cyber Maturity Assessment Centre . ${date}\nThis is a working draft. Review and edit before including in client deliverables.\nAll data processed locally  -  no client information was transmitted externally.`);
 
@@ -1349,7 +1443,7 @@ export default function MaturityScorecard() {
     wsDocReview["!cols"] = [{wch:52},{wch:14},{wch:10},{wch:14},{wch:40},{wch:50}];
     XLSX.utils.book_append_sheet(wb, wsDocReview, "Documentation Review");
 
-    XLSX.writeFile(wb, `${(clientName||"client").replace(/\s+/g,"-")}-maturity-scorecard.xlsx`);
+    XLSX.writeFile(wb, `${slugify(clientName||"client")}-maturity-scorecard.xlsx`);
     flash("Excel exported ✓");
   }
 
@@ -1400,15 +1494,19 @@ export default function MaturityScorecard() {
       s1.addText(date, { x:0.6, y:3.6, w:6, h:0.35, fontSize:13, color:TM, fontFace:"Calibri" });
       s1.addText(`Prepared for ${client} by ${asses}`, { x:0.6, y:4.0, w:9, h:0.35, fontSize:12, color:TM, fontFace:"Calibri", italic:true });
       if(overall) {
-        s1.addText(`Current Score: ${parseFloat(overall).toFixed(2)} / 4.0  -  ${tierStr(overall)}`, { x:0.6, y:4.9, w:9, h:0.45, fontSize:17, color:scoreCol(overall), fontFace:"Calibri", bold:true });
-        if(overallTarget) s1.addText(`Target Score: ${parseFloat(overallTarget).toFixed(2)} / 4.0  -  ${tierStr(overallTarget)}`, { x:0.6, y:5.4, w:9, h:0.4, fontSize:14, color:CY, fontFace:"Calibri" });
+        s1.addText(`Current Score: ${parseFloat(overall).toFixed(2)} out of 4.0 - ${tierStr(overall)}`, { x:0.6, y:4.9, w:9, h:0.45, fontSize:17, color:scoreCol(overall), fontFace:"Calibri", bold:true });
+        if(overallTarget) s1.addText(`Target Score: ${parseFloat(overallTarget).toFixed(2)} out of 4.0 - ${tierStr(overallTarget)}`, { x:0.6, y:5.4, w:9, h:0.4, fontSize:14, color:CY, fontFace:"Calibri" });
       }
       s1.addText("CONFIDENTIAL  -  NOT FOR DISTRIBUTION", { x:0.6, y:7.0, w:10, h:0.28, fontSize:9, color:TD, fontFace:"Calibri" });
 
       // -- SLIDE 2  -  Executive Summary: Introduction ---------------------
       const s2 = prs.addSlide(); bg(s2); hdr(s2, "EXECUTIVE SUMMARY"); foot(s2);
       s2.addText("Introduction", { x:0.5, y:0.52, w:12, h:0.55, fontSize:22, color:WH, fontFace:"Calibri", bold:true });
-      const introBody = `${asses} was engaged by ${client} to provide a view of cyber security maturity in line with the NIST Cybersecurity Framework (CSF) 2.0. NIST CSF is widely adopted across industries and accepted by regulatory bodies.\n\n${asses} has conducted a comprehensive assessment covering all six NIST CSF function areas: Govern, Identify, Protect, Detect, Respond and Recover  -  scoring each of the 106 subcategories across 22 categories.\n\nNIST CSF maturity scores range from 0-4 (Not Present -> Partial -> Risk-Informed -> Repeatable -> Adaptive). ${client} achieved a current profile score of ${overall?parseFloat(overall).toFixed(2):"TBC"} (${tierStr(overall)}).${overallTarget?" A target of "+parseFloat(overallTarget).toFixed(2)+" ("+tierStr(overallTarget)+") has been identified and agreed as an appropriate balance of investment and security for "+client+".":""}`;
+      const introPart1 = asses + " was engaged by " + client + " to provide a view of cyber security maturity in line with the NIST Cybersecurity Framework (CSF) 2.0. NIST CSF is widely adopted across industries and accepted by regulatory bodies.";
+      const introPart2 = asses + " has conducted a comprehensive assessment covering all six NIST CSF function areas: Govern, Identify, Protect, Detect, Respond and Recover - scoring each of the 106 subcategories across 22 categories.";
+      const scoreRange = "NIST CSF maturity scores range from 0-4 (Not Present to Partial to Risk-Informed to Repeatable to Adaptive).";
+      const introPart3 = scoreRange + " " + client + " achieved a current profile score of " + (overall?parseFloat(overall).toFixed(2):"TBC") + " (" + tierStr(overall) + ")." + (overallTarget?" A target of "+parseFloat(overallTarget).toFixed(2)+" ("+tierStr(overallTarget)+") has been identified and agreed as an appropriate balance of investment and security for "+client+".":"");
+      const introBody = introPart1 + "\n\n" + introPart2 + "\n\n" + introPart3;
       s2.addText(introBody, { x:0.5, y:1.18, w:7.7, h:3.5, fontSize:11, color:TM, fontFace:"Calibri", valign:"top" });
 
       // Score callouts right side
@@ -1434,7 +1532,7 @@ export default function MaturityScorecard() {
           const catGaps = gaps.filter(g=>g.cat.id===cat.id);
           const topGap = catGaps[0];
           const pri = topGap?.rec?.priority || (catGaps.length>0?"Medium":" - ");
-          const finding = topGap?.rec?.action || (catGaps.length>0?`${catGaps.length} subcategories below target threshold`:"No gaps identified");
+          const finding = topGap?.rec?.action || (catGaps.length > 0 ? catGaps.length + " subcategories below target threshold" : "No gaps identified");
           const fill = ri%2===0?CARD:CARD2;
           return [mkCell(cat.id+"  -  "+cat.name,fill,WH,{fontSize:9}), mkCell(pri,fill,PRI_CFG[pri]?.color?.replace("#","")||TM,{fontSize:9,bold:true}), mkCell(finding,fill,TM,{fontSize:9})];
         })
@@ -1444,7 +1542,7 @@ export default function MaturityScorecard() {
       // -- SLIDE 3  -  Executive Summary: Background / Journey to Target ---
       const s3 = prs.addSlide(); bg(s3); hdr(s3, "EXECUTIVE SUMMARY"); foot(s3);
       s3.addText("Background  -  Journey to Target Profile", { x:0.5, y:0.52, w:12, h:0.55, fontSize:22, color:WH, fontFace:"Calibri", bold:true });
-      s3.addText(`As a first step to work towards a target profile score of ${overallTarget?parseFloat(overallTarget).toFixed(2):"the agreed target"}, ${asses} recommends that ${client} focus on the priority workstreams identified below. The recommendations have been prioritised to maximise the impact on cybersecurity risk reduction within an achievable implementation timeframe.`, { x:0.5, y:1.18, w:12.33, h:0.65, fontSize:11, color:TM, fontFace:"Calibri" });
+      s3.addText("As a first step to work towards a target profile score of " + (overallTarget?parseFloat(overallTarget).toFixed(2):"the agreed target") + ", " + asses + " recommends that " + client + " focus on the priority workstreams identified below. The recommendations have been prioritised to maximise the impact on cybersecurity risk reduction within an achievable implementation timeframe.", { x:0.5, y:1.18, w:12.33, h:0.65, fontSize:11, color:TM, fontFace:"Calibri" });
 
       // Current vs target table
       const cvtHdr = [mkCell("Function","1E3A6B",WH,{bold:true,fontSize:10}), mkCell("Current","1E3A6B",WH,{bold:true,fontSize:10}), mkCell("Current Tier","1E3A6B",WH,{bold:true,fontSize:10}), mkCell("Target","1E3A6B",CY,{bold:true,fontSize:10}), mkCell("Target Tier","1E3A6B",CY,{bold:true,fontSize:10}), mkCell("Gap","1E3A6B",LI,{bold:true,fontSize:10})];
@@ -1523,7 +1621,7 @@ export default function MaturityScorecard() {
         const h6Rows=[h6Hdr,...critHighGaps.map(({cat,domain,q,sc,rec},i)=>{
           const fill=i%2===0?CARD:CARD2;
           const pc=rec?.priority==="Critical"?"F87171":"FCD34D";
-          return [mkCell(`${rec?.priority==="Critical"?"C":"H"}-${String(i+1).padStart(2,"0")}`,fill,CY,{fontSize:9,bold:true}),mkCell(rec?.priority||" - ",fill,pc,{fontSize:9,bold:true}),mkCell(domain.id,fill,cat.color.replace("#",""),{fontSize:9,bold:true}),mkCell(rec?.action||q.slice(0,70),fill,WH,{fontSize:9}),mkCell(rec?.detail||" - ",fill,TM,{fontSize:8}),mkCell(rec?.effort||" - ",fill,TM,{fontSize:9})];
+          return [mkCell((rec?.priority==="Critical"?"C":"H") + "-" + (String(i+1).padStart(2,"0")),fill,CY,{fontSize:9,bold:true}),mkCell(rec?.priority||" - ",fill,pc,{fontSize:9,bold:true}),mkCell(domain.id,fill,cat.color.replace("#",""),{fontSize:9,bold:true}),mkCell(rec?.action||q.slice(0,70),fill,WH,{fontSize:9}),mkCell(rec?.detail||" - ",fill,TM,{fontSize:8}),mkCell(rec?.effort||" - ",fill,TM,{fontSize:9})];
         })];
         s6.addTable(h6Rows,{ x:0.5, y:1.55, w:12.33, colW:[0.65,0.95,1.2,3.5,4.6,1.43], border:{ pt:0.4, color:BD } });
       }
@@ -1547,13 +1645,14 @@ export default function MaturityScorecard() {
       s8.addShape(prs.ShapeType.rect, { x:0, y:0, w:0.38, h:7.5, fill:{ color:CY }, line:{ color:CY, width:0 } });
       s8.addText("CONCLUSION", { x:0.6, y:0.38, w:8, h:0.26, fontSize:8, color:CY, fontFace:"Calibri", bold:true, charSpacing:5 });
       s8.addText(client, { x:0.6, y:0.68, w:11, h:0.62, fontSize:24, color:WH, fontFace:"Calibri", bold:true });
-      s8.addText(`Following a detailed assessment of ${client} against the NIST Cybersecurity Framework (CSF) 2.0, ${asses} has identified a current profile score of ${overall?parseFloat(overall).toFixed(2):"TBC"} (${tierStr(overall)}).`, { x:0.6, y:1.38, w:12.1, h:0.5, fontSize:11, color:TM, fontFace:"Calibri" });
-      s8.addText(`Current: ${overall?parseFloat(overall).toFixed(2):"TBC"} (${tierStr(overall)})   ->   Target: ${overallTarget?parseFloat(overallTarget).toFixed(2):"TBC"} (${tierStr(overallTarget)})`, { x:0.6, y:2.0, w:10, h:0.45, fontSize:16, color:scoreCol(overall), fontFace:"Calibri", bold:true });
+      s8.addText("Following a detailed assessment of " + client + " against the NIST Cybersecurity Framework (CSF) 2.0, " + asses + " has identified a current profile score of " + (overall?parseFloat(overall).toFixed(2):"TBC") + " (" + tierStr(overall) + ").", { x:0.6, y:1.38, w:12.1, h:0.5, fontSize:11, color:TM, fontFace:"Calibri" });
+      const currentTarget = "Current: " + (overall?parseFloat(overall).toFixed(2):"TBC") + " (" + tierStr(overall) + ")   to   Target: " + (overallTarget?parseFloat(overallTarget).toFixed(2):"TBC") + " (" + tierStr(overallTarget) + ")";
+      s8.addText(currentTarget, { x:0.6, y:2.0, w:10, h:0.45, fontSize:16, color:scoreCol(overall), fontFace:"Calibri", bold:true });
       const strongAreas = fw.filter(cat=>{ const sc=catScore(cat); return sc&&parseFloat(sc)>=3; }).map(cat=>cat.id+"  -  "+cat.name).slice(0,3);
       const improveAreas = fw.filter(cat=>{ const sc=catScore(cat); return sc&&parseFloat(sc)<2; }).map(cat=>cat.id+"  -  "+cat.name).concat(gaps.filter(g=>g.rec?.priority==="Critical").slice(0,3).map(g=>g.rec?.action||g.domain.name)).slice(0,5);
       if(strongAreas.length>0) { s8.addText("What "+client+" does well:", { x:0.6, y:2.6, w:5.8, h:0.32, fontSize:11, color:LI, fontFace:"Calibri", bold:true }); strongAreas.forEach((a,i)=>s8.addText("* "+a, { x:0.6, y:2.95+i*0.38, w:5.8, h:0.35, fontSize:10, color:WH, fontFace:"Calibri" })); }
       if(improveAreas.length>0) { s8.addText("Where "+client+" could improve:", { x:7.0, y:2.6, w:5.8, h:0.32, fontSize:11, color:"F87171", fontFace:"Calibri", bold:true }); improveAreas.forEach((a,i)=>s8.addText("* "+a, { x:7.0, y:2.95+i*0.38, w:5.8, h:0.35, fontSize:10, color:WH, fontFace:"Calibri" })); }
-      s8.addText(`${asses} recommends ${critN+highN} High/Critical and ${medN} Medium priority workstreams. If implemented, ${client} should reach the target profile of ${overallTarget?parseFloat(overallTarget).toFixed(2):"the agreed target"}.`, { x:0.6, y:5.5, w:12.1, h:0.6, fontSize:11, color:TM, fontFace:"Calibri", italic:true });
+      s8.addText(asses + " recommends " + (critN+highN) + " High/Critical and " + medN + " Medium priority workstreams. If implemented, " + client + " should reach the target profile of " + (overallTarget?parseFloat(overallTarget).toFixed(2):"the agreed target") + ".", { x:0.6, y:5.5, w:12.1, h:0.6, fontSize:11, color:TM, fontFace:"Calibri", italic:true });
       foot(s8);
 
       // -- SLIDE 9  -  Appendix: NIST CSF 2.0 Overview --------------------
@@ -1570,7 +1669,11 @@ export default function MaturityScorecard() {
       ].map(([v,label,desc,col],i)=>[mkCell(String(v),i%2===0?CARD:CARD2,col,{bold:true,fontSize:14}),mkCell(label,i%2===0?CARD:CARD2,col,{bold:true,fontSize:11}),mkCell(desc,i%2===0?CARD:CARD2,WH,{fontSize:10})])];
       s9.addTable(apRows,{ x:0.5, y:1.7, w:12.33, colW:[0.7,2.2,9.43], border:{ pt:0.4, color:BD } });
       s9.addText("Function Summary:", { x:0.5, y:5.7, w:4, h:0.28, fontSize:10, color:TM, fontFace:"Calibri", bold:true });
-      fw.forEach((cat,i) => s9.addText(`${cat.id}: ${cat.domains.length} categories, ${cat.domains.reduce((a,d)=>a+d.questions.length,0)} subcategories`, { x:0.5+(i%3)*4.11, y:6.05+Math.floor(i/3)*0.34, w:4.0, h:0.3, fontSize:9, color:TM, fontFace:"Calibri" }));
+      fw.forEach((cat,i) => {
+        const col3 = i % 3;
+        const row3 = Math.floor(i * 0.333333);
+        s9.addText(cat.id + ": " + cat.domains.length + " categories, " + (cat.domains.reduce((a,d)=>a+d.questions.length,0)) + " subcategories", { x:0.5+col3*4.11, y:6.05+row3*0.34, w:4.0, h:0.3, fontSize:9, color:TM, fontFace:"Calibri" });
+      });
 
       // -- SLIDE 10  -  Appendix: Documentation Reviewed ------------------
       const s10 = prs.addSlide(); bg(s10); hdr(s10,"APPENDIX 3  -  DOCUMENTATION REVIEWED",TD); foot(s10);
@@ -1610,7 +1713,7 @@ export default function MaturityScorecard() {
         s10.addText(`Additional documents: ${customDocs.join(", ")}`, { x:0.5, y:Math.min(customY, 6.8), w:12.33, h:0.3, fontSize:9, color:TM, fontFace:"Calibri", italic:true });
       }
 
-      await prs.writeFile({ fileName:`${client.replace(/\s+/g,"-")}-NIST-Assessment-${new Date().toISOString().slice(0,10)}.pptx` });
+      await prs.writeFile({ fileName:`${slugify(client)}-NIST-Assessment-${new Date().toISOString().slice(0,10)}.pptx` });
       flash("Report downloaded ✓");
     } catch(e) {
       console.error(e);
@@ -1627,24 +1730,23 @@ export default function MaturityScorecard() {
   const totalGaps = priSegments.reduce((a,s)=>a+s.value,0);
   const avgByCat = fw.map(cat=>({ label:cat.id, value:catScore(cat)?parseFloat(catScore(cat)):0, color:getMC(catScore(cat)) }));
 
+  const appStyle = { minHeight:"100vh", background:"#08111F", fontFamily:"Outfit,Segoe UI,sans-serif", color:"#E2EAF4" };
+
+  useEffect(() => {
+    const link = document.createElement("link");
+    link.rel = "stylesheet";
+    link.href = "https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800&family=IBM+Plex+Mono:wght@400;500;700&display=swap";
+    document.head.appendChild(link);
+  }, []);
+
   return (
-    <div style={{ minHeight:"100vh", background:"#08111F", fontFamily:"'Outfit','Segoe UI',sans-serif", color:"#E2EAF4", position:"relative" }}>
-      <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800&family=IBM+Plex+Mono:wght@400;500;700&display=swap" rel="stylesheet"/>
-      {/* Noise texture overlay  -  SVG filter applied via pseudo approach */}
-      <svg style={{ position:"fixed", top:0, left:0, width:"100%", height:"100%", pointerEvents:"none", zIndex:0, opacity:0.028 }} xmlns="http://www.w3.org/2000/svg">
-        <filter id="noise"><feTurbulence type="fractalNoise" baseFrequency="0.72" numOctaves="4" stitchTiles="stitch"/><feColorMatrix type="saturate" values="0"/></filter>
-        <rect width="100%" height="100%" filter="url(#noise)"/>
-      </svg>
-      {/* Subtle radial gradient blooms */}
-      <div style={{ position:"fixed", top:"-20%", left:"-10%", width:"60%", height:"60%", background:"radial-gradient(ellipse, rgba(30,111,217,0.07) 0%, transparent 70%)", pointerEvents:"none", zIndex:0 }}/>
-      <div style={{ position:"fixed", bottom:"-20%", right:"-10%", width:"50%", height:"50%", background:"radial-gradient(ellipse, rgba(0,191,255,0.05) 0%, transparent 70%)", pointerEvents:"none", zIndex:0 }}/>
-      <div style={{ position:"relative", zIndex:1 }}>
+    <div style={appStyle}>
       <input type="file" accept=".json" ref={fileInputRef} onChange={loadSession} style={{display:"none"}}/>
 
-      {/* -- Header -- */}
+      
       <div style={{ background:"#060E1A", padding:"0 28px", display:"flex", alignItems:"center", justifyContent:"space-between", height:"62px", borderBottom:"1px solid #1B3A6B", boxShadow:"0 2px 20px rgba(0,0,0,0.5)" }}>
         <div style={{ display:"flex", alignItems:"center", gap:"14px" }}>
-          {/* LevelBlue logo mark  -  three diagonal stripes */}
+          
           <div style={{ width:"36px", height:"36px", borderRadius:"8px", background:"#0D1F3C", border:"1px solid #1B3A6B", display:"flex", alignItems:"center", justifyContent:"center", gap:"3px", padding:"7px", overflow:"hidden" }}>
             <div style={{ display:"flex", gap:"3px", transform:"skewX(-12deg)" }}>
               <div style={{ width:"5px", height:"18px", background:"#1E6FD9", borderRadius:"1px" }}/>
@@ -1668,10 +1770,10 @@ export default function MaturityScorecard() {
           ].map(({v,label})=><button key={v} onClick={()=>setView(v)} style={navBtn(view===v)}>{label}</button>)}
         </div>
         <div style={{ display:"flex", alignItems:"center", gap:"10px" }}>
-          {overall && <span style={{ fontSize:"14px", fontWeight:"800", color:getMC(overall), background:"rgba(13,31,60,0.8)", padding:"4px 10px", borderRadius:"5px", border:"1px solid #1B3A6B" }}>{overall} / 4.0</span>}
-          <button onClick={saveSession} style={{ padding:"5px 12px", borderRadius:"5px", border:"1px solid #1B3A6B", background:"#0D1F3C", color:statusMsg.includes("saved")?"#C8F135":"#8BAAC8", fontSize:"13px", fontWeight:"700", cursor:"pointer", fontFamily:"inherit" }}>Save ↓</button>
-          <button onClick={()=>fileInputRef.current?.click()} style={{ padding:"5px 12px", borderRadius:"5px", border:"1px solid #1B3A6B", background:"#0D1F3C", color:statusMsg.includes("loaded")?"#C8F135":"#8BAAC8", fontSize:"13px", fontWeight:"700", cursor:"pointer", fontFamily:"inherit" }}>Load ↑</button>
-          <button onClick={exportExcel} style={{ padding:"5px 12px", borderRadius:"5px", border:"1px solid rgba(200,241,53,0.4)", background:"rgba(200,241,53,0.1)", color:"#C8F135", fontSize:"13px", fontWeight:"700", cursor:"pointer", fontFamily:"inherit" }}>Excel ↓</button>
+          {overall && <span style={{ fontSize:"14px", fontWeight:"800", color:getMC(overall), background:"rgba(13,31,60,0.8)", padding:"4px 10px", borderRadius:"5px", border:"1px solid #1B3A6B" }}>{overall}{" of "}4.0</span>}
+          <button onClick={saveSession} style={{ padding:"5px 12px", borderRadius:"5px", border:"1px solid #1B3A6B", background:"#0D1F3C", color:statusMsg.includes("saved")?"#C8F135":"#8BAAC8", fontSize:"13px", fontWeight:"700", cursor:"pointer", fontFamily:"inherit" }}>Save v</button>
+          <button onClick={()=>fileInputRef.current?.click()} style={{ padding:"5px 12px", borderRadius:"5px", border:"1px solid #1B3A6B", background:"#0D1F3C", color:statusMsg.includes("loaded")?"#C8F135":"#8BAAC8", fontSize:"13px", fontWeight:"700", cursor:"pointer", fontFamily:"inherit" }}>Load ^</button>
+          <button onClick={exportExcel} style={{ padding:"5px 12px", borderRadius:"5px", border:"1px solid rgba(200,241,53,0.4)", background:"rgba(200,241,53,0.1)", color:"#C8F135", fontSize:"13px", fontWeight:"700", cursor:"pointer", fontFamily:"inherit" }}>Excel v</button>
           {isNIST && <button onClick={exportPPTXReport} disabled={generatingReport} style={{ padding:"5px 12px", borderRadius:"5px", border:"1px solid rgba(0,191,255,0.4)", background:"rgba(0,191,255,0.1)", color:"#00BFFF", fontSize:"13px", fontWeight:"700", cursor:"pointer", fontFamily:"inherit", opacity:generatingReport?0.6:1 }}>{generatingReport?"Building...":"Report v"}</button>}
           {statusMsg && <span style={{ fontSize:"13px", color:"#C8F135", fontWeight:"600" }}>{statusMsg}</span>}
         </div>
@@ -1679,7 +1781,7 @@ export default function MaturityScorecard() {
 
       <div style={{ maxWidth:"1140px", margin:"0 auto", padding:"26px 22px" }}>
 
-        {/* -- Progress tracker strip  -  only shown when not on home -- */}
+        
         {view !== "home" && (()=>{
           const docsReviewedCount = NIST_DOCS.filter(d => docsProvided[d.id] === "yes" || docsProvided[d.id] === "partial" || docsProvided[d.id] === "no" || docsProvided[d.id] === "na").length;
           const workshopNotesCount = fw.flatMap(c=>c.domains).filter(d => workshopNotes[d.id]?.trim()).length;
@@ -1688,19 +1790,19 @@ export default function MaturityScorecard() {
           const stages = [
             { id:"setup",    label:"Setup",    icon:"⚙",
               done: !!(clientName && assessor),
-              detail: clientName ? `${clientName}${clientSector?" . "+clientSector:""}` : "Client details not entered",
+              detail: clientName ? clientName + (clientSector?" . "+clientSector:"") : "Client details not entered",
               ok: !!(clientName && assessor) },
             { id:"docs",     label:"Docs",     icon:"📄",
-              done: docsReviewedCount >= NIST_DOCS.length * 0.5,
-              detail: isNIST ? `${docsReviewedCount}/${NIST_DOCS.length} reviewed${missingDocs>0?" . "+missingDocs+" missing":""}` : "N/A for CIS",
+              done: docsReviewedCount * 2 >= NIST_DOCS.length,
+              detail: isNIST ? docsReviewedCount + " of " + NIST_DOCS.length + " reviewed" + (missingDocs > 0 ? " . " + missingDocs + " missing" : "") : "N/A for CIS",
               ok: isNIST ? docsReviewedCount >= NIST_DOCS.length * 0.5 : true },
             { id:"workshop", label:"Workshop", icon:"💬",
-              done: workshopNotesCount >= Math.ceil(totalDomains * 0.5),
+              done: workshopNotesCount * 2 >= totalDomains,
               detail: `${workshopNotesCount}/${totalDomains} categories have notes`,
               ok: workshopNotesCount >= Math.ceil(totalDomains * 0.5) },
             { id:"score",    label:"Score",    icon:"📊",
               done: completion >= 80,
-              detail: `${completion}% scored${overall?" . "+overall+"/4.0":""}`,
+              detail: completion + "% scored" + (overall?" . "+overall+"/4.0":""),
               ok: completion >= 80 },
             { id:"results",  label:"Results",  icon:"✓",
               done: completion >= 100,
@@ -1723,7 +1825,7 @@ export default function MaturityScorecard() {
                       <div style={{ display:"flex", alignItems:"center", gap:"6px", marginBottom:"3px" }}>
                         <span style={{ fontSize:"15px" }}>{stage.icon}</span>
                         <span style={{ fontSize:"13px", fontWeight:"700", color:col }}>{stage.label}</span>
-                        {isDone && <span style={{ fontSize:"11px", color:"#C8F135", marginLeft:"auto" }}>&#10003;</span>}
+                        {isDone && <span style={{ fontSize:"11px", color:"#C8F135", marginLeft:"auto" }}>{"✓"}</span>}
                         {isCurrent && <span style={{ fontSize:"11px", color:"#00BFFF", marginLeft:"auto", fontWeight:"700" }}>ACTIVE</span>}
                       </div>
                       <div style={{ fontSize:"12px", color:"#4A6A8A", lineHeight:"1.5", paddingLeft:"19px" }}>{stage.detail}</div>
@@ -1731,18 +1833,22 @@ export default function MaturityScorecard() {
                   );
                 })}
               </div>
-              {/* Overall progress bar */}
+              
               <div style={{ height:"3px", background:"#1B3A6B", display:"flex" }}>
                 {stages.map((stage,i) => {
-                  const pct = stage.id==="setup" ? (clientName&&assessor?100:0) : stage.id==="docs" ? (docsReviewedCount/NIST_DOCS.length)*100 : stage.id==="workshop" ? (workshopNotesCount/totalDomains)*100 : stage.id==="score" ? completion : completion>=100?100:0;
-                  return <div key={i} style={{ flex:1, background:pct>0?`linear-gradient(90deg,${stages[i].done?"#C8F135":"#1E6FD9"} ${pct}%,transparent ${pct}%)`:"transparent" }}/>;
+                  const pctDocs     = NIST_DOCS.length > 0 ? docsReviewedCount * 100 / NIST_DOCS.length : 0;
+                  const pctWorkshop = totalDomains > 0 ? workshopNotesCount * 100 / totalDomains : 0;
+                  const pct = stage.id==="setup" ? (clientName&&assessor?100:0) : stage.id==="docs" ? pctDocs : stage.id==="workshop" ? pctWorkshop : stage.id==="score" ? completion : completion>=100?100:0;
+                  const barColor = stages[i].done ? "#C8F135" : "#1E6FD9";
+                  const barBg = pct > 0 ? "linear-gradient(90deg," + barColor + " " + pct + "%,transparent " + pct + "%)" : "transparent";
+                  return <div key={i} style={{ flex:1, background:barBg }}/>;
                 })}
               </div>
             </div>
           );
         })()}
 
-        {/* -- Recovery banner -- */}
+        
         {recoveryAvailable && (
           <div style={{ marginBottom:"18px", padding:"14px 18px", borderRadius:"10px", background:"rgba(252,211,77,0.1)", border:"1px solid rgba(252,211,77,0.35)", display:"flex", alignItems:"center", justifyContent:"space-between", gap:"16px" }}>
             <div>
@@ -1756,139 +1862,194 @@ export default function MaturityScorecard() {
           </div>
         )}
 
-        {/* -- HOME -- */}
+        
         {view==="home" && (
           <div>
-            {/* Hero  -  compact two-column layout */}
-            <div style={{ display:"grid", gridTemplateColumns:"1fr 380px", gap:"20px", marginBottom:"24px", alignItems:"stretch" }}>
-              {/* Left  -  title + description + CTA */}
-              <div style={{ padding:"36px 40px", borderRadius:"16px", background:"linear-gradient(160deg, #0D1F3C 0%, #08111F 70%)", border:"1px solid #1B3A6B", position:"relative", overflow:"hidden", display:"flex", flexDirection:"column", justifyContent:"space-between" }}>
-                <div style={{ position:"absolute", top:0, right:0, width:"260px", height:"100%", opacity:0.05, background:"linear-gradient(135deg, transparent 40%, #1E6FD9 40%, #1E6FD9 45%, transparent 45%, transparent 55%, #00BFFF 55%, #00BFFF 60%, transparent 60%, transparent 70%, #C8F135 70%, #C8F135 75%, transparent 75%)" }}/>
-                {/* Logo mark */}
-                <div style={{ display:"flex", gap:"4px", transform:"skewX(-14deg)", marginBottom:"24px" }}>
-                  {[["#1E6FD9",44],["#00BFFF",58],["#C8F135",44]].map(([c,h],i)=>(
-                    <div key={i} style={{ width:"10px", height:`${h}px`, background:c, borderRadius:"2px" }}/>
-                  ))}
-                </div>
-                <div>
-                  <div style={{ fontSize:"13px", fontWeight:"700", color:"#4A6A8A", letterSpacing:"0.16em", textTransform:"uppercase", marginBottom:"8px" }}>LevelBlue Cyber Advisory</div>
-                  <div style={{ fontSize:"30px", fontWeight:"800", color:"#FFFFFF", lineHeight:1.2, marginBottom:"12px" }}>Cyber Maturity<br/><span style={{ color:"#00BFFF" }}>Assessment</span> Centre</div>
-                  <div style={{ fontSize:"15px", color:"#8BAAC8", lineHeight:1.7, marginBottom:"28px", maxWidth:"480px" }}>A structured, workshop-ready platform for delivering NIST CSF 2.0 and CIS Controls v8 assessments  -  from discovery through scoring to client-ready reports and AI-assisted narratives.</div>
-                  <div style={{ display:"flex", gap:"10px", flexWrap:"wrap" }}>
-                    <button onClick={()=>setView("setup")} style={{ padding:"12px 28px", borderRadius:"9px", background:"linear-gradient(135deg,#1E6FD9,#0EA5E9)", color:"#FFFFFF", border:"none", fontWeight:"700", fontSize:"15px", cursor:"pointer", fontFamily:"inherit" }}>{"->"} Start Assessment</button>
-                    <button onClick={()=>fileInputRef.current?.click()} style={{ padding:"12px 20px", borderRadius:"9px", background:"transparent", color:"#8BAAC8", border:"1px solid #1B3A6B", fontWeight:"600", fontSize:"14px", cursor:"pointer", fontFamily:"inherit" }}>Load Session ^</button>
+
+            
+            <div style={{ padding:"44px 48px 40px", borderRadius:"18px", background:"linear-gradient(150deg, #0D1F3C 0%, #091627 60%, #08111F 100%)", border:"1px solid rgba(27,58,107,0.8)", position:"relative", overflow:"hidden", marginBottom:"20px" }}>
+              
+              <div style={{ position:"absolute", top:0, left:0, right:0, height:"3px", background:"linear-gradient(90deg, #1E6FD9 0%, #00BFFF 50%, #C8F135 100%)" }}/>
+              
+              <div style={{ position:"absolute", top:"-60px", right:"-60px", width:"320px", height:"320px", borderRadius:"50%", background:"radial-gradient(circle, rgba(30,111,217,0.08) 0%, transparent 70%)", pointerEvents:"none" }}/>
+              <div style={{ position:"absolute", bottom:"-40px", right:"20%", width:"200px", height:"200px", borderRadius:"50%", background:"radial-gradient(circle, rgba(0,191,255,0.05) 0%, transparent 70%)", pointerEvents:"none" }}/>
+
+              <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", gap:"40px" }}>
+                <div style={{ flex:1 }}>
+                  
+                  <div style={{ display:"flex", gap:"4px", transform:"skewX(-14deg)", marginBottom:"20px" }}>
+                    {[["#1E6FD9",40],["#00BFFF",54],["#C8F135",40]].map(([c,h],i)=>(
+                      <div key={i} style={{ width:"9px", height:`${h}px`, background:c, borderRadius:"2px" }}/>
+                    ))}
+                  </div>
+                  <div style={{ fontSize:"12px", fontWeight:"700", color:"#4A6A8A", letterSpacing:"0.18em", textTransform:"uppercase", marginBottom:"8px" }}>LevelBlue Cyber Advisory</div>
+                  <div style={{ fontSize:"32px", fontWeight:"800", color:"#FFFFFF", lineHeight:1.15, marginBottom:"14px" }}>
+                    Cyber Maturity<br/>
+                    <span style={{ color:"#00BFFF" }}>Assessment</span> Centre
+                  </div>
+                  <div style={{ fontSize:"15px", color:"#8BAAC8", lineHeight:1.75, marginBottom:"28px", maxWidth:"520px" }}>
+                    A structured, workshop-ready platform for NIST CSF 2.0 and CIS Controls v8 assessments  -  from discovery through scoring to client-ready reports and AI-assisted narratives.
+                  </div>
+                  <div style={{ display:"flex", gap:"12px", flexWrap:"wrap" }}>
+                    <button onClick={()=>setView("setup")} style={{ padding:"13px 32px", borderRadius:"10px", background:"linear-gradient(135deg,#1E6FD9,#0EA5E9)", color:"#FFFFFF", border:"none", fontWeight:"700", fontSize:"15px", cursor:"pointer", fontFamily:"inherit", boxShadow:"0 4px 20px rgba(30,111,217,0.4)" }}>
+                      Start Assessment
+                    </button>
+                    <button onClick={()=>fileInputRef.current?.click()} style={{ padding:"13px 22px", borderRadius:"10px", background:"rgba(27,58,107,0.4)", color:"#8BAAC8", border:"1px solid rgba(27,58,107,0.8)", fontWeight:"600", fontSize:"14px", cursor:"pointer", fontFamily:"inherit" }}>
+                      Load Session
+                    </button>
                   </div>
                 </div>
-              </div>
 
-              {/* Right  -  framework selector */}
-              <div style={{ display:"flex", flexDirection:"column", gap:"12px" }}>
-                <div style={{ fontSize:"12px", fontWeight:"700", color:"#4A6A8A", letterSpacing:"0.12em", textTransform:"uppercase" }}>Select Framework</div>
-                {[
-                  { id:"NIST CSF 2.0", badge:"NIST CSF 2.0", badgeCol:"#1E6FD9", headline:"NIST CSF 2.0", sub:"6 functions . 22 categories . 106 subcategories", detail:"Full subcategory scoring, target profiles, 9-slide report, AI narrative", color:"#1E6FD9", glow:"rgba(30,111,217,0.15)" },
-                  { id:"CIS Controls v8", badge:"CIS Controls v8", badgeCol:"#00BFFF", headline:"CIS Controls v8", sub:"3 groups . 18 controls . IG1-IG3", detail:"Implementation group scoring, gap analysis, Excel export", color:"#00BFFF", glow:"rgba(0,191,255,0.12)" },
-                ].map(f=>(
-                  <button key={f.id} onClick={()=>{ setFramework(f.id); setScores({}); setNotes({}); setWorkshopNotes({}); setTargetScores({}); }} style={{ flex:1, textAlign:"left", padding:"18px 20px", borderRadius:"12px", border:`2px solid ${framework===f.id ? f.color : "#1B3A6B"}`, background:framework===f.id ? f.glow : "#0A1932", cursor:"pointer", fontFamily:"inherit", position:"relative", overflow:"hidden" }}>
-                    <div style={{ position:"absolute", top:0, left:0, right:0, height:"3px", background:framework===f.id ? f.color : "transparent", borderRadius:"12px 12px 0 0" }}/>
-                    <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:"6px" }}>
-                      <div style={{ fontSize:"14px", fontWeight:"800", color:"#FFFFFF" }}>{f.headline}</div>
-                      <span style={{ fontSize:"11px", fontWeight:"700", color:f.badgeCol, background:`${f.badgeCol}18`, padding:"2px 8px", borderRadius:"20px", border:`1px solid ${f.badgeCol}40`, whiteSpace:"nowrap" }}>{f.badge}</span>
-                    </div>
-                    <div style={{ fontSize:"13px", color:framework===f.id ? f.color : "#4A6A8A", fontWeight:"600", marginBottom:"4px" }}>{f.sub}</div>
-                    <div style={{ fontSize:"13px", color:"#8BAAC8" }}>{f.detail}</div>
-                    {framework===f.id && <div style={{ marginTop:"10px", fontSize:"12px", fontWeight:"700", color:f.color }}>&#10003; Selected  -  framework info below</div>}
-                  </button>
-                ))}
-
-                {/* Stat pills */}
-                <div style={{ display:"grid", gridTemplateColumns:"repeat(2,1fr)", gap:"8px" }}>
-                  {(framework==="NIST CSF 2.0"
-                    ? [["106","Subcategories","#1E6FD9"],["22","Categories","#00BFFF"],["0-4","Tier Scale","#C8F135"],["9","Report Slides","#A78BFA"]]
-                    : [["153","Controls","#00BFFF"],["18","Control Groups","#1E6FD9"],["3","Impl. Groups","#C8F135"],["1-4","Score Range","#A78BFA"]]
-                  ).map(([n,l,c])=>(
-                    <div key={l} style={{ padding:"10px 12px", borderRadius:"8px", background:"rgba(0,0,0,0.3)", border:`1px solid ${c}25`, textAlign:"center" }}>
-                      <div style={{ fontSize:"20px", fontWeight:"800", color:c }}>{n}</div>
-                      <div style={{ fontSize:"11px", color:"#4A6A8A", fontWeight:"600", textTransform:"uppercase", letterSpacing:"0.06em" }}>{l}</div>
+                
+                <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"10px", flexShrink:0 }}>
+                  {[["106","NIST Subcategories","#1E6FD9"],["22","NIST Categories","#00BFFF"],["0-4","Tier Scale","#C8F135"],["9","Report Slides","#A78BFA"]].map(([n,l,c])=>(
+                    <div key={l} style={{ padding:"16px 18px", borderRadius:"12px", background:"rgba(0,0,0,0.35)", border:`1px solid ${c}30`, textAlign:"center", minWidth:"100px" }}>
+                      <div style={{ fontSize:"26px", fontWeight:"800", color:c, fontFamily:MONO }}>{n}</div>
+                      <div style={{ fontSize:"11px", color:"#4A6A8A", fontWeight:"600", textTransform:"uppercase", letterSpacing:"0.06em", marginTop:"3px" }}>{l}</div>
                     </div>
                   ))}
                 </div>
               </div>
             </div>
 
-            {/* How it works + process  -  single compact row */}
-            <div style={{ ...card, marginBottom:"20px" }}>
-              <div style={{ fontSize:"12px", fontWeight:"700", color:"#4A6A8A", letterSpacing:"0.12em", textTransform:"uppercase", marginBottom:"14px" }}>Assessment Process</div>
-              <div style={{ display:"grid", gridTemplateColumns:"repeat(6,1fr)" }}>
+            
+            <div style={{ marginBottom:"6px" }}>
+              <div style={{ fontSize:"11px", fontWeight:"700", color:"#4A6A8A", letterSpacing:"0.14em", textTransform:"uppercase", marginBottom:"12px" }}>Select Assessment Framework</div>
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"14px", marginBottom:"16px" }}>
                 {[
-                  {n:"01", label:"Setup",    desc:"Client & framework",       col:"#1E6FD9", v:"setup"},
-                  {n:"02", label:"Docs",     desc:"Documentation review",     col:"#0EA5E9", v:"docs"},
-                  {n:"03", label:"Workshop", desc:"Discovery & notes",        col:"#00BFFF", v:"workshop"},
-                  {n:"04", label:"Score",    desc:"0-4 per subcategory",      col:"#C8F135", v:"score"},
-                  {n:"05", label:"Results",  desc:"Insights & gap analysis",  col:"#A78BFA", v:"results"},
-                  {n:"06", label:"Report",   desc:"PPTX, Excel & narrative",  col:"#F87171", v:"results"},
+                  {
+                    id:"NIST CSF 2.0",
+                    headline:"NIST Cybersecurity Framework 2.0",
+                    tag:"CSF 2.0",
+                    stats:["6 Functions","22 Categories","106 Subcategories","0-4 Tiers"],
+                    features:["Full subcategory scoring with N/A handling","Current & target profile per control","Documentation gaps wired into findings","9-slide PPTX report auto-populated","AI narrative generator (client-side, no data sent)"],
+                    color:"#1E6FD9", glow:"rgba(30,111,217,0.12)", tagBg:"rgba(30,111,217,0.15)"
+                  },
+                  {
+                    id:"CIS Controls v8",
+                    headline:"CIS Controls v8",
+                    tag:"Controls v8",
+                    stats:["3 Impl. Groups","18 Control Areas","IG1 / IG2 / IG3","1-4 Scale"],
+                    features:["Implementation group scoring","Workshop question bank per control","Gap analysis & recommendations","Excel workbook with 4 sheets","Session JSON save & restore"],
+                    color:"#00BFFF", glow:"rgba(0,191,255,0.1)", tagBg:"rgba(0,191,255,0.12)"
+                  },
+                ].map(f=>{
+                  const isSelected = framework === f.id;
+                  return (
+                    <button key={f.id} onClick={()=>{ setFramework(f.id); setScores({}); setNotes({}); setWorkshopNotes({}); setTargetScores({}); }} style={{ textAlign:"left", padding:"0", borderRadius:"14px", border:"2px solid " + (isSelected ? f.color : "rgba(27,58,107,0.7)"), background:"transparent", cursor:"pointer", fontFamily:"inherit", position:"relative", overflow:"hidden", transition:"border-color 0.2s" }}>
+                      
+                      <div style={{ height:"4px", background:isSelected ? `linear-gradient(90deg, ${f.color}, ${f.color}88)` : "rgba(27,58,107,0.5)", transition:"background 0.2s" }}/>
+                      <div style={{ padding:"20px 24px", background:isSelected ? f.glow : "rgba(10,25,50,0.5)" }}>
+                        
+                        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:"14px" }}>
+                          <div>
+                            <div style={{ fontSize:"17px", fontWeight:"800", color:"#FFFFFF", marginBottom:"3px" }}>{f.headline}</div>
+                            <div style={{ display:"flex", gap:"6px", flexWrap:"wrap", marginTop:"6px" }}>
+                              {f.stats.map(s=>(
+                                <span key={s} style={{ fontSize:"11px", fontWeight:"600", color:isSelected?f.color:"#4A6A8A", background:isSelected?f.tagBg:"rgba(27,58,107,0.4)", padding:"2px 8px", borderRadius:"4px", border:"1px solid " + (isSelected?f.color+"40":"rgba(27,58,107,0.6)") }}>{s}</span>
+                              ))}
+                            </div>
+                          </div>
+                          {isSelected && (
+                            <span style={{ fontSize:"11px", fontWeight:"700", color:f.color, background:f.tagBg, padding:"4px 10px", borderRadius:"20px", border:`1px solid ${f.color}50`, flexShrink:0, marginLeft:"12px" }}>{"✓"} Active</span>
+                          )}
+                        </div>
+                        
+                        <div style={{ display:"flex", flexDirection:"column", gap:"5px" }}>
+                          {f.features.map(ft=>(
+                            <div key={ft} style={{ display:"flex", alignItems:"flex-start", gap:"8px" }}>
+                              <div style={{ width:"5px", height:"5px", borderRadius:"50%", background:isSelected?f.color:"#1B3A6B", marginTop:"6px", flexShrink:0 }}/>
+                              <span style={{ fontSize:"13px", color:isSelected?"#C8D8EA":"#8BAAC8", lineHeight:"1.5" }}>{ft}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            
+            <div style={{ ...card, marginBottom:"20px", padding:"24px 28px" }}>
+              <div style={{ fontSize:"11px", fontWeight:"700", color:"#4A6A8A", letterSpacing:"0.14em", textTransform:"uppercase", marginBottom:"18px" }}>Assessment Process</div>
+              <div style={{ display:"grid", gridTemplateColumns:"repeat(6,1fr)", position:"relative" }}>
+                
+                <div style={{ position:"absolute", top:"22px", left:"8%", right:"8%", height:"1px", background:"linear-gradient(90deg, #1E6FD9, #00BFFF, #C8F135, #A78BFA, #F87171)", opacity:0.3, zIndex:0 }}/>
+                {[
+                  {n:"01", label:"Setup",    desc:"Client details",         col:"#1E6FD9", v:"setup"},
+                  {n:"02", label:"Docs",     desc:"Document review",        col:"#0EA5E9", v:"docs"},
+                  {n:"03", label:"Workshop", desc:"Discovery & notes",      col:"#00BFFF", v:"workshop"},
+                  {n:"04", label:"Score",    desc:"Rate 0-4 per control",   col:"#C8F135", v:"score"},
+                  {n:"05", label:"Results",  desc:"Insights & gaps",        col:"#A78BFA", v:"results"},
+                  {n:"06", label:"Report",   desc:"PPTX, Excel, Narrative", col:"#F87171", v:"results"},
                 ].map((s,i)=>(
-                  <div key={s.n} style={{ padding:"12px 8px", position:"relative", cursor:"pointer" }} onClick={()=>s.v && setView(s.v)}>
-                    <div style={{ fontSize:"18px", fontWeight:"800", color:s.col, marginBottom:"3px" }}>{s.n}</div>
-                    <div style={{ fontSize:"14px", fontWeight:"700", color:"#E2EAF4", marginBottom:"2px" }}>{s.label}</div>
-                    <div style={{ fontSize:"12px", color:"#4A6A8A", lineHeight:"1.6" }}>{s.desc}</div>
-                    {i<5 && <div style={{ position:"absolute", right:"-1px", top:"50%", transform:"translateY(-50%)", color:"#1B3A6B", fontSize:"14px" }}>{" > "}</div>}
+                  <div key={s.n} onClick={()=>s.v && setView(s.v)} style={{ display:"flex", flexDirection:"column", alignItems:"center", textAlign:"center", padding:"0 6px", cursor:"pointer", position:"relative", zIndex:1 }}>
+                    <div style={{ width:"44px", height:"44px", borderRadius:"50%", background:`radial-gradient(circle, ${s.col}22 0%, ${s.col}08 100%)`, border:`1.5px solid ${s.col}60`, display:"flex", alignItems:"center", justifyContent:"center", marginBottom:"10px" }}>
+                      <span style={{ fontSize:"13px", fontWeight:"800", color:s.col, fontFamily:MONO }}>{s.n}</span>
+                    </div>
+                    <div style={{ fontSize:"13px", fontWeight:"700", color:"#E2EAF4", marginBottom:"3px" }}>{s.label}</div>
+                    <div style={{ fontSize:"11px", color:"#4A6A8A", lineHeight:"1.5" }}>{s.desc}</div>
                   </div>
                 ))}
               </div>
             </div>
 
-            {/* Framework breakdown  -  inline, no toggle needed, clean compact grid */}
+            
             {framework === "NIST CSF 2.0" && (
-              <div style={{ ...card, marginBottom:"20px" }}>
-                <div style={{ fontSize:"12px", fontWeight:"700", color:"#4A6A8A", letterSpacing:"0.12em", textTransform:"uppercase", marginBottom:"14px" }}>NIST CSF 2.0  -  Functions & Categories</div>
-                <div style={{ display:"grid", gridTemplateColumns:"repeat(6,1fr)", gap:"8px", marginBottom:"14px" }}>
+              <div style={{ ...card, marginBottom:"20px", padding:"24px 28px" }}>
+                <div style={{ fontSize:"11px", fontWeight:"700", color:"#4A6A8A", letterSpacing:"0.14em", textTransform:"uppercase", marginBottom:"16px" }}>NIST CSF 2.0  -  Functions & Categories</div>
+                <div style={{ display:"grid", gridTemplateColumns:"repeat(6,1fr)", gap:"10px", marginBottom:"16px" }}>
                   {FRAMEWORKS["NIST CSF 2.0"].map(cat=>(
-                    <div key={cat.id} style={{ padding:"12px", borderRadius:"9px", background:cat.light, border:`1px solid ${cat.color}35` }}>
-                      <div style={{ fontSize:"13px", fontWeight:"800", color:cat.color, marginBottom:"3px" }}>{cat.id}</div>
-                      <div style={{ fontSize:"14px", fontWeight:"700", color:"#FFFFFF", marginBottom:"4px" }}>{cat.name}</div>
-                      <div style={{ fontSize:"12px", color:"#4A6A8A" }}>{cat.domains.reduce((a,d)=>a+d.questions.length,0)} subcategories</div>
-                      <div style={{ marginTop:"6px", display:"flex", flexWrap:"wrap", gap:"2px" }}>
-                        {cat.domains.map(d=><span key={d.id} style={{ fontSize:"11px", color:cat.color, background:`${cat.color}18`, padding:"1px 5px", borderRadius:"3px", fontWeight:"600" }}>{d.id}</span>)}
+                    <div key={cat.id} style={{ padding:"14px", borderRadius:"10px", background:cat.light, border:`1px solid ${cat.color}35` }}>
+                      <div style={{ fontSize:"13px", fontWeight:"800", color:cat.color, marginBottom:"2px", fontFamily:MONO }}>{cat.id}</div>
+                      <div style={{ fontSize:"13px", fontWeight:"700", color:"#FFFFFF", marginBottom:"6px", lineHeight:1.3 }}>{cat.name}</div>
+                      <div style={{ fontSize:"11px", color:"#4A6A8A", marginBottom:"8px" }}>{cat.domains.reduce((a,d)=>a+d.questions.length,0)} subcategories</div>
+                      <div style={{ display:"flex", flexWrap:"wrap", gap:"3px" }}>
+                        {cat.domains.map(d=>(
+                          <span key={d.id} style={{ fontSize:"10px", color:cat.color, background:`${cat.color}18`, padding:"2px 6px", borderRadius:"3px", fontWeight:"600", fontFamily:MONO }}>{d.id}</span>
+                        ))}
                       </div>
                     </div>
                   ))}
                 </div>
                 <div style={{ display:"grid", gridTemplateColumns:"repeat(5,1fr)", gap:"8px" }}>
                   {ML.map(m=>(
-                    <div key={m.value} style={{ padding:"9px 11px", borderRadius:"7px", background:m.bg, border:`1px solid ${m.color}35` }}>
-                      <div style={{ fontSize:"16px", fontWeight:"800", color:m.color }}>{m.value}</div>
-                      <div style={{ fontSize:"13px", fontWeight:"700", color:"#E2EAF4", marginTop:"2px" }}>{m.label}</div>
-                      <div style={{ fontSize:"12px", color:"#4A6A8A", marginTop:"2px", lineHeight:"1.5" }}>{ML_DESC[m.value]?.slice(0,50)}...</div>
+                    <div key={m.value} style={{ padding:"12px", borderRadius:"8px", background:m.bg, border:`1px solid ${m.color}35` }}>
+                      <div style={{ fontSize:"22px", fontWeight:"800", color:m.color, fontFamily:MONO }}>{m.value}</div>
+                      <div style={{ fontSize:"13px", fontWeight:"700", color:"#E2EAF4", marginTop:"3px" }}>{m.label}</div>
+                      <div style={{ fontSize:"11px", color:"#4A6A8A", marginTop:"3px", lineHeight:"1.5" }}>{ML_DESC[m.value]?.slice(0,55)}...</div>
                     </div>
                   ))}
                 </div>
               </div>
             )}
             {framework === "CIS Controls v8" && (
-              <div style={{ ...card, marginBottom:"20px" }}>
-                <div style={{ fontSize:"12px", fontWeight:"700", color:"#4A6A8A", letterSpacing:"0.12em", textTransform:"uppercase", marginBottom:"14px" }}>CIS Controls v8  -  Implementation Groups</div>
-                <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:"12px", marginBottom:"12px" }}>
+              <div style={{ ...card, marginBottom:"20px", padding:"24px 28px" }}>
+                <div style={{ fontSize:"11px", fontWeight:"700", color:"#4A6A8A", letterSpacing:"0.14em", textTransform:"uppercase", marginBottom:"16px" }}>CIS Controls v8  -  Implementation Groups</div>
+                <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:"14px", marginBottom:"14px" }}>
                   {FRAMEWORKS["CIS Controls v8"].map(grp=>(
-                    <div key={grp.id} style={{ padding:"14px", borderRadius:"9px", background:grp.light, border:`1px solid ${grp.color}35` }}>
-                      <div style={{ fontSize:"13px", fontWeight:"800", color:grp.color, marginBottom:"2px" }}>{grp.id}  -  {grp.name}</div>
-                      <div style={{ fontSize:"13px", color:"#8BAAC8", marginBottom:"10px" }}>{grp.description}</div>
+                    <div key={grp.id} style={{ padding:"16px", borderRadius:"10px", background:grp.light, border:`1px solid ${grp.color}35` }}>
+                      <div style={{ fontSize:"14px", fontWeight:"800", color:grp.color, marginBottom:"4px" }}>{grp.id}  -  {grp.name}</div>
+                      <div style={{ fontSize:"13px", color:"#8BAAC8", marginBottom:"12px", lineHeight:1.5 }}>{grp.description}</div>
                       {grp.domains.map(d=>(
-                        <div key={d.id} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"4px 7px", borderRadius:"5px", background:"rgba(0,0,0,0.2)", marginBottom:"3px" }}>
-                          <span style={{ fontSize:"12px", color:grp.color, fontWeight:"600" }}>{d.id}</span>
+                        <div key={d.id} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"5px 8px", borderRadius:"6px", background:"rgba(0,0,0,0.2)", marginBottom:"4px" }}>
+                          <span style={{ fontSize:"11px", color:grp.color, fontWeight:"700", fontFamily:MONO }}>{d.id}</span>
                           <span style={{ fontSize:"12px", color:"#8BAAC8" }}>{d.name}</span>
                         </div>
                       ))}
                     </div>
                   ))}
                 </div>
-                <div style={{ padding:"10px 14px", borderRadius:"7px", background:"rgba(0,191,255,0.06)", border:"1px solid rgba(0,191,255,0.18)", fontSize:"13px", color:"#8BAAC8" }}>
-                  <strong style={{color:"#00BFFF"}}>IG1</strong> Basic hygiene.&nbsp;&nbsp;<strong style={{color:"#00BFFF"}}>IG2</strong> IT expertise supporting multiple departments.&nbsp;&nbsp;<strong style={{color:"#00BFFF"}}>IG3</strong> Dedicated security expertise. Each group builds on the previous.
+                <div style={{ padding:"12px 16px", borderRadius:"8px", background:"rgba(0,191,255,0.06)", border:"1px solid rgba(0,191,255,0.18)", fontSize:"13px", color:"#8BAAC8", lineHeight:1.7 }}>
+                  <strong style={{color:"#00BFFF"}}>IG1</strong>  -  Basic hygiene every organisation should have.{" "}
+                  <strong style={{color:"#00BFFF"}}>IG2</strong>  -  For organisations with IT expertise supporting multiple departments.{" "}
+                  <strong style={{color:"#00BFFF"}}>IG3</strong>  -  For organisations with dedicated security expertise. Each group builds on the previous.
                 </div>
               </div>
             )}
           </div>
         )}
-        {/* -- SETUP -- */}
         {view==="setup" && (
           <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"18px" }}>
             <div style={card}>
@@ -1907,7 +2068,7 @@ export default function MaturityScorecard() {
             <div style={{ display:"flex", flexDirection:"column", gap:"14px" }}>
               <div style={card}>
                 <div style={{ fontSize:"13px", fontWeight:"700", color:"#4A6A8A", letterSpacing:"0.1em", textTransform:"uppercase", marginBottom:"10px" }}>Selected Framework</div>
-                <div style={{ padding:"14px", borderRadius:"9px", background:`${FRAMEWORKS[framework][0]?.color ? "rgba(30,111,217,0.1)" : "#0A1932"}`, border:`1px solid ${FRAMEWORKS[framework][0]?.color || "#1B3A6B"}40` }}>
+                <div style={{ padding:"14px", borderRadius:"9px", background:(FRAMEWORKS[framework][0]?.color ? "rgba(30,111,217,0.1)" : "#0A1932"), border:"1px solid " + (FRAMEWORKS[framework][0]?.color || "#1B3A6B") + "40" }}>
                   <div style={{ fontSize:"15px", fontWeight:"800", color:"#FFFFFF", marginBottom:"3px" }}>{framework}</div>
                   <div style={{ fontSize:"13px", color:"#8BAAC8" }}>{framework==="NIST CSF 2.0" ? "6 functions . 22 categories . 106 subcategories . 0-4 NIST tiers" : "3 groups . 18 controls . Implementation groups"}</div>
                 </div>
@@ -1917,8 +2078,8 @@ export default function MaturityScorecard() {
                 <div style={{ fontSize:"13px", fontWeight:"700", color:"#4A6A8A", letterSpacing:"0.1em", textTransform:"uppercase", marginBottom:"10px" }}>Session Persistence</div>
                 <div style={{ fontSize:"13px", color:"#8BAAC8", lineHeight:"1.6", marginBottom:"10px" }}>Use <strong style={{color:"#C8F135"}}>Save JSON</strong> to download progress at any time. Load it in any future session to resume exactly where you left off.</div>
                 <div style={{ display:"flex", gap:"8px" }}>
-                  <button onClick={saveSession} style={{ flex:1, padding:"8px", borderRadius:"6px", border:"1px solid rgba(200,241,53,0.4)", background:"rgba(200,241,53,0.08)", color:"#C8F135", fontSize:"13px", fontWeight:"700", cursor:"pointer", fontFamily:"inherit" }}>Save ↓</button>
-                  <button onClick={()=>fileInputRef.current?.click()} style={{ flex:1, padding:"8px", borderRadius:"6px", border:"1px solid #1B3A6B", background:"#0A1932", color:"#8BAAC8", fontSize:"13px", fontWeight:"700", cursor:"pointer", fontFamily:"inherit" }}>Load ↑</button>
+                  <button onClick={saveSession} style={{ flex:1, padding:"8px", borderRadius:"6px", border:"1px solid rgba(200,241,53,0.4)", background:"rgba(200,241,53,0.08)", color:"#C8F135", fontSize:"13px", fontWeight:"700", cursor:"pointer", fontFamily:"inherit" }}>Save v</button>
+                  <button onClick={()=>fileInputRef.current?.click()} style={{ flex:1, padding:"8px", borderRadius:"6px", border:"1px solid #1B3A6B", background:"#0A1932", color:"#8BAAC8", fontSize:"13px", fontWeight:"700", cursor:"pointer", fontFamily:"inherit" }}>Load ^</button>
                 </div>
               </div>
               <div style={{ ...card, borderTop:`3px solid #1E6FD9` }}>
@@ -1941,7 +2102,7 @@ export default function MaturityScorecard() {
           </div>
         )}
 
-        {/* -- DOCS -- */}
+        
         {view==="docs" && (()=>{
           const cats = [...new Set(NIST_DOCS.map(d=>d.cat))];
           const provided = NIST_DOCS.filter(d=>docsProvided[d.id]==="yes").length;
@@ -1949,7 +2110,7 @@ export default function MaturityScorecard() {
           const totalDocs = NIST_DOCS.length + customDocs.length;
           return (
             <div>
-              {/* Header bar */}
+              
               <div style={{ marginBottom:"20px", padding:"16px 20px", borderRadius:"12px", background:"rgba(30,111,217,0.08)", border:"1px solid rgba(30,111,217,0.25)", display:"flex", alignItems:"center", justifyContent:"space-between" }}>
                 <div>
                   <div style={{ fontSize:"15px", fontWeight:"700", color:"#1E6FD9", marginBottom:"3px" }}>Documentation Review</div>
@@ -1965,7 +2126,7 @@ export default function MaturityScorecard() {
                 </div>
               </div>
 
-              {/* Legend */}
+              
               <div style={{ display:"flex", gap:"10px", marginBottom:"18px", flexWrap:"wrap" }}>
                 {[["yes","Provided","#C8F135","rgba(200,241,53,0.12)"],["partial","Partial / In Progress","#FCD34D","rgba(252,211,77,0.1)"],["no","Not Provided","#F87171","rgba(248,113,113,0.08)"],["na","Not Applicable","#4A6A8A","rgba(74,106,138,0.1)"]].map(([v,l,c,bg])=>(
                   <div key={v} style={{ display:"flex", alignItems:"center", gap:"6px", padding:"5px 12px", borderRadius:"20px", background:bg, border:`1px solid ${c}40` }}>
@@ -1975,7 +2136,7 @@ export default function MaturityScorecard() {
                 ))}
               </div>
 
-              {/* Doc checklist grouped by NIST function */}
+              
               {cats.map(cat=>{
                 const catDocs = NIST_DOCS.filter(d=>d.cat===cat);
                 const col = DOC_CAT_COLORS[cat] || "#8BAAC8";
@@ -1983,19 +2144,19 @@ export default function MaturityScorecard() {
                   <div key={cat} style={{ ...card, marginBottom:"12px", borderLeft:`4px solid ${col}` }}>
                     <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"12px" }}>
                       <div style={{ fontSize:"14px", fontWeight:"800", color:col, letterSpacing:"0.08em", textTransform:"uppercase" }}>{cat}</div>
-                      <div style={{ fontSize:"13px", color:"#4A6A8A" }}>{catDocs.filter(d=>docsProvided[d.id]==="yes").length} / {catDocs.length} provided</div>
+                      <div style={{ fontSize:"13px", color:"#4A6A8A" }}>{catDocs.filter(d=>docsProvided[d.id]==="yes").length}{" of "}{catDocs.length} provided</div>
                     </div>
                     <div style={{ display:"flex", flexDirection:"column", gap:"6px" }}>
                       {catDocs.map(doc=>{
                         const status = docsProvided[doc.id] || "";
                         const note = docNotes[doc.id] || "";
                         return (
-                          <div key={doc.id} style={{ borderRadius:"8px", background:status==="yes"?"rgba(200,241,53,0.06)":status==="partial"?"rgba(252,211,77,0.05)":status==="no"?"rgba(248,113,113,0.04)":"#0A1932", border:`1px solid ${status==="yes"?"rgba(200,241,53,0.2)":status==="partial"?"rgba(252,211,77,0.15)":status==="no"?"rgba(248,113,113,0.1)":"#1B3A6B"}`, overflow:"hidden" }}>
+                          <div key={doc.id} style={{ borderRadius:"8px", background:status==="yes"?"rgba(200,241,53,0.06)":status==="partial"?"rgba(252,211,77,0.05)":status==="no"?"rgba(248,113,113,0.04)":"#0A1932", border:"1px solid " + (status==="yes"?"rgba(200,241,53,0.2)":status==="partial"?"rgba(252,211,77,0.15)":status==="no"?"rgba(248,113,113,0.1)":"#1B3A6B"), overflow:"hidden" }}>
                             <div style={{ display:"flex", alignItems:"center", gap:"10px", padding:"10px 12px" }}>
                               <div style={{ flex:1, fontSize:"14px", color:"#E2EAF4", fontWeight:"500" }}>{doc.label}</div>
                               <div style={{ display:"flex", gap:"4px" }}>
                                 {[["yes","✓ Provided","#C8F135","rgba(200,241,53,0.15)"],["partial","~ Partial","#FCD34D","rgba(252,211,77,0.12)"],["no","✗ Not Provided","#F87171","rgba(248,113,113,0.12)"],["na","N/A","#4A6A8A","rgba(74,106,138,0.12)"]].map(([v,l,c,bg])=>(
-                                  <button key={v} onClick={()=>setDocsProvided(p=>({...p,[doc.id]:p[doc.id]===v?"":v}))} style={{ padding:"4px 10px", borderRadius:"5px", border:`1px solid ${status===v?c:"#1B3A6B"}`, background:status===v?bg:"transparent", color:status===v?c:"#4A6A8A", fontSize:"12px", fontWeight:"700", cursor:"pointer", fontFamily:"inherit", whiteSpace:"nowrap" }}>{l}</button>
+                                  <button key={v} onClick={()=>setDocsProvided(p=>({...p,[doc.id]:p[doc.id]===v?"":v}))} style={{ padding:"4px 10px", borderRadius:"5px", border:"1px solid " + (status===v?c:"#1B3A6B"), background:status===v?bg:"transparent", color:status===v?c:"#4A6A8A", fontSize:"12px", fontWeight:"700", cursor:"pointer", fontFamily:"inherit", whiteSpace:"nowrap" }}>{l}</button>
                                 ))}
                               </div>
                             </div>
@@ -2015,9 +2176,9 @@ export default function MaturityScorecard() {
                 );
               })}
 
-              {/* Custom documents */}
+              
               <div style={{ ...card, marginBottom:"18px", borderLeft:"4px solid #8BAAC8" }}>
-                <div style={{ fontSize:"14px", fontWeight:"800", color:"#8BAAC8", letterSpacing:"0.08em", textTransform:"uppercase", marginBottom:"12px" }}>Additional / Custom Documents</div>
+                <div style={{ fontSize:"14px", fontWeight:"800", color:"#8BAAC8", letterSpacing:"0.08em", textTransform:"uppercase", marginBottom:"12px" }}>Additional and Custom Documents</div>
                 {customDocs.map((doc,i)=>{
                   const s = docsProvided[`custom_${i}`];
                   const note = docNotes[`custom_${i}`] || "";
@@ -2027,7 +2188,7 @@ export default function MaturityScorecard() {
                         <div style={{ flex:1, fontSize:"14px", color:"#E2EAF4" }}>{doc}</div>
                         <div style={{ display:"flex", gap:"4px" }}>
                           {[["yes","v","#C8F135","rgba(200,241,53,0.15)"],["partial","~","#FCD34D","rgba(252,211,77,0.12)"],["no","x","#F87171","rgba(248,113,113,0.12)"]].map(([v,l,c,bg])=>(
-                            <button key={v} onClick={()=>setDocsProvided(p=>({...p,[`custom_${i}`]:p[`custom_${i}`]===v?"":v}))} style={{ padding:"4px 8px", borderRadius:"5px", border:`1px solid ${s===v?c:"#1B3A6B"}`, background:s===v?bg:"transparent", color:s===v?c:"#4A6A8A", fontSize:"13px", fontWeight:"700", cursor:"pointer", fontFamily:"inherit" }}>{l}</button>
+                            <button key={v} onClick={()=>setDocsProvided(p=>({...p,[`custom_${i}`]:p[`custom_${i}`]===v?"":v}))} style={{ padding:"4px 8px", borderRadius:"5px", border:"1px solid " + (s===v?c:"#1B3A6B"), background:s===v?bg:"transparent", color:s===v?c:"#4A6A8A", fontSize:"13px", fontWeight:"700", cursor:"pointer", fontFamily:"inherit" }}>{l}</button>
                           ))}
                         </div>
                         <button onClick={()=>setCustomDocs(p=>p.filter((_,j)=>j!==i))} style={{ fontSize:"16px", color:"#4A6A8A", background:"none", border:"none", cursor:"pointer", lineHeight:1, padding:"0 4px" }}>x</button>
@@ -2057,7 +2218,7 @@ export default function MaturityScorecard() {
           );
         })()}
 
-        {/* -- WORKSHOP -- */}
+        
         {view==="workshop" && (
           <div>
             <div style={{ marginBottom:"18px", padding:"14px 18px", borderRadius:"10px", background:"rgba(0,191,255,0.08)", border:"1px solid rgba(0,191,255,0.2)", display:"flex", alignItems:"center", justifyContent:"space-between" }}>
@@ -2072,7 +2233,7 @@ export default function MaturityScorecard() {
                 {fw.map(cat=>{
                   const wCaptured = cat.domains.filter(d=>workshopNotes[d.id]&&workshopNotes[d.id].trim()).length;
                   return (
-                    <button key={cat.id} onClick={()=>setActiveSection(cat.id===activeSection?null:cat.id)} style={{ padding:"11px 13px", borderRadius:"9px", textAlign:"left", border:`2px solid ${activeSection===cat.id?cat.color:"#1B3A6B"}`, background:activeSection===cat.id?cat.light:"#0A1932", cursor:"pointer", fontFamily:"inherit" }}>
+                    <button key={cat.id} onClick={()=>setActiveSection(cat.id===activeSection?null:cat.id)} style={{ padding:"11px 13px", borderRadius:"9px", textAlign:"left", border:"2px solid " + (activeSection===cat.id?cat.color:"#1B3A6B"), background:activeSection===cat.id?cat.light:"#0A1932", cursor:"pointer", fontFamily:"inherit" }}>
                       <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
                         <span style={{ fontSize:"13px", fontWeight:"800", color:cat.color, letterSpacing:"0.08em" }}>{cat.id}</span>
                         {wCaptured>0&&<span style={{ fontSize:"12px", color:"#C8F135", background:"rgba(200,241,53,0.15)", padding:"1px 6px", borderRadius:"3px" }}>{wCaptured} noted</span>}
@@ -2117,7 +2278,7 @@ export default function MaturityScorecard() {
                                 <span style={{ fontSize:"12px", color:"#4A6A8A", marginLeft:"8px" }}>({wqs.length} questions)</span>
                               </div>
                               <div style={{ display:"flex", alignItems:"center", gap:"8px" }}>
-                                {hasNotes && <span style={{ fontSize:"12px", color:"#C8F135", fontWeight:"700" }}>&#10003; Notes</span>}
+                                {hasNotes && <span style={{ fontSize:"12px", color:"#C8F135", fontWeight:"700" }}>{"✓"} Notes</span>}
                                 <span style={{ color:"#4A6A8A", fontSize:"13px" }}>{isOpen?"^":"v"}</span>
                               </div>
                             </button>
@@ -2139,7 +2300,7 @@ export default function MaturityScorecard() {
                                   value={workshopNotes[domain.id]||""}
                                   onChange={e=>setWorkshopNotes(p=>({...p,[domain.id]:e.target.value}))}
                                   placeholder={`Capture client responses, examples and context for ${domain.name}. These notes will be visible alongside each subcategory when you move to scoring.`}
-                                  style={{ width:"100%", minHeight:"110px", padding:"10px 12px", borderRadius:"7px", border:`1px solid ${hasNotes?"rgba(200,241,53,0.35)":"#1B3A6B"}`, fontSize:"14px", fontFamily:"inherit", outline:"none", background:"#0A1932", color:"#E2EAF4", boxSizing:"border-box", lineHeight:"1.6", resize:"vertical" }}
+                                  style={{ width:"100%", minHeight:"110px", padding:"10px 12px", borderRadius:"7px", border:"1px solid " + (hasNotes?"rgba(200,241,53,0.35)":"#1B3A6B"), fontSize:"14px", fontFamily:"inherit", outline:"none", background:"#0A1932", color:"#E2EAF4", boxSizing:"border-box", lineHeight:"1.6", resize:"vertical" }}
                                 />
                               </div>
                             )}
@@ -2154,7 +2315,7 @@ export default function MaturityScorecard() {
           </div>
         )}
 
-        {/* -- SCORE -- */}
+        
         {view==="score" && (
           <div>
             <div style={{ marginBottom:"18px", padding:"14px 18px", borderRadius:"10px", background:"rgba(200,241,53,0.07)", border:"1px solid rgba(200,241,53,0.25)", display:"flex", alignItems:"center", justifyContent:"space-between" }}>
@@ -2163,7 +2324,7 @@ export default function MaturityScorecard() {
                 <div style={{ fontSize:"14px", color:"#8BAAC8" }}>Score each subcategory 0-4 using workshop notes and document evidence. Set a target score alongside the current score. Save JSON regularly.</div>
               </div>
               <div style={{ display:"flex", gap:"8px", flexShrink:0 }}>
-                <button onClick={saveSession} style={{ padding:"8px 16px", borderRadius:"7px", background:"rgba(200,241,53,0.15)", border:"1px solid rgba(200,241,53,0.4)", color:"#C8F135", fontWeight:"700", fontSize:"14px", cursor:"pointer", fontFamily:"inherit" }}>Save ↓</button>
+                <button onClick={saveSession} style={{ padding:"8px 16px", borderRadius:"7px", background:"rgba(200,241,53,0.15)", border:"1px solid rgba(200,241,53,0.4)", color:"#C8F135", fontWeight:"700", fontSize:"14px", cursor:"pointer", fontFamily:"inherit" }}>Save v</button>
                 <button onClick={()=>setView("results")} style={{ padding:"8px 16px", borderRadius:"7px", background:"rgba(0,191,255,0.12)", border:"1px solid rgba(0,191,255,0.3)", color:"#00BFFF", fontWeight:"700", fontSize:"14px", cursor:"pointer", fontFamily:"inherit" }}>{"->"} View Results</button>
               </div>
             </div>
@@ -2174,7 +2335,7 @@ export default function MaturityScorecard() {
                   const scoredCount = cat.domains.flatMap(d=>d.questions.map((_,qi)=>scores[`${d.id}_q${qi}`])).filter(v=>v!==undefined).length;
                   const totalCount = cat.domains.flatMap(d=>d.questions).length;
                   return (
-                    <button key={cat.id} onClick={()=>setActiveSection(cat.id===activeSection?null:cat.id)} style={{ padding:"11px 13px", borderRadius:"9px", textAlign:"left", border:`2px solid ${activeSection===cat.id?cat.color:"#1B3A6B"}`, background:activeSection===cat.id?cat.light:"#0A1932", cursor:"pointer", fontFamily:"inherit" }}>
+                    <button key={cat.id} onClick={()=>setActiveSection(cat.id===activeSection?null:cat.id)} style={{ padding:"11px 13px", borderRadius:"9px", textAlign:"left", border:"2px solid " + (activeSection===cat.id?cat.color:"#1B3A6B"), background:activeSection===cat.id?cat.light:"#0A1932", cursor:"pointer", fontFamily:"inherit" }}>
                       <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
                         <span style={{ fontSize:"13px", fontWeight:"800", color:cat.color, letterSpacing:"0.08em" }}>{cat.id}</span>
                         {sc && <span style={{ fontSize:"15px", fontWeight:"800", color:getMC(sc), fontFamily:MONO }}>{sc}</span>}
@@ -2243,7 +2404,7 @@ export default function MaturityScorecard() {
 
                             {isOpen && (
                               <div style={{ marginTop:"14px", borderTop:"1px solid #1B3A6B", paddingTop:"14px" }}>
-                                {/* Workshop notes from Step 2  -  visible here to inform scoring */}
+                                
                                 {wNote && (
                                   <div style={{ marginBottom:"16px", padding:"12px 14px", borderRadius:"8px", background:"rgba(200,241,53,0.06)", border:"1px solid rgba(200,241,53,0.2)" }}>
                                     <div style={{ fontSize:"12px", fontWeight:"700", color:"#C8F135", marginBottom:"5px", letterSpacing:"0.06em", textTransform:"uppercase" }}>Workshop Notes</div>
@@ -2263,14 +2424,14 @@ export default function MaturityScorecard() {
                                         <span style={{ fontSize:"15px", color:"#E2EAF4", lineHeight:"1.5", fontWeight:"500" }}>{isNIST ? qText : q}</span>
                                       </div>
 
-                                      {/* Evidence note from workshop  -  shown above scoring if captured */}
+                                      
                                       {notes[key] && (
                                         <div style={{ marginBottom:"8px", padding:"9px 12px", borderRadius:"5px", background:"rgba(0,191,255,0.06)", border:"1px solid rgba(0,191,255,0.15)", fontSize:"13px", color:"#8BAAC8", fontStyle:"italic" }}>
                                           Doc {notes[key]}
                                         </div>
                                       )}
 
-                                      {/* Doc status flags  -  warn if relevant docs missing */}
+                                      
                                       {isNIST && (()=>{
                                         const subcatId = (isNIST ? q.split("  -  ")[0] : null);
                                         const docStatuses = subcatId ? getSubcatDocStatus(subcatId) : [];
@@ -2295,27 +2456,27 @@ export default function MaturityScorecard() {
                                         );
                                       })()}
 
-                                      {/* Current score */}
+                                      
                                       <div style={{ marginBottom:"6px" }}>
                                         <div style={{ fontSize:"12px", fontWeight:"700", color:"#4A6A8A", textTransform:"uppercase", letterSpacing:"0.06em", marginBottom:"5px" }}>Current Score</div>
                                         <div style={{ display:"flex", gap:"4px", flexWrap:"wrap", alignItems:"center" }}>
-                                          <button onClick={()=>setScores(p=>({...p,[key]:-1}))} style={{ padding:"5px 11px", borderRadius:"5px", border:`2px solid ${cur===-1?"#4A6A8A":"#1B3A6B"}`, background:cur===-1?"rgba(74,106,138,0.3)":"#0A1932", color:cur===-1?"#8BAAC8":"#4A6A8A", fontSize:"13px", fontWeight:"700", cursor:"pointer", fontFamily:"inherit" }}>N/A</button>
+                                          <button onClick={()=>setScores(p=>({...p,[key]:-1}))} style={{ padding:"5px 11px", borderRadius:"5px", border:"2px solid " + (cur===-1?"#4A6A8A":"#1B3A6B"), background:cur===-1?"rgba(74,106,138,0.3)":"#0A1932", color:cur===-1?"#8BAAC8":"#4A6A8A", fontSize:"13px", fontWeight:"700", cursor:"pointer", fontFamily:"inherit" }}>N/A</button>
                                           {ML.map(m=>(
-                                            <button key={m.value} onClick={()=>setScores(p=>({...p,[key]:m.value}))} style={{ padding:"5px 11px", borderRadius:"5px", border:`2px solid ${cur===m.value?m.color:"#1B3A6B"}`, background:cur===m.value?m.bg:"#0A1932", color:cur===m.value?m.color:"#4A6A8A", fontSize:"15px", fontWeight:"700", cursor:"pointer", fontFamily:MONO }}>{m.value}</button>
+                                            <button key={m.value} onClick={()=>setScores(p=>({...p,[key]:m.value}))} style={{ padding:"5px 11px", borderRadius:"5px", border:"2px solid " + (cur===m.value?m.color:"#1B3A6B"), background:cur===m.value?m.bg:"#0A1932", color:cur===m.value?m.color:"#4A6A8A", fontSize:"15px", fontWeight:"700", cursor:"pointer", fontFamily:MONO }}>{m.value}</button>
                                           ))}
                                           {cur!==-1&&cur!==undefined&&<span style={{ fontSize:"13px", color:"#8BAAC8", marginLeft:"4px" }}>{ML.find(m=>m.value===cur)?.label}</span>}
                                           {cur===-1&&<span style={{ fontSize:"13px", color:"#4A6A8A", marginLeft:"4px" }}>N/A  -  excluded</span>}
                                         </div>
                                       </div>
 
-                                      {/* Target score */}
+                                      
                                       {isNIST && (
                                         <div style={{ marginBottom:"8px" }}>
                                           <div style={{ fontSize:"12px", fontWeight:"700", color:"#00BFFF", textTransform:"uppercase", letterSpacing:"0.06em", marginBottom:"5px" }}>Target Score</div>
                                           <div style={{ display:"flex", gap:"4px", flexWrap:"wrap", alignItems:"center" }}>
-                                            <button onClick={()=>setTargetScores(p=>({...p,[key]:-1}))} style={{ padding:"5px 11px", borderRadius:"5px", border:`2px solid ${targetScores[key]===-1?"#4A6A8A":"#1B3A6B"}`, background:targetScores[key]===-1?"rgba(74,106,138,0.2)":"transparent", color:targetScores[key]===-1?"#8BAAC8":"#4A6A8A", fontSize:"13px", fontWeight:"700", cursor:"pointer", fontFamily:"inherit" }}>N/A</button>
+                                            <button onClick={()=>setTargetScores(p=>({...p,[key]:-1}))} style={{ padding:"5px 11px", borderRadius:"5px", border:"2px solid " + (targetScores[key]===-1?"#4A6A8A":"#1B3A6B"), background:targetScores[key]===-1?"rgba(74,106,138,0.2)":"transparent", color:targetScores[key]===-1?"#8BAAC8":"#4A6A8A", fontSize:"13px", fontWeight:"700", cursor:"pointer", fontFamily:"inherit" }}>N/A</button>
                                             {ML.map(m=>{ const tgt=targetScores[key]; return (
-                                              <button key={m.value} onClick={()=>setTargetScores(p=>({...p,[key]:m.value}))} style={{ padding:"5px 11px", borderRadius:"5px", border:`2px solid ${tgt===m.value?"#00BFFF":"#1B3A6B"}`, background:tgt===m.value?"rgba(0,191,255,0.15)":"transparent", color:tgt===m.value?"#00BFFF":"#4A6A8A", fontSize:"15px", fontWeight:"700", cursor:"pointer", fontFamily:MONO }}>{m.value}</button>
+                                              <button key={m.value} onClick={()=>setTargetScores(p=>({...p,[key]:m.value}))} style={{ padding:"5px 11px", borderRadius:"5px", border:"2px solid " + (tgt===m.value?"#00BFFF":"#1B3A6B"), background:tgt===m.value?"rgba(0,191,255,0.15)":"transparent", color:tgt===m.value?"#00BFFF":"#4A6A8A", fontSize:"15px", fontWeight:"700", cursor:"pointer", fontFamily:MONO }}>{m.value}</button>
                                             );})}
                                             {targetScores[key]!==undefined&&targetScores[key]!==-1&&<span style={{ fontSize:"13px", color:"#00BFFF", marginLeft:"4px" }}>{ML.find(m=>m.value===targetScores[key])?.label}</span>}
                                             {targetScores[key]===undefined&&cur!==undefined&&cur!==-1&&<span style={{ fontSize:"12px", color:"#4A6A8A", marginLeft:"4px", fontStyle:"italic" }}>defaults to current ({cur})</span>}
@@ -2323,7 +2484,7 @@ export default function MaturityScorecard() {
                                         </div>
                                       )}
 
-                                      {/* Evidence note field */}
+                                      
                                       <input
                                         placeholder="Evidence note  -  document references, verbatim quotes, observations..."
                                         value={notes[key]||""}
@@ -2346,7 +2507,7 @@ export default function MaturityScorecard() {
           </div>
         )}
 
-        {/* -- RESULTS -- */}
+        
         {view==="results" && (
           <div>
             <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"18px" }}>
@@ -2363,12 +2524,12 @@ export default function MaturityScorecard() {
             <div style={{ display:"flex", gap:"3px", marginBottom:"18px", background:"#0A1932", padding:"4px", borderRadius:"8px", width:"fit-content", border:"1px solid #1B3A6B" }}>
               {["overview","insights","recommendations","narrative","workshop"].map(t=>(
                 <button key={t} onClick={()=>setResultsTab(t)} style={{ padding:"7px 16px", borderRadius:"6px", border:"none", background:resultsTab===t?"#1B3A6B":"transparent", color:resultsTab===t?"#FFFFFF":"#4A6A8A", fontSize:"14px", fontWeight:"700", cursor:"pointer", fontFamily:"inherit" }}>
-                  {t==="overview"?"Scorecard":t==="insights"?"Insights":t==="recommendations"?`Recommendations${(getAllGaps().length+getDocGaps().length)>0?` (${getAllGaps().length+getDocGaps().length})`:""}`:t==="narrative"?"* Narrative":"Workshop Notes"}
+                  {t==="overview"?"Scorecard":t==="insights"?"Insights":t==="recommendations"?("Recommendations" + ((getAllGaps().length+getDocGaps().length) > 0 ? " (" + (getAllGaps().length+getDocGaps().length) + ")" : "")):t==="narrative"?"* Narrative":"Workshop Notes"}
                 </button>
               ))}
             </div>
 
-            {/* SCORECARD OVERVIEW */}
+            
             {resultsTab==="overview" && (()=>{
               const displayScore  = animScore  !== null ? parseFloat(animScore).toFixed(2)  : " - ";
               const displayTarget = animTarget !== null ? parseFloat(animTarget).toFixed(2) : " - ";
@@ -2383,7 +2544,7 @@ export default function MaturityScorecard() {
                         <div style={{ width:"88px", height:"88px", borderRadius:"50%", background:`conic-gradient(${getMC(overall)} ${(parseFloat(overall||0)/4)*360}deg, #1B3A6B 0deg)`, display:"flex", alignItems:"center", justifyContent:"center" }}>
                           <div style={{ width:"64px", height:"64px", borderRadius:"50%", background:"#0D1F3C", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center" }}>
                             <div style={{ fontSize:"20px", fontWeight:"800", color:getMC(overall), lineHeight:1, fontFamily:MONO }}>{displayScore}</div>
-                            <div style={{ fontSize:"11px", color:"#4A6A8A", fontWeight:"600", fontFamily:MONO }}>/4.0</div>
+                            <div style={{ fontSize:"11px", color:"#4A6A8A", fontWeight:"600", fontFamily:MONO }}>{"of"} 4.0</div>
                           </div>
                         </div>
                         <div style={{ fontSize:"13px", fontWeight:"700", color:getMC(overall), marginTop:"5px" }}>{getML(overall)}</div>
@@ -2397,14 +2558,14 @@ export default function MaturityScorecard() {
                         <div style={{ width:"88px", height:"88px", borderRadius:"50%", background:`conic-gradient(#00BFFF ${(parseFloat(overallTarget||0)/4)*360}deg, #1B3A6B 0deg)`, display:"flex", alignItems:"center", justifyContent:"center" }}>
                           <div style={{ width:"64px", height:"64px", borderRadius:"50%", background:"#0D1F3C", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center" }}>
                             <div style={{ fontSize:"20px", fontWeight:"800", color:"#00BFFF", lineHeight:1, fontFamily:MONO }}>{displayTarget}</div>
-                            <div style={{ fontSize:"11px", color:"#4A6A8A", fontWeight:"600", fontFamily:MONO }}>/4.0</div>
+                            <div style={{ fontSize:"11px", color:"#4A6A8A", fontWeight:"600", fontFamily:MONO }}>{"of"} 4.0</div>
                           </div>
                         </div>
                         <div style={{ fontSize:"13px", fontWeight:"700", color:"#00BFFF", marginTop:"5px" }}>{getML(overallTarget)}</div>
                       </div>
                     </div>
                     <div style={{ display:"flex", flexDirection:"column", gap:"7px" }}>
-                      {fw.map(cat=>{ const sc=catScore(cat); const tgt=catTarget(cat); const pctC=sc?(parseFloat(sc)/4)*100:0; const pctT=tgt?(parseFloat(tgt)/4)*100:0; return (
+                      {fw.map(cat=>{ const sc=catScore(cat); const tgt=catTarget(cat); const scNum=sc?parseFloat(sc):0; const tgtNum=tgt?parseFloat(tgt):0; const pctC=scNum*25; const pctT=tgtNum*25; return (
                         <div key={cat.id}>
                           <div style={{ display:"flex", justifyContent:"space-between", marginBottom:"3px" }}>
                             <span style={{ fontSize:"13px", fontWeight:"600", color:"#8BAAC8" }}>{cat.id}  -  {cat.name}</span>
@@ -2423,7 +2584,7 @@ export default function MaturityScorecard() {
                     </div>
                   </div>
 
-                  {/* Hex Map  -  right panel */}
+                  
                   <div style={{ ...card, position:"relative", overflow:"hidden", display:"flex", flexDirection:"column" }}>
                     <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"4px" }}>
                       <div>
@@ -2434,7 +2595,7 @@ export default function MaturityScorecard() {
                         const cat = fw.find(c=>c.id===activeHex);
                         const sc  = catScore(cat);
                         return (
-                          <div style={{ padding:"10px 16px", borderRadius:"9px", background:"rgba(8,17,31,0.92)", border:`1px solid ${cat?.color||"#1B3A6B"}80`, backdropFilter:"blur(8px)", display:"flex", alignItems:"center", gap:"14px" }}>
+                          <div style={{ padding:"10px 16px", borderRadius:"9px", background:"rgba(8,17,31,0.92)", border:"1px solid " + (cat?.color||"#1B3A6B") + "80", backdropFilter:"blur(8px)", display:"flex", alignItems:"center", gap:"14px" }}>
                             <div>
                               <span style={{ fontSize:"14px", fontWeight:"800", color:cat?.color, fontFamily:MONO }}>{activeHex}</span>
                               <span style={{ fontSize:"13px", color:"#8BAAC8", marginLeft:"8px" }}>{cat?.name}</span>
@@ -2484,7 +2645,7 @@ export default function MaturityScorecard() {
               );
             })()}
 
-            {/* INSIGHTS */}
+            
             {resultsTab==="insights" && (
               completion<10?(
                 <div style={{ ...card, textAlign:"center", padding:"56px" }}>
@@ -2494,7 +2655,7 @@ export default function MaturityScorecard() {
                 </div>
               ):(
                 <div>
-                  {/* Row 1  -  Score distribution + Avg by function */}
+                  
                   <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"14px", marginBottom:"14px" }}>
                     <div style={card}>
                       <div style={{ fontSize:"15px", fontWeight:"700", color:"#E2EAF4", marginBottom:"3px" }}>Score Distribution</div>
@@ -2524,13 +2685,13 @@ export default function MaturityScorecard() {
                     </div>
                   </div>
 
-                  {/* Row 2  -  Gaps by function + Priority breakdown */}
+                  
                   <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"14px", marginBottom:"14px" }}>
                     <div style={card}>
                       <div style={{ fontSize:"15px", fontWeight:"700", color:"#E2EAF4", marginBottom:"3px" }}>Gaps by Function</div>
                       <div style={{ fontSize:"13px", color:"#4A6A8A", marginBottom:"16px" }}>Controls scoring below 3 per function  -  guides remediation workstream scoping</div>
                       <HBarChart data={fw.map(cat=>({ label:cat.id, value:getAllGaps().filter(g=>g.cat.id===cat.id).length, color:cat.color }))} />
-                      {(()=>{ const worst=fw.map(cat=>({id:cat.id,name:cat.name,color:cat.color,n:getAllGaps().filter(g=>g.cat.id===cat.id).length})).sort((a,b)=>b.n-a.n)[0]; return worst?.n>0?(
+                      {(()=>{ const worst=fw.map(cat=>({id:cat.id,name:cat.name,color:cat.color,n:getAllGaps().filter(g=>g.cat.id===cat.id).length})).sort((a,b)=>b.n-a.n)[0]; const hasGaps = worst && worst.n > 0; return hasGaps?(
                         <div style={{ marginTop:"12px", padding:"9px 12px", borderRadius:"6px", background:"rgba(0,0,0,0.2)", border:"1px solid #1B3A6B", fontSize:"13px", color:"#8BAAC8" }}>
                           <span style={{ fontWeight:"700", color:worst.color }}>{worst.id}  -  {worst.name}</span>{" "}has the most gaps ({worst.n} controls below threshold)
                         </div>
@@ -2572,7 +2733,7 @@ export default function MaturityScorecard() {
                     </div>
                   </div>
 
-                  {/* Row 3  -  Effort profile */}
+                  
                   <div style={card}>
                     <div style={{ fontSize:"15px", fontWeight:"700", color:"#E2EAF4", marginBottom:"3px" }}>Remediation Effort Profile</div>
                     <div style={{ fontSize:"13px", color:"#4A6A8A", marginBottom:"16px" }}>Distribution of effort required to close all identified gaps  -  use for resource planning</div>
@@ -2601,17 +2762,17 @@ export default function MaturityScorecard() {
               )
             )}
 
-            {/* RECOMMENDATIONS */}
+            
             {resultsTab==="recommendations" && (
               (getAllGaps().length===0 && getDocGaps().length===0) ? (
                 <div style={{ ...card, textAlign:"center", padding:"56px" }}>
-                  <div style={{ fontSize:"30px", marginBottom:"12px" }}>&#10003;</div>
+                  <div style={{ fontSize:"30px", marginBottom:"12px" }}>{"✓"}</div>
                   <div style={{ fontSize:"15px", fontWeight:"700", color:"#E2EAF4" }}>No gaps identified yet</div>
                   <div style={{ fontSize:"14px", color:"#4A6A8A", marginTop:"7px" }}>Complete the assessment and documentation review to see recommendations</div>
                 </div>
               ) : (
                 <div>
-                  {/* Summary counters */}
+                  
                   <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:"10px", marginBottom:"18px" }}>
                     {["Critical","High","Medium"].map(p=>{ const count=getAllGaps().filter(g=>g.rec?.priority===p).length; const cfg=PRI_CFG[p]; return (
                       <div key={p} style={{ ...card, borderLeft:`4px solid ${cfg.color}`, padding:"14px 16px" }}>
@@ -2625,7 +2786,7 @@ export default function MaturityScorecard() {
                     </div>
                   </div>
 
-                  {/* Documentation gaps section */}
+                  
                   {getDocGaps().length > 0 && (
                     <div style={{ marginBottom:"24px" }}>
                       <div style={{ display:"flex", alignItems:"center", gap:"8px", marginBottom:"10px" }}>
@@ -2666,7 +2827,7 @@ export default function MaturityScorecard() {
                     </div>
                   )}
 
-                  {/* Scored control gaps */}
+                  
                   {getAllGaps().length > 0 && (
                     <div>
                       <div style={{ display:"flex", alignItems:"center", gap:"8px", marginBottom:"10px" }}>
@@ -2730,13 +2891,13 @@ export default function MaturityScorecard() {
               )
             )}
 
-            {/* NARRATIVE */}
+            
             {resultsTab==="narrative" && (()=>{
               const narrative = generateNarrative();
               const sections = narrative.split("\n\n");
               return (
                 <div>
-                  {/* Header */}
+                  
                   <div style={{ marginBottom:"18px", padding:"16px 20px", borderRadius:"12px", background:"linear-gradient(135deg, rgba(30,111,217,0.12), rgba(0,191,255,0.08))", border:"1px solid rgba(0,191,255,0.25)", display:"flex", alignItems:"flex-start", justifyContent:"space-between", gap:"20px" }}>
                     <div>
                       <div style={{ fontSize:"15px", fontWeight:"800", color:"#FFFFFF", marginBottom:"4px" }}>* AI-Assisted Report Narrative</div>
@@ -2744,8 +2905,8 @@ export default function MaturityScorecard() {
                         Draft narrative generated entirely from your scored data  -  no client information was transmitted externally. Review, edit and refine before including in any client deliverable.
                       </div>
                       <div style={{ marginTop:"8px", display:"flex", gap:"8px", flexWrap:"wrap" }}>
-                        <span style={{ fontSize:"12px", color:"#C8F135", background:"rgba(200,241,53,0.1)", padding:"2px 10px", borderRadius:"20px", border:"1px solid rgba(200,241,53,0.25)", fontWeight:"700" }}>&#10003; 100% Client-Side</span>
-                        <span style={{ fontSize:"12px", color:"#00BFFF", background:"rgba(0,191,255,0.1)", padding:"2px 10px", borderRadius:"20px", border:"1px solid rgba(0,191,255,0.2)", fontWeight:"700" }}>&#10003; No Data Transmitted</span>
+                        <span style={{ fontSize:"12px", color:"#C8F135", background:"rgba(200,241,53,0.1)", padding:"2px 10px", borderRadius:"20px", border:"1px solid rgba(200,241,53,0.25)", fontWeight:"700" }}>{"✓"} 100% Client-Side</span>
+                        <span style={{ fontSize:"12px", color:"#00BFFF", background:"rgba(0,191,255,0.1)", padding:"2px 10px", borderRadius:"20px", border:"1px solid rgba(0,191,255,0.2)", fontWeight:"700" }}>{"✓"} No Data Transmitted</span>
                         <span style={{ fontSize:"12px", color:"#8BAAC8", background:"rgba(139,170,200,0.1)", padding:"2px 10px", borderRadius:"20px", border:"1px solid rgba(139,170,200,0.2)", fontWeight:"700" }}>Draft  -  Requires Review</span>
                       </div>
                     </div>
@@ -2764,7 +2925,7 @@ export default function MaturityScorecard() {
                     </div>
                   )}
 
-                  {/* Narrative rendered section by section */}
+                  
                   <div style={{ display:"flex", flexDirection:"column", gap:"12px" }}>
                     {sections.map((section, i) => {
                       const isHeading = section.startsWith("EXECUTIVE SUMMARY") || section.startsWith("FUNCTION ASSESSMENT") || section.startsWith("RECOMMENDATIONS OVERVIEW") || section.startsWith("CONCLUSION");
@@ -2799,7 +2960,7 @@ export default function MaturityScorecard() {
               );
             })()}
 
-            {/* WORKSHOP NOTES */}
+            
             {resultsTab==="workshop" && (
               <div>
                 <div style={{ marginBottom:"16px", padding:"12px 16px", borderRadius:"8px", background:"rgba(0,191,255,0.08)", border:"1px solid rgba(0,191,255,0.2)", fontSize:"14px", color:"#00BFFF" }}>
@@ -2841,7 +3002,6 @@ export default function MaturityScorecard() {
             )}
           </div>
         )}
-      </div>
       </div>
     </div>
   );
