@@ -805,6 +805,50 @@ NIST_DOCS.forEach(doc => {
 
 const DOC_CAT_COLORS = { Governance:"#1E6FD9", Identify:"#00BFFF", Protect:"#C8F135", Detect:"#F59E0B", Respond:"#F87171", Recover:"#A78BFA", "Supply Chain":"#34D399" };
 
+// Domain keyword index for matching imported notes to workshop categories
+const DOMAIN_KEYWORDS = {
+  "GV.OC": ["mission","business strategy","regulation","legal","contractual","GDPR","NIS2","critical process","board","business context","organisational context"],
+  "GV.RM": ["risk management","risk appetite","risk tolerance","risk register","risk committee","risk framework","ISO 31000","risk owner","accountable"],
+  "GV.RR": ["roles","responsibilities","authorities","accountability","RACI","risk-aware culture","human resources","workforce"],
+  "GV.PO": ["policy","acceptable use","information security policy","policy review","policy exception","sign-off","policy framework"],
+  "GV.OV": ["oversight","strategy review","performance","risk management strategy","adjusted","coverage"],
+  "GV.SC": ["supply chain","supplier","third-party","vendor","contract","due diligence","onboarding","supplier risk","service provider"],
+  "ID.AM": ["asset inventory","hardware","software","network topology","data flow","shadow IT","CMDB","asset register","SaaS","licence"],
+  "ID.RA": ["vulnerability","threat intelligence","risk assessment","risk register","likelihood","impact","CVSS","penetration test","scan","prioritisation"],
+  "ID.IM": ["improvement","lessons learned","post-incident","KPI","KRI","metrics","assessment findings","remediation plan","security programme"],
+  "PR.AA": ["identity","access control","MFA","multi-factor","authentication","joiner","mover","leaver","JML","privileged","service account","PAM","RBAC","least privilege"],
+  "PR.AT": ["awareness","training","phishing simulation","security awareness","click rate","role-specific","onboarding training"],
+  "PR.DS": ["data classification","encryption","data at rest","data in transit","TLS","BitLocker","FileVault","retention","disposal","DLP","data leakage"],
+  "PR.PS": ["configuration","hardening","CIS Benchmark","patch management","patching","change management","CAB","baseline","GPO","MDM","SCCM"],
+  "PR.IR": ["network protection","infrastructure resilience","environmental","logical access"],
+  "DE.CM": ["monitoring","SIEM","EDR","endpoint detection","IDS","IPS","NDR","log management","antivirus","anti-malware","UEBA","continuous monitoring"],
+  "DE.AE": ["alert","triage","correlation","baseline","false positive","adverse event","detection rule","MITRE"],
+  "RS.MA": ["incident response","IR plan","playbook","severity","classification","P1","P2","escalation","tabletop","simulation"],
+  "RS.AN": ["root cause","forensic","evidence","chain of custody","RCA","five whys","incident analysis","threat intelligence"],
+  "RS.CO": ["notification","escalation path","regulatory","ICO","communication","breach","stakeholder","out-of-hours"],
+  "RS.MI": ["containment","eradication","mitigation","isolate"],
+  "RC.RP": ["recovery","backup","restore","disaster recovery","DRP","BCP","RTO","RPO","runbook","business continuity"],
+  "RC.CO": ["recovery communication","post-incident review","lessons learned","reputation","stakeholder update"],
+  "CIS1": ["hardware asset","asset inventory","device","NAC","network access control","unauthorised device","asset discovery"],
+  "CIS2": ["software inventory","software asset","application allowlist","unauthorised software","licence","browser extension"],
+  "CIS3": ["data classification","encryption","data protection","retention","disposal","sensitive data"],
+  "CIS4": ["secure configuration","hardening","CIS Benchmark","default credentials","configuration drift","baseline"],
+  "CIS5": ["account management","JML","joiner mover leaver","privileged account","dormant account","deprovisioning"],
+  "CIS6": ["access control","MFA","least privilege","access review","role-based","RBAC","entitlement"],
+  "CIS7": ["vulnerability management","vulnerability scan","patching","remediation SLA","penetration test","CREST"],
+  "CIS8": ["audit log","log management","SIEM","log retention","tamper","centralised logging"],
+  "CIS9": ["email security","web filtering","DMARC","DKIM","SPF","phishing","DNS filtering","Umbrella"],
+  "CIS10": ["malware","antivirus","EDR","endpoint detection","CrowdStrike","SentinelOne","Defender"],
+  "CIS11": ["backup","data recovery","3-2-1","restore","air-gapped","immutable","ransomware resilience"],
+  "CIS12": ["network segmentation","firewall","VLAN","remote access","VPN","RDP","network management"],
+  "CIS13": ["network monitoring","IDS","IPS","NDR","DNS filtering","anomaly detection","traffic monitoring"],
+  "CIS14": ["security awareness","training","phishing simulation","role-specific training"],
+  "CIS15": ["service provider","supplier","third-party","vendor","contract security","supplier access"],
+  "CIS16": ["application security","SDLC","secure development","SAST","DAST","code review","OWASP","SCA","Snyk"],
+  "CIS17": ["incident response","IR plan","tabletop","post-incident review","PIR","playbook"],
+  "CIS18": ["penetration testing","pen test","CREST","CHECK","social engineering","red team","retest"],
+};
+
 function BarChart({ data, height = 150 }) {
   const max = Math.max(...data.map(d => d.value), 4);
   const w = 100 / data.length;
@@ -959,7 +1003,12 @@ export default function MaturityScorecard() {
   const [narrativeCopied, setNarrativeCopied] = useState(false);
   const [activeHex, setActiveHex] = useState(null);
   const [recoveryAvailable, setRecoveryAvailable] = useState(false);
+  const [baselineScores, setBaselineScores] = useState({});
+  const [importPreview, setImportPreview] = useState(null);
+  const [notesImportPreview, setNotesImportPreview] = useState(null);
   const fileInputRef = useRef();
+  const importScoresRef = useRef();
+  const importNotesRef = useRef();
 
   const fw = FRAMEWORKS[framework];
   const isNIST = framework === "NIST CSF 2.0";
@@ -1139,7 +1188,299 @@ export default function MaturityScorecard() {
     e.target.value = "";
   }
 
-  // -- Excel Export ---------------------------------------------------------
+  // -- Import Previous Scores from Excel ------------------------------------
+  // Reads .xlsx, detects subcategory IDs and scores, maps to internal keys
+  // 100% client-side via SheetJS - no data transmitted
+  function importPreviousScores(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const wb = XLSX.read(ev.target.result, { type: "array" });
+        const allMapped = {};
+        const allNotes = {};
+        let matchCount = 0;
+        let sheetUsed = "";
+
+        // Build a lookup: subcategory ID prefix -> domain + question index
+        const subcatLookup = {};
+        fw.forEach(cat => {
+          cat.domains.forEach(domain => {
+            domain.questions.forEach((q, qi) => {
+              // Extract subcategory ID from question text (e.g. "GV.OC-01")
+              const parts = q.split("  -  ");
+              const subId = parts[0]?.trim();
+              if (subId) {
+                subcatLookup[subId] = domain.id + "_q" + qi;
+                // Also map without the dash format
+                const alt = subId.replace("-", ".");
+                subcatLookup[alt] = domain.id + "_q" + qi;
+              }
+              // Also map by domain + index (e.g. "GV.OC_q0")
+              subcatLookup[domain.id + "_q" + qi] = domain.id + "_q" + qi;
+            });
+          });
+        });
+
+        // Try each sheet
+        for (const sheetName of wb.SheetNames) {
+          const ws = wb.Sheets[sheetName];
+          const data = XLSX.utils.sheet_to_json(ws, { header: 1 });
+          if (data.length < 2) continue;
+
+          // Find header row - look for columns containing subcategory-like IDs
+          const headers = data[0] || [];
+          let idCol = -1;
+          let scoreCol = -1;
+          let noteCol = -1;
+          let targetCol = -1;
+
+          for (let c = 0; c < headers.length; c++) {
+            const h = String(headers[c] || "").toLowerCase();
+            if (h.includes("subcat") || h.includes("control") || h.includes("sub id") || h.includes("id")) {
+              if (idCol === -1) idCol = c;
+            }
+            if (h.includes("current") || h.includes("score") || h.includes("rating") || h.includes("maturity")) {
+              if (scoreCol === -1) scoreCol = c;
+            }
+            if (h.includes("target")) {
+              if (targetCol === -1) targetCol = c;
+            }
+            if (h.includes("note") || h.includes("evidence") || h.includes("comment")) {
+              if (noteCol === -1) noteCol = c;
+            }
+          }
+
+          // Fallback: if no ID column found, check if first column has subcategory-like values
+          if (idCol === -1) {
+            for (let r = 1; r < Math.min(data.length, 10); r++) {
+              const val = String(data[r]?.[0] || "");
+              if (/^[A-Z]{2}\.[A-Z]{2}-\d{2}/.test(val) || /^CIS\d+/.test(val)) {
+                idCol = 0;
+                break;
+              }
+            }
+          }
+
+          if (idCol === -1 || scoreCol === -1) continue;
+
+          // Process rows
+          for (let r = 1; r < data.length; r++) {
+            const row = data[r];
+            if (!row || !row[idCol]) continue;
+            const rawId = String(row[idCol]).trim();
+            const rawScore = row[scoreCol];
+
+            // Try to match the ID
+            let key = subcatLookup[rawId];
+            if (!key) {
+              // Try partial match - strip whitespace variants
+              const cleaned = rawId.replace(/\s+/g, "");
+              key = subcatLookup[cleaned];
+            }
+            if (!key) continue;
+
+            // Parse score (0-4 or N/A)
+            const scoreVal = parseFloat(rawScore);
+            if (!isNaN(scoreVal) && scoreVal >= 0 && scoreVal <= 4) {
+              allMapped[key] = Math.round(scoreVal);
+              matchCount++;
+            }
+            // Parse target if available
+            if (targetCol >= 0 && row[targetCol] !== undefined) {
+              const tgtVal = parseFloat(row[targetCol]);
+              if (!isNaN(tgtVal) && tgtVal >= 0 && tgtVal <= 4) {
+                allMapped["tgt_" + key] = Math.round(tgtVal);
+              }
+            }
+            // Parse notes if available
+            if (noteCol >= 0 && row[noteCol]) {
+              allNotes[key] = String(row[noteCol]).trim();
+            }
+          }
+
+          if (matchCount > 0) {
+            sheetUsed = sheetName;
+            break;
+          }
+        }
+
+        if (matchCount === 0) {
+          flash("No matching subcategories found in spreadsheet. Check format.");
+          return;
+        }
+
+        // Build preview
+        const preview = {
+          total: matchCount,
+          sheet: sheetUsed,
+          scores: {},
+          targets: {},
+          notes: allNotes,
+        };
+        Object.keys(allMapped).forEach(k => {
+          if (k.startsWith("tgt_")) {
+            preview.targets[k.slice(4)] = allMapped[k];
+          } else {
+            preview.scores[k] = allMapped[k];
+          }
+        });
+
+        setImportPreview(preview);
+      } catch (err) {
+        console.error(err);
+        flash("Error reading spreadsheet: " + err.message);
+      }
+    };
+    reader.readAsArrayBuffer(file);
+    e.target.value = "";
+  }
+
+  function confirmScoreImport(mode) {
+    if (!importPreview) return;
+    if (mode === "baseline") {
+      // Store as baseline for comparison only
+      setBaselineScores(importPreview.scores);
+      flash("Imported " + Object.keys(importPreview.scores).length + " scores as baseline");
+    } else if (mode === "current") {
+      // Import as current scores
+      setScores(prev => {
+        const merged = { ...prev };
+        Object.entries(importPreview.scores).forEach(function(entry) {
+          merged[entry[0]] = entry[1];
+        });
+        return merged;
+      });
+      if (Object.keys(importPreview.targets).length > 0) {
+        setTargetScores(prev => {
+          const merged = { ...prev };
+          Object.entries(importPreview.targets).forEach(function(entry) {
+            merged[entry[0]] = entry[1];
+          });
+          return merged;
+        });
+      }
+      if (Object.keys(importPreview.notes).length > 0) {
+        setNotes(prev => {
+          const merged = { ...prev };
+          Object.entries(importPreview.notes).forEach(function(entry) {
+            merged[entry[0]] = entry[1];
+          });
+          return merged;
+        });
+      }
+      flash("Imported " + Object.keys(importPreview.scores).length + " scores as current assessment");
+    }
+    setImportPreview(null);
+  }
+
+  // -- Import Previous Notes from Text/Word ---------------------------------
+  // Reads .txt or plain text, splits into paragraphs, matches to domains
+  // by keyword density. 100% client-side - no data transmitted
+  function importPreviousNotes(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const text = ev.target.result;
+        if (!text || text.trim().length < 50) {
+          flash("File appears empty or too short to analyse");
+          return;
+        }
+
+        // Split into meaningful paragraphs (min 30 chars)
+        const paragraphs = text.split(/\n\s*\n/)
+          .map(p => p.trim())
+          .filter(p => p.length > 30);
+
+        if (paragraphs.length === 0) {
+          flash("No meaningful content found in file");
+          return;
+        }
+
+        // Score each paragraph against each domain's keywords
+        const domainIds = fw.flatMap(c => c.domains.map(d => d.id));
+        const assignments = {};
+        domainIds.forEach(id => { assignments[id] = []; });
+
+        paragraphs.forEach(para => {
+          const lowerPara = para.toLowerCase();
+          let bestDomain = null;
+          let bestScore = 0;
+
+          domainIds.forEach(domId => {
+            const keywords = DOMAIN_KEYWORDS[domId] || [];
+            let score = 0;
+            keywords.forEach(kw => {
+              const kwLower = kw.toLowerCase();
+              // Count keyword occurrences (partial match for compound terms)
+              const idx = lowerPara.indexOf(kwLower);
+              if (idx >= 0) {
+                score += kwLower.length > 6 ? 3 : 1; // longer keywords score higher
+                // Bonus for multiple occurrences
+                const count = lowerPara.split(kwLower).length - 1;
+                if (count > 1) score += count - 1;
+              }
+            });
+
+            if (score > bestScore) {
+              bestScore = score;
+              bestDomain = domId;
+            }
+          });
+
+          // Only assign if we got a meaningful match (score >= 2)
+          if (bestDomain && bestScore >= 2) {
+            assignments[bestDomain].push(para);
+          }
+        });
+
+        // Build preview
+        const matchedDomains = Object.entries(assignments).filter(function(entry) { return entry[1].length > 0; });
+        const totalMatched = matchedDomains.reduce(function(a, entry) { return a + entry[1].length; }, 0);
+
+        if (totalMatched === 0) {
+          flash("No content could be matched to assessment domains. Try a more detailed document.");
+          return;
+        }
+
+        setNotesImportPreview({
+          fileName: file.name,
+          totalParagraphs: paragraphs.length,
+          matchedParagraphs: totalMatched,
+          matchedDomains: matchedDomains.length,
+          assignments: assignments,
+        });
+      } catch (err) {
+        console.error(err);
+        flash("Error reading file: " + err.message);
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = "";
+  }
+
+  function confirmNotesImport() {
+    if (!notesImportPreview) return;
+    const assignments = notesImportPreview.assignments;
+    setWorkshopNotes(prev => {
+      const merged = { ...prev };
+      Object.entries(assignments).forEach(function(entry) {
+        const domId = entry[0];
+        const paras = entry[1];
+        if (paras.length > 0) {
+          const existing = merged[domId] || "";
+          const imported = "[Imported from " + notesImportPreview.fileName + "]\n" + paras.join("\n\n");
+          merged[domId] = existing ? existing + "\n\n" + imported : imported;
+        }
+      });
+      return merged;
+    });
+    flash("Distributed " + notesImportPreview.matchedParagraphs + " paragraphs across " + notesImportPreview.matchedDomains + " domains");
+    setNotesImportPreview(null);
+  }
   // -- Narrative Generator ---------------------------------------------------
   // Fully client-side. No API calls. No client data transmitted externally.
   function generateNarrative() {
@@ -1742,6 +2083,8 @@ export default function MaturityScorecard() {
   return (
     <div style={appStyle}>
       <input type="file" accept=".json" ref={fileInputRef} onChange={loadSession} style={{display:"none"}}/>
+      <input type="file" accept=".xlsx,.xls,.csv" ref={importScoresRef} onChange={importPreviousScores} style={{display:"none"}}/>
+      <input type="file" accept=".txt,.md,.rtf" ref={importNotesRef} onChange={importPreviousNotes} style={{display:"none"}}/>
 
       
       <div style={{ background:"#060E1A", padding:"0 28px", display:"flex", alignItems:"center", justifyContent:"space-between", height:"62px", borderBottom:"1px solid #1B3A6B", boxShadow:"0 2px 20px rgba(0,0,0,0.5)" }}>
@@ -2102,10 +2445,83 @@ export default function MaturityScorecard() {
                 ))}
               </div>
             </div>
+            <div style={{ ...card, gridColumn:"1 / -1", borderTop:"3px solid #00BFFF" }}>
+              <div style={{ fontSize:"13px", fontWeight:"700", color:"#00BFFF", letterSpacing:"0.1em", textTransform:"uppercase", marginBottom:"6px" }}>Import Previous Assessment Data</div>
+              <div style={{ fontSize:"13px", color:"#8BAAC8", lineHeight:"1.6", marginBottom:"16px" }}>Upload a previous assessment to pre-populate scores or distribute workshop notes. All processing is 100% client-side  -  no data is transmitted externally.</div>
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"16px" }}>
+                <div style={{ padding:"18px", borderRadius:"10px", background:"#0A1932", border:"1px solid #1B3A6B" }}>
+                  <div style={{ display:"flex", alignItems:"center", gap:"8px", marginBottom:"10px" }}>
+                    <div style={{ width:"32px", height:"32px", borderRadius:"8px", background:"rgba(200,241,53,0.12)", border:"1px solid rgba(200,241,53,0.3)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:"16px" }}>S</div>
+                    <div>
+                      <div style={{ fontSize:"14px", fontWeight:"700", color:"#E2EAF4" }}>Previous Scores (Excel)</div>
+                      <div style={{ fontSize:"12px", color:"#4A6A8A" }}>.xlsx, .xls or .csv</div>
+                    </div>
+                  </div>
+                  <div style={{ fontSize:"13px", color:"#8BAAC8", lineHeight:"1.6", marginBottom:"12px" }}>Upload a scored assessment spreadsheet. The tool will detect subcategory IDs and scores, then let you import as a baseline for comparison or as current scores.</div>
+                  <button onClick={()=>importScoresRef.current?.click()} style={{ width:"100%", padding:"10px", borderRadius:"7px", background:"rgba(200,241,53,0.1)", border:"1px solid rgba(200,241,53,0.3)", color:"#C8F135", fontWeight:"700", fontSize:"14px", cursor:"pointer", fontFamily:"inherit" }}>Upload Spreadsheet</button>
+                  {Object.keys(baselineScores).length > 0 && (
+                    <div style={{ marginTop:"10px", padding:"8px 12px", borderRadius:"6px", background:"rgba(200,241,53,0.08)", border:"1px solid rgba(200,241,53,0.2)", fontSize:"13px", color:"#C8F135" }}>
+                      {"Baseline loaded: " + Object.keys(baselineScores).length + " scores"}
+                      <button onClick={()=>setBaselineScores({})} style={{ marginLeft:"8px", background:"none", border:"none", color:"#4A6A8A", fontSize:"12px", cursor:"pointer", fontFamily:"inherit", textDecoration:"underline" }}>Clear</button>
+                    </div>
+                  )}
+                </div>
+                <div style={{ padding:"18px", borderRadius:"10px", background:"#0A1932", border:"1px solid #1B3A6B" }}>
+                  <div style={{ display:"flex", alignItems:"center", gap:"8px", marginBottom:"10px" }}>
+                    <div style={{ width:"32px", height:"32px", borderRadius:"8px", background:"rgba(0,191,255,0.12)", border:"1px solid rgba(0,191,255,0.3)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:"16px" }}>N</div>
+                    <div>
+                      <div style={{ fontSize:"14px", fontWeight:"700", color:"#E2EAF4" }}>Previous Notes (Text)</div>
+                      <div style={{ fontSize:"12px", color:"#4A6A8A" }}>.txt or .md</div>
+                    </div>
+                  </div>
+                  <div style={{ fontSize:"13px", color:"#8BAAC8", lineHeight:"1.6", marginBottom:"12px" }}>Upload notes from a previous assessment, meeting minutes, or report text. The tool will analyse content and distribute it across the matching workshop categories using keyword matching.</div>
+                  <button onClick={()=>importNotesRef.current?.click()} style={{ width:"100%", padding:"10px", borderRadius:"7px", background:"rgba(0,191,255,0.1)", border:"1px solid rgba(0,191,255,0.3)", color:"#00BFFF", fontWeight:"700", fontSize:"14px", cursor:"pointer", fontFamily:"inherit" }}>Upload Notes</button>
+                </div>
+              </div>
+              {importPreview && (
+                <div style={{ marginTop:"16px", padding:"18px", borderRadius:"10px", background:"rgba(200,241,53,0.06)", border:"1px solid rgba(200,241,53,0.25)" }}>
+                  <div style={{ fontSize:"14px", fontWeight:"700", color:"#C8F135", marginBottom:"8px" }}>Score Import Preview</div>
+                  <div style={{ fontSize:"13px", color:"#8BAAC8", marginBottom:"12px", lineHeight:"1.6" }}>
+                    {"Found " + importPreview.total + " matching subcategory scores from sheet \"" + importPreview.sheet + "\""}
+                    {Object.keys(importPreview.targets).length > 0 ? " with " + Object.keys(importPreview.targets).length + " target scores" : ""}
+                    {Object.keys(importPreview.notes).length > 0 ? " and " + Object.keys(importPreview.notes).length + " evidence notes" : ""}
+                    {"."}
+                  </div>
+                  <div style={{ display:"flex", gap:"8px" }}>
+                    <button onClick={()=>confirmScoreImport("baseline")} style={{ flex:1, padding:"10px", borderRadius:"7px", background:"rgba(167,139,250,0.15)", border:"1px solid rgba(167,139,250,0.4)", color:"#A78BFA", fontWeight:"700", fontSize:"13px", cursor:"pointer", fontFamily:"inherit" }}>Import as Baseline (comparison only)</button>
+                    <button onClick={()=>confirmScoreImport("current")} style={{ flex:1, padding:"10px", borderRadius:"7px", background:"rgba(200,241,53,0.15)", border:"1px solid rgba(200,241,53,0.4)", color:"#C8F135", fontWeight:"700", fontSize:"13px", cursor:"pointer", fontFamily:"inherit" }}>Import as Current Scores</button>
+                    <button onClick={()=>setImportPreview(null)} style={{ padding:"10px 16px", borderRadius:"7px", background:"transparent", border:"1px solid #1B3A6B", color:"#4A6A8A", fontWeight:"700", fontSize:"13px", cursor:"pointer", fontFamily:"inherit" }}>Cancel</button>
+                  </div>
+                </div>
+              )}
+              {notesImportPreview && (
+                <div style={{ marginTop:"16px", padding:"18px", borderRadius:"10px", background:"rgba(0,191,255,0.06)", border:"1px solid rgba(0,191,255,0.25)" }}>
+                  <div style={{ fontSize:"14px", fontWeight:"700", color:"#00BFFF", marginBottom:"8px" }}>Notes Distribution Preview</div>
+                  <div style={{ fontSize:"13px", color:"#8BAAC8", marginBottom:"8px", lineHeight:"1.6" }}>
+                    {"Analysed " + notesImportPreview.totalParagraphs + " paragraphs from \"" + notesImportPreview.fileName + "\". Matched " + notesImportPreview.matchedParagraphs + " paragraphs across " + notesImportPreview.matchedDomains + " domains."}
+                  </div>
+                  <div style={{ display:"flex", flexWrap:"wrap", gap:"6px", marginBottom:"12px" }}>
+                    {Object.entries(notesImportPreview.assignments).filter(function(entry) { return entry[1].length > 0; }).map(function(entry) {
+                      const domId = entry[0];
+                      const paras = entry[1];
+                      const cat = fw.find(c => c.domains.some(d => d.id === domId));
+                      return (
+                        <span key={domId} style={{ fontSize:"12px", fontWeight:"700", color:cat?.color || "#8BAAC8", background:(cat?.color || "#8BAAC8") + "18", padding:"3px 10px", borderRadius:"4px", border:"1px solid " + (cat?.color || "#8BAAC8") + "40" }}>
+                          {domId + ": " + paras.length + " para" + (paras.length !== 1 ? "s" : "")}
+                        </span>
+                      );
+                    })}
+                  </div>
+                  <div style={{ display:"flex", gap:"8px" }}>
+                    <button onClick={confirmNotesImport} style={{ flex:1, padding:"10px", borderRadius:"7px", background:"rgba(0,191,255,0.15)", border:"1px solid rgba(0,191,255,0.4)", color:"#00BFFF", fontWeight:"700", fontSize:"13px", cursor:"pointer", fontFamily:"inherit" }}>Distribute to Workshop Notes</button>
+                    <button onClick={()=>setNotesImportPreview(null)} style={{ padding:"10px 16px", borderRadius:"7px", background:"transparent", border:"1px solid #1B3A6B", color:"#4A6A8A", fontWeight:"700", fontSize:"13px", cursor:"pointer", fontFamily:"inherit" }}>Cancel</button>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         )}
 
-        
         {view==="docs" && (()=>{
           const cats = [...new Set(NIST_DOCS.map(d=>d.cat))];
           const provided = NIST_DOCS.filter(d=>docsProvided[d.id]==="yes").length;
@@ -2461,7 +2877,14 @@ export default function MaturityScorecard() {
 
                                       
                                       <div style={{ marginBottom:"6px" }}>
-                                        <div style={{ fontSize:"12px", fontWeight:"700", color:"#4A6A8A", textTransform:"uppercase", letterSpacing:"0.06em", marginBottom:"5px" }}>Current Score</div>
+                                        <div style={{ display:"flex", alignItems:"center", gap:"8px", marginBottom:"5px" }}>
+                                          <div style={{ fontSize:"12px", fontWeight:"700", color:"#4A6A8A", textTransform:"uppercase", letterSpacing:"0.06em" }}>Current Score</div>
+                                          {baselineScores[key] !== undefined && (
+                                            <span style={{ fontSize:"12px", fontWeight:"700", color:"#A78BFA", background:"rgba(167,139,250,0.12)", padding:"2px 8px", borderRadius:"4px", border:"1px solid rgba(167,139,250,0.3)" }}>
+                                              {"Previous: " + baselineScores[key] + " (" + (ML.find(m=>m.value===baselineScores[key])?.label || "N/A") + ")"}
+                                            </span>
+                                          )}
+                                        </div>
                                         <div style={{ display:"flex", gap:"4px", flexWrap:"wrap", alignItems:"center" }}>
                                           <button onClick={()=>setScores(p=>({...p,[key]:-1}))} style={{ padding:"5px 11px", borderRadius:"5px", border:"2px solid " + (cur===-1?"#4A6A8A":"#1B3A6B"), background:cur===-1?"rgba(74,106,138,0.3)":"#0A1932", color:cur===-1?"#8BAAC8":"#4A6A8A", fontSize:"13px", fontWeight:"700", cursor:"pointer", fontFamily:"inherit" }}>N/A</button>
                                           {ML.map(m=>(
