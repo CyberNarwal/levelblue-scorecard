@@ -385,6 +385,255 @@ const WORKSHOP_QS = {
 
 // Helper: get all workshop questions for a domain (matches by prefix)
 // Returns array of { id, question } sorted by subcategory ID
+// --- NIST SUBCATEGORY DETAIL  -  assessor guidance & implementation examples --
+// guidance: what we are asking the client and what good looks like
+// examples: NIST CSF 2.0 implementation examples for each subcategory
+const NIST_DETAIL = {
+  // ── GV.OC  -  Organisational Context ──────────────────────────────────────
+  "GV.OC-01": {
+    guidance: "We need to understand whether cybersecurity is driven by business objectives or treated as a standalone IT function. Look for a documented mission statement that links security investment to business outcomes. At higher maturity, this is a board-approved document referenced in strategy discussions.",
+    examples: "Ex1: Establish criteria for determining mission criticality of systems. Ex2: Document how cybersecurity strategy supports the business mission. Ex3: Leadership communicates cybersecurity as an enabler of business objectives."
+  },
+  "GV.OC-02": {
+    guidance: "Probe who the key stakeholders are  -  board, regulators, customers, partners, insurers  -  and whether their cybersecurity expectations are formally captured. At lower maturity, this is ad hoc; at higher maturity, there is a documented stakeholder register with mapped requirements.",
+    examples: "Ex1: Identify and document stakeholders who have an interest in cybersecurity risk management outcomes. Ex2: Determine stakeholder needs and expectations regarding cybersecurity. Ex3: Prioritise stakeholder requirements for the cybersecurity strategy."
+  },
+  "GV.OC-03": {
+    guidance: "Identify every regulation, law and contractual obligation that applies  -  UK GDPR, NIS2, PCI DSS, sector regulators, insurance requirements, client contracts. Ask who owns compliance tracking and how gaps are identified. Look for a compliance register or obligations matrix.",
+    examples: "Ex1: Determine applicable legal requirements such as data protection regulations. Ex2: Determine contractual cybersecurity obligations. Ex3: Maintain a register of applicable compliance requirements and map them to controls."
+  },
+  "GV.OC-04": {
+    guidance: "Understand what services external parties rely on  -  customer-facing platforms, APIs, data feeds  -  and whether cybersecurity dependencies for those services are identified and communicated to stakeholders.",
+    examples: "Ex1: Identify services and capabilities that external stakeholders depend on. Ex2: Document cybersecurity requirements for those services. Ex3: Communicate dependencies and risks to relevant external stakeholders."
+  },
+  "GV.OC-05": {
+    guidance: "The mirror of OC-04: what does the organisation depend on from external parties? Cloud providers, ISPs, managed services, payment processors. Look for documented dependencies with risk assessments and continuity considerations.",
+    examples: "Ex1: Identify and document external dependencies including cloud services, utilities and suppliers. Ex2: Assess cybersecurity risks associated with dependencies. Ex3: Communicate dependency risks to organisational leadership."
+  },
+
+  // ── GV.RM  -  Risk Management Strategy ────────────────────────────────────
+  "GV.RM-01": {
+    guidance: "Is there a documented risk management framework or policy approved at senior level? Look for ISO 31000 alignment, NIST RMF adoption, or a bespoke framework. At low maturity this does not exist; at high maturity it is a living document driving decisions.",
+    examples: "Ex1: Document risk management objectives aligned with organisational goals. Ex2: Senior leadership reviews and approves risk management objectives. Ex3: Communicate objectives to all stakeholders."
+  },
+  "GV.RM-02": {
+    guidance: "Ask to see the risk appetite statement. It should define what level of risk is acceptable across different asset classes. Probe whether it is just a document or whether it actually drives risk acceptance decisions in practice.",
+    examples: "Ex1: Create and maintain a risk appetite statement approved by leadership. Ex2: Define risk tolerance levels for different risk categories. Ex3: Communicate risk appetite and tolerance to relevant stakeholders."
+  },
+  "GV.RM-03": {
+    guidance: "Is cybersecurity risk integrated into the enterprise risk management process or siloed within IT? At higher maturity, cyber risks appear alongside financial, operational and reputational risks in a unified register reviewed by the risk committee.",
+    examples: "Ex1: Include cybersecurity risks in enterprise risk management processes. Ex2: Determine how cybersecurity risk management activities align with enterprise risk activities. Ex3: Ensure cybersecurity risk reporting reaches enterprise risk governance."
+  },
+  "GV.RM-04": {
+    guidance: "Is there documented guidance on which risk response options are appropriate  -  accept, mitigate, transfer, avoid  -  and the criteria for selecting each? Look for a risk treatment policy or risk response framework.",
+    examples: "Ex1: Establish and communicate a risk response strategy. Ex2: Define criteria for selecting risk response options. Ex3: Document approved risk response options for different risk categories."
+  },
+  "GV.RM-05": {
+    guidance: "How does cybersecurity risk information flow through the organisation? Look for defined reporting lines, dashboards, regular cadences (monthly risk reports, quarterly board packs), and whether supplier risks are included.",
+    examples: "Ex1: Establish communication pathways for cybersecurity risks across the organisation. Ex2: Include supplier and third-party risks in risk communication. Ex3: Ensure risk information reaches decision-makers at all levels."
+  },
+  "GV.RM-06": {
+    guidance: "Is there a consistent methodology for assessing risk  -  a defined risk matrix (5x5), CVSS for technical vulnerabilities, a standardised likelihood/impact scale? Check if everyone uses the same method or if each team has its own approach.",
+    examples: "Ex1: Adopt a standardised risk assessment methodology. Ex2: Document the method for calculating and categorising risks. Ex3: Ensure consistent application of the methodology across the organisation."
+  },
+  "GV.RM-07": {
+    guidance: "Are positive risks (opportunities) from cybersecurity investment considered? For example, achieving Cyber Essentials Plus to win new contracts, or investing in zero trust to enable remote working. This is often missed at lower maturity levels.",
+    examples: "Ex1: Include positive risk identification in risk assessment processes. Ex2: Document strategic opportunities enabled by cybersecurity investments. Ex3: Present opportunities alongside threats in risk discussions."
+  },
+
+  // ── GV.SC  -  Cybersecurity Supply Chain Risk Management ──────────────────
+  "GV.SC-01": {
+    guidance: "Is there a documented supply chain risk management programme with clear strategy and objectives, or is supplier security handled reactively? Look for a SCRM policy, supplier tiering model and defined processes.",
+    examples: "Ex1: Establish a cybersecurity supply chain risk management programme. Ex2: Define objectives and policies for supply chain risk. Ex3: Assign roles for supply chain risk management."
+  },
+  "GV.SC-02": {
+    guidance: "Are security responsibilities clearly defined for suppliers, customers and partners  -  not just internally but communicated to and agreed with external parties? Look for RACI matrices covering third-party relationships.",
+    examples: "Ex1: Define cybersecurity responsibilities for suppliers. Ex2: Communicate and coordinate responsibilities with partners and customers. Ex3: Include responsibilities in contracts and agreements."
+  },
+  "GV.SC-03": {
+    guidance: "Is supply chain risk management part of the main risk management and improvement processes, or is it a separate disconnected activity? At higher maturity, supplier risks flow into the enterprise risk register.",
+    examples: "Ex1: Integrate supply chain risks into the enterprise risk register. Ex2: Include supply chain considerations in risk assessments. Ex3: Feed supply chain findings into improvement processes."
+  },
+  "GV.SC-04": {
+    guidance: "Do you have a supplier register that categorises suppliers by criticality? Look for a tiering model (Critical, High, Medium, Low) based on data access, system connectivity and business dependency.",
+    examples: "Ex1: Maintain an inventory of suppliers. Ex2: Prioritise suppliers based on criticality assessments. Ex3: Review and update supplier criticality ratings periodically."
+  },
+  "GV.SC-05": {
+    guidance: "Are cybersecurity requirements embedded in contracts  -  minimum controls, incident notification timelines (e.g. 72 hours), audit rights, data handling obligations, right to penetration test? Or are contracts purely commercial?",
+    examples: "Ex1: Include cybersecurity requirements in supplier contracts. Ex2: Require incident notification within defined timelines. Ex3: Include audit rights and compliance verification provisions."
+  },
+  "GV.SC-06": {
+    guidance: "Before onboarding a supplier with data or system access, what security assessment is performed? Look for questionnaires, ISO 27001/CE+ requirements, technical assessments. At low maturity, this is skipped or purely commercial.",
+    examples: "Ex1: Conduct security assessments before entering supplier relationships. Ex2: Require evidence of security certifications or controls. Ex3: Assess the risk of proposed supplier relationships."
+  },
+  "GV.SC-07": {
+    guidance: "How are supplier risks monitored after onboarding  -  periodic reassessment, continuous monitoring (e.g. SecurityScorecard), triggered reviews on major incidents? Or is it only checked at contract renewal?",
+    examples: "Ex1: Monitor supplier risk posture throughout the relationship. Ex2: Record and assess supplier risks periodically. Ex3: Respond to changes in supplier risk levels."
+  },
+  "GV.SC-08": {
+    guidance: "Are key suppliers included in your incident response and recovery planning? Would they know what to do if you had a major incident  -  and would you know what to do if they had one?",
+    examples: "Ex1: Include relevant suppliers in incident response planning. Ex2: Conduct joint incident response exercises with critical suppliers. Ex3: Establish communication protocols with suppliers for incidents."
+  },
+  "GV.SC-09": {
+    guidance: "Are supply chain security practices embedded across the full technology lifecycle  -  procurement, deployment, operation, decommissioning  -  and monitored for effectiveness?",
+    examples: "Ex1: Integrate supply chain security into technology lifecycle processes. Ex2: Monitor supply chain security practices for effectiveness. Ex3: Include supply chain considerations in cybersecurity programme reviews."
+  },
+  "GV.SC-10": {
+    guidance: "When a supplier relationship ends, what happens? Look for provisions covering data return/destruction, access revocation, knowledge transfer and transition security.",
+    examples: "Ex1: Include end-of-relationship provisions in supplier agreements. Ex2: Define data return and destruction requirements. Ex3: Plan for secure transition of services from departing suppliers."
+  },
+
+  // ── GV.RR  -  Roles, Responsibilities and Authorities ────────────────────
+  "GV.RR-01": {
+    guidance: "Is there a named individual at leadership level who is accountable for cybersecurity risk  -  CISO, CRO, or equivalent? Does the board receive regular cyber risk reporting? Is there evidence of a risk-aware culture driven from the top?",
+    examples: "Ex1: Assign leadership accountability for cybersecurity risk. Ex2: Foster an ethical and risk-aware organisational culture. Ex3: Demonstrate continuous improvement through leadership engagement."
+  },
+  "GV.RR-02": {
+    guidance: "Are cybersecurity roles and responsibilities formally documented  -  job descriptions, RACI matrix, terms of reference? Are they communicated to the individuals concerned and actually enforced?",
+    examples: "Ex1: Document cybersecurity roles and responsibilities. Ex2: Communicate roles to all relevant personnel. Ex3: Enforce accountability for cybersecurity responsibilities."
+  },
+  "GV.RR-03": {
+    guidance: "Are budget, headcount and tooling adequate for the cybersecurity risk strategy? This is about whether resources match the stated ambition. If the policy says 24/7 monitoring but there is no SOC budget, there is a gap.",
+    examples: "Ex1: Allocate budget commensurate with cybersecurity strategy. Ex2: Ensure sufficient staffing for cybersecurity functions. Ex3: Provide tools and technologies needed to execute the security programme."
+  },
+  "GV.RR-04": {
+    guidance: "Is cybersecurity built into HR processes  -  pre-employment screening, security in employment contracts, role-based training requirements, exit procedures including access revocation?",
+    examples: "Ex1: Include cybersecurity in recruitment and onboarding. Ex2: Address cybersecurity in employment agreements. Ex3: Integrate cybersecurity into exit and role-change processes."
+  },
+
+  // ── GV.PO  -  Policies, Processes and Procedures ─────────────────────────
+  "GV.PO-01": {
+    guidance: "What policies exist  -  Information Security Policy, Acceptable Use, Access Control, Data Handling, Incident Response? Who approved them? How are they communicated to staff  -  intranet, sign-off, training? Is compliance enforced?",
+    examples: "Ex1: Establish cybersecurity policy based on organisational context and strategy. Ex2: Communicate policy to all relevant personnel. Ex3: Enforce compliance with cybersecurity policy."
+  },
+  "GV.PO-02": {
+    guidance: "When were policies last reviewed? Is there an annual review cycle with named owners? Do reviews reflect changes in threats, technology and business requirements? Look for a policy register with review dates.",
+    examples: "Ex1: Review and update cybersecurity policy periodically. Ex2: Reflect changes in requirements, threats and technology. Ex3: Communicate policy updates to relevant personnel."
+  },
+
+  // ── GV.OV  -  Oversight ──────────────────────────────────────────────────
+  "GV.OV-01": {
+    guidance: "Are the outcomes of the cybersecurity risk management strategy reviewed at a senior level  -  has the investment delivered the expected risk reduction? Is strategy adjusted based on outcomes?",
+    examples: "Ex1: Review cybersecurity risk management outcomes regularly. Ex2: Use outcomes to inform strategy adjustments. Ex3: Report risk management results to senior leadership."
+  },
+  "GV.OV-02": {
+    guidance: "Is the risk management strategy itself reviewed periodically  -  not just the outcomes, but whether the strategy still covers current requirements, new threats and business changes?",
+    examples: "Ex1: Review the cybersecurity strategy for continued relevance. Ex2: Adjust strategy to cover emerging risks. Ex3: Validate strategy against current organisational requirements."
+  },
+  "GV.OV-03": {
+    guidance: "Is programme performance measured and evaluated  -  KPIs, KRIs, maturity metrics, audit findings? Are adjustments made based on performance data rather than just gut feel?",
+    examples: "Ex1: Evaluate cybersecurity programme performance using metrics. Ex2: Compare performance against objectives and benchmarks. Ex3: Identify and implement needed adjustments."
+  },
+
+  // ── ID.AM  -  Asset Management ────────────────────────────────────────────
+  "ID.AM-01": { guidance: "How complete and current is the hardware asset inventory? Look for active discovery tooling (Lansweeper, runZero), CMDB integration, and coverage of remote/cloud assets. Ask how rogue devices are detected.", examples: "Ex1: Maintain an inventory of hardware assets. Ex2: Use automated tools to discover and catalogue assets. Ex3: Reconcile inventory regularly and address discrepancies." },
+  "ID.AM-02": { guidance: "How is software tracked  -  Intune, SCCM, Jamf? Does it include SaaS, browser extensions and shadow IT? Are versions tracked against vulnerability data?", examples: "Ex1: Maintain inventories of software and services. Ex2: Include cloud services and SaaS in inventories. Ex3: Track software versions and patch status." },
+  "ID.AM-03": { guidance: "Is there a current network diagram showing trust boundaries, VLANs, cloud connectivity and data flows? When was it last validated against the actual environment?", examples: "Ex1: Document authorised network communications. Ex2: Map internal and external data flows. Ex3: Validate network documentation against actual configurations." },
+  "ID.AM-04": { guidance: "Is there a register of services provided by suppliers  -  cloud hosting, managed services, SaaS  -  including what data they handle and their access levels?", examples: "Ex1: Maintain an inventory of supplier-provided services. Ex2: Track data processed by suppliers. Ex3: Review supplier service inventory periodically." },
+  "ID.AM-05": { guidance: "Are assets prioritised by classification and criticality? Is there a tiered protection model  -  crown jewels getting more investment than commodity systems?", examples: "Ex1: Classify assets based on criticality and sensitivity. Ex2: Prioritise protection based on asset classification. Ex3: Review and update asset priorities periodically." },
+  "ID.AM-07": { guidance: "Is there a data inventory with metadata  -  data owners, classification, location, retention requirements? Or is data scattered across systems with no central visibility?", examples: "Ex1: Maintain inventories of data and metadata. Ex2: Classify data according to sensitivity. Ex3: Track data locations and assign data owners." },
+  "ID.AM-08": { guidance: "Are systems managed through their full lifecycle  -  procurement, deployment, operation, decommissioning? Is there a process for end-of-life systems?", examples: "Ex1: Manage assets throughout their lifecycle. Ex2: Plan for end-of-life and decommissioning. Ex3: Ensure secure disposal of retired assets." },
+
+  // ── ID.RA  -  Risk Assessment ─────────────────────────────────────────────
+  "ID.RA-01": { guidance: "Are you running regular authenticated vulnerability scans covering the full estate  -  cloud, on-premise, remote endpoints? How quickly are findings acted on? Is there a vulnerability management programme?", examples: "Ex1: Conduct vulnerability assessments regularly. Ex2: Validate and record identified vulnerabilities. Ex3: Track vulnerability remediation to completion." },
+  "ID.RA-02": { guidance: "Where does threat intelligence come from  -  NCSC, CISA, sector ISACs, commercial feeds? Does it actually change prioritisation decisions or is it just received and filed?", examples: "Ex1: Receive threat intelligence from information sharing forums. Ex2: Correlate threat intelligence with organisational risks. Ex3: Use threat intelligence to inform risk priorities." },
+  "ID.RA-03": { guidance: "Are internal and external threats formally identified and recorded  -  insider threat, nation state, cybercrime, hacktivist? Is there a threat register or threat model?", examples: "Ex1: Identify internal and external threats. Ex2: Record threats in a threat register. Ex3: Update threat identification based on changing landscape." },
+  "ID.RA-04": { guidance: "For identified threats and vulnerabilities, are potential impacts and likelihoods formally assessed using a consistent methodology?", examples: "Ex1: Assess potential impacts of threats exploiting vulnerabilities. Ex2: Determine likelihoods using consistent methodology. Ex3: Record impact and likelihood assessments." },
+  "ID.RA-05": { guidance: "Are threats, vulnerabilities, likelihoods and impacts brought together to calculate inherent risk and drive prioritisation? Is the risk register a live decision-making tool?", examples: "Ex1: Calculate inherent risk from threat and vulnerability data. Ex2: Prioritise risk responses based on risk levels. Ex3: Communicate risk priorities to decision-makers." },
+  "ID.RA-06": { guidance: "Once risks are identified, are responses formally chosen (mitigate, accept, transfer, avoid), planned with owners and timelines, tracked and reported?", examples: "Ex1: Select and plan risk responses. Ex2: Track risk response implementation. Ex3: Communicate risk response status to stakeholders." },
+  "ID.RA-07": { guidance: "How are changes and exceptions managed  -  is there a formal process for assessing risk impact of changes and documenting exceptions with compensating controls and expiry dates?", examples: "Ex1: Assess risk impact of proposed changes. Ex2: Record and track exceptions with compensating controls. Ex3: Review exceptions periodically." },
+  "ID.RA-08": { guidance: "Is there a process for receiving vulnerability disclosures from external researchers or vendors  -  a security contact, responsible disclosure policy, or bug bounty programme?", examples: "Ex1: Establish vulnerability disclosure processes. Ex2: Analyse and respond to disclosed vulnerabilities. Ex3: Communicate with vulnerability reporters." },
+  "ID.RA-09": { guidance: "Before acquiring hardware or software, is authenticity and integrity verified  -  trusted suppliers, code signing, hash verification, supply chain integrity checks?", examples: "Ex1: Verify authenticity of hardware and software before use. Ex2: Assess integrity through trusted channels. Ex3: Validate digital signatures and checksums." },
+  "ID.RA-10": { guidance: "Are critical suppliers assessed for security risk before acquisition  -  not just commercial due diligence but specific cybersecurity evaluation?", examples: "Ex1: Assess critical supplier cybersecurity posture before acquisition. Ex2: Include security criteria in supplier selection. Ex3: Document supplier risk assessment results." },
+
+  // ── ID.IM  -  Improvement ─────────────────────────────────────────────────
+  "ID.IM-01": { guidance: "After security evaluations (audits, assessments, maturity reviews), are improvements identified, documented and tracked through to implementation?", examples: "Ex1: Identify improvements from security evaluations. Ex2: Track improvement actions to completion. Ex3: Report improvement status to leadership." },
+  "ID.IM-02": { guidance: "After security tests (pen tests, tabletops, red team exercises), including those with suppliers, are findings converted into a tracked improvement plan?", examples: "Ex1: Identify improvements from security tests and exercises. Ex2: Prioritise and assign improvement actions. Ex3: Validate improvements through follow-up testing." },
+  "ID.IM-03": { guidance: "Are improvements identified from day-to-day operations  -  incident handling, change management failures, access review findings, near-misses?", examples: "Ex1: Capture improvement opportunities from operational activities. Ex2: Track and implement operational improvements. Ex3: Share lessons learned across the organisation." },
+  "ID.IM-04": { guidance: "Are incident response, disaster recovery and business continuity plans actively maintained and improved based on operational experience, exercises and changing requirements?", examples: "Ex1: Maintain and improve cybersecurity plans based on experience. Ex2: Update plans to reflect changing threats and requirements. Ex3: Communicate plan updates to relevant stakeholders." },
+
+  // ── PR.AA  -  Identity Management, Authentication & Access Control ────────
+  "PR.AA-01": { guidance: "Walk through the identity lifecycle  -  how are accounts created, who approves, how are service accounts and API keys managed? Is there a JML process? How quickly are leavers disabled?", examples: "Ex1: Manage identities and credentials for authorised users. Ex2: Provision and deprovision accounts promptly. Ex3: Manage non-human identities (service accounts, API keys)." },
+  "PR.AA-02": { guidance: "How are identities verified before credentials are issued  -  identity proofing for new starters, verification for password resets, step-up authentication for sensitive operations?", examples: "Ex1: Proof identities before binding credentials. Ex2: Use context-appropriate identity verification methods. Ex3: Re-verify identity for high-risk operations." },
+  "PR.AA-03": { guidance: "Where is MFA enforced  -  VPN, privileged access, cloud consoles, email, all remote access? What type  -  FIDO2, authenticator app, SMS? Are there known gaps?", examples: "Ex1: Authenticate users with appropriate strength mechanisms. Ex2: Enforce MFA for remote and privileged access. Ex3: Authenticate services and hardware where appropriate." },
+  "PR.AA-04": { guidance: "How are identity assertions (SSO tokens, SAML assertions, OAuth tokens) protected in transit, verified by relying parties, and managed for expiry?", examples: "Ex1: Protect identity assertions during transmission. Ex2: Verify assertions at the relying party. Ex3: Manage assertion lifetimes and revocation." },
+  "PR.AA-05": { guidance: "Are access permissions defined by policy, managed through RBAC, and reviewed periodically? Is least privilege enforced? Are line managers involved in access certification?", examples: "Ex1: Define access permissions in policy using least privilege. Ex2: Enforce separation of duties. Ex3: Review and certify access periodically." },
+  "PR.AA-06": { guidance: "How is physical access managed  -  server rooms, network cabinets, offices? Is access monitored (logs, CCTV) and enforced proportionate to the risk of the area?", examples: "Ex1: Manage physical access commensurate with risk. Ex2: Monitor physical access to sensitive areas. Ex3: Enforce physical access controls consistently." },
+
+  // ── PR.AT  -  Awareness and Training ──────────────────────────────────────
+  "PR.AT-01": { guidance: "Is there a structured awareness programme with tracked completion and annual renewal? Does every joiner receive it? Are phishing simulations run and click rates tracked?", examples: "Ex1: Provide cybersecurity awareness training to all personnel. Ex2: Track training completion. Ex3: Update training content based on evolving threats." },
+  "PR.AT-02": { guidance: "Do IT admins, developers, finance, executives receive role-specific training beyond the generic programme  -  reflecting their specific threat exposure and responsibilities?", examples: "Ex1: Identify specialised training needs by role. Ex2: Deliver tailored training to specialised roles. Ex3: Assess effectiveness of specialised training." },
+
+  // ── PR.DS  -  Data Security ───────────────────────────────────────────────
+  "PR.DS-01": { guidance: "Is sensitive data encrypted at rest  -  full disk encryption on endpoints (BitLocker/FileVault), database field encryption, encrypted backup media? Is the classification scheme actually applied?", examples: "Ex1: Protect data-at-rest confidentiality through encryption. Ex2: Implement integrity controls for stored data. Ex3: Ensure availability through backup and redundancy." },
+  "PR.DS-02": { guidance: "Is TLS enforced for all data in transit  -  external and internal? Are legacy unencrypted protocols still in use? What is the minimum TLS version?", examples: "Ex1: Protect data-in-transit using encryption. Ex2: Enforce minimum TLS versions. Ex3: Verify integrity of data during transmission." },
+  "PR.DS-10": { guidance: "How is data protected while being actively processed  -  memory encryption, secure enclaves, trusted execution environments? This is about protecting data-in-use, which is a more advanced control.", examples: "Ex1: Protect data while being processed. Ex2: Use memory encryption or secure computing techniques where appropriate. Ex3: Monitor for unauthorised access to data in use." },
+  "PR.DS-11": { guidance: "Walk through backup strategy  -  coverage, frequency, tooling, storage location, offline/immutable copies. When did you last restore at meaningful scale? Are RTO and RPO defined and tested?", examples: "Ex1: Create backups of critical data. Ex2: Protect backups from modification and deletion. Ex3: Test backup restoration regularly." },
+
+  // ── PR.PS  -  Platform Security ───────────────────────────────────────────
+  "PR.PS-01": { guidance: "Are systems built to a defined security baseline  -  CIS Benchmark, NCSC guidance? Is configuration managed through GPO/MDM? Is drift from baseline detected and remediated?", examples: "Ex1: Establish secure configuration baselines. Ex2: Apply baselines to all asset types. Ex3: Monitor for and remediate configuration drift." },
+  "PR.PS-02": { guidance: "Who owns patching? What are the SLAs  -  Critical 48hrs, High 7 days? How are hard-to-patch systems handled? Is there a formal change management process for production changes?", examples: "Ex1: Maintain software through patching and updates. Ex2: Replace or remove end-of-life software. Ex3: Track patch compliance against defined SLAs." },
+  "PR.PS-03": { guidance: "How is hardware maintained through its lifecycle  -  warranty tracking, end-of-life planning, firmware updates? How is decommissioned hardware securely disposed of?", examples: "Ex1: Track hardware lifecycle and maintenance schedules. Ex2: Replace hardware approaching end of life. Ex3: Ensure secure disposal of decommissioned hardware." },
+  "PR.PS-04": { guidance: "What is being logged  -  authentication events, privileged activity, network devices, cloud management plane, application logs? Are there known gaps? Are logs tamper-protected?", examples: "Ex1: Generate log records for critical systems. Ex2: Ensure logs are available for monitoring and investigation. Ex3: Protect log integrity." },
+  "PR.PS-05": { guidance: "How is unauthorised software prevented  -  application allowlisting (AppLocker, WDAC), software restriction policies? How broadly is enforcement applied  -  servers, endpoints, both?", examples: "Ex1: Prevent execution of unauthorised software. Ex2: Implement application allowlisting on critical systems. Ex3: Monitor for and block unauthorised software installation." },
+  "PR.PS-06": { guidance: "Is there a secure SDLC  -  security requirements, threat modelling, secure code review, SAST/DAST in CI/CD, software composition analysis (Snyk, Dependabot)? Or is security a post-development consideration?", examples: "Ex1: Integrate secure development practices into the SDLC. Ex2: Perform security testing during development. Ex3: Monitor secure development practices for effectiveness." },
+
+  // ── PR.IR  -  Technology Infrastructure Resilience ────────────────────────
+  "PR.IR-01": { guidance: "How are networks protected  -  segmentation, firewall rules, NAC, zero trust principles? Is there east-west traffic control? Are rules documented with business justification?", examples: "Ex1: Protect networks from unauthorised access. Ex2: Implement network segmentation. Ex3: Control and monitor network traffic flows." },
+  "PR.IR-02": { guidance: "Are data centres and IT infrastructure protected from environmental threats  -  fire suppression, UPS, climate control, flood risk, physical security?", examples: "Ex1: Protect assets from environmental threats. Ex2: Implement physical security controls for critical infrastructure. Ex3: Test environmental protections periodically." },
+  "PR.IR-03": { guidance: "What resilience mechanisms are in place  -  redundancy, failover, load balancing, graceful degradation? Have these been tested  -  chaos engineering, failover exercises?", examples: "Ex1: Implement redundancy for critical systems. Ex2: Test failover and recovery mechanisms. Ex3: Design systems for graceful degradation under adverse conditions." },
+  "PR.IR-04": { guidance: "Is capacity planning in place  -  resource monitoring, trend analysis, auto-scaling? Could a sudden spike in demand or a DDoS cause service degradation?", examples: "Ex1: Monitor resource capacity. Ex2: Plan for capacity needs. Ex3: Implement mechanisms to ensure availability under load." },
+
+  // ── DE.CM  -  Continuous Monitoring ────────────────────────────────────────
+  "DE.CM-01": { guidance: "How is network traffic monitored  -  IDS/IPS, NDR, NetFlow? Does coverage include cloud, not just on-premise? Is east-west (internal lateral movement) traffic monitored?", examples: "Ex1: Monitor networks for potentially adverse events. Ex2: Analyse network traffic for anomalies. Ex3: Alert on suspicious network activity." },
+  "DE.CM-02": { guidance: "How is the physical environment monitored  -  CCTV, door access logs, environmental sensors (temperature, water, smoke)? Are alerts acted on?", examples: "Ex1: Monitor physical environment for adverse events. Ex2: Use sensors and surveillance in sensitive areas. Ex3: Alert on physical security anomalies." },
+  "DE.CM-03": { guidance: "Is personnel activity and technology usage monitored  -  UEBA, privileged session recording, DLP alerts, unusual login detection? What about insider threat indicators?", examples: "Ex1: Monitor user activity for anomalies. Ex2: Monitor technology usage patterns. Ex3: Alert on potentially adverse personnel activities." },
+  "DE.CM-06": { guidance: "Are external service provider activities monitored  -  cloud audit logs (AWS CloudTrail, Azure Monitor), third-party access sessions, SLA performance?", examples: "Ex1: Monitor external service provider activities. Ex2: Review provider audit logs. Ex3: Alert on anomalous provider behaviour." },
+  "DE.CM-09": { guidance: "Are endpoints, servers and runtime environments monitored  -  EDR (CrowdStrike, SentinelOne, Defender), HIDS, file integrity monitoring, container security?", examples: "Ex1: Monitor computing environments for adverse events. Ex2: Deploy endpoint detection and response capabilities. Ex3: Monitor runtime environments and application behaviour." },
+
+  // ── DE.AE  -  Adverse Event Analysis ──────────────────────────────────────
+  "DE.AE-02": { guidance: "When a potentially adverse event is detected, how is it analysed  -  triage SLAs, investigation process, enrichment with context? Is there a defined workflow or does it depend on who is on shift?", examples: "Ex1: Analyse potentially adverse events. Ex2: Understand activities associated with adverse events. Ex3: Determine the scope and nature of adverse events." },
+  "DE.AE-03": { guidance: "Are events correlated across multiple sources  -  SIEM rules, XDR correlation, threat intelligence enrichment? Can you detect multi-stage attacks spanning different log sources?", examples: "Ex1: Correlate information from multiple monitoring sources. Ex2: Combine data for integrated threat identification. Ex3: Use correlation to reduce false positives." },
+  "DE.AE-04": { guidance: "When an adverse event is identified, how is blast radius assessed  -  affected systems, data exposure, business impact? Is there a methodology for scope estimation?", examples: "Ex1: Determine the scope of adverse events. Ex2: Estimate potential impact. Ex3: Use scope and impact to prioritise response." },
+  "DE.AE-06": { guidance: "Are alerts routed to the right people  -  SIEM integration, on-call notification, PagerDuty/Opsgenie? What happens if an alert goes unacknowledged?", examples: "Ex1: Provide adverse event information to authorised staff. Ex2: Ensure alerts reach appropriate response personnel. Ex3: Integrate alerts with response tools and workflows." },
+  "DE.AE-07": { guidance: "Is threat intelligence actively integrated into event analysis  -  IOC enrichment, TTP mapping to MITRE ATT&CK, actor attribution? Or is analysis done without external context?", examples: "Ex1: Integrate threat intelligence into adverse event analysis. Ex2: Use contextual information to improve analysis accuracy. Ex3: Map events to known threat actor techniques." },
+  "DE.AE-08": { guidance: "At what point is an adverse event declared an incident? Are there clear criteria, a defined declaration authority, and triggers for escalation? Or is it subjective?", examples: "Ex1: Define criteria for declaring incidents. Ex2: Declare incidents when criteria are met. Ex3: Communicate incident declarations to relevant stakeholders." },
+
+  // ── RS.MA  -  Incident Management ─────────────────────────────────────────
+  "RS.MA-01": { guidance: "Is the IR plan actually executed in coordination with third parties  -  IR retainer, legal counsel, regulators, cyber insurer, communications agency? Are these contacts documented and tested?", examples: "Ex1: Execute incident response plan in coordination with third parties. Ex2: Activate pre-arranged support from incident response providers. Ex3: Coordinate with relevant stakeholders during response." },
+  "RS.MA-02": { guidance: "How are incident reports triaged and validated  -  is there a defined severity classification, SLAs for initial assessment, and a process for validating whether the event is real?", examples: "Ex1: Triage incident reports. Ex2: Validate security alerts. Ex3: Prioritise incidents based on validated severity." },
+  "RS.MA-03": { guidance: "How are incidents categorised (ransomware, BEC, data breach, DDoS) and prioritised (P1-P4)? Are there clear criteria and corresponding response procedures for each?", examples: "Ex1: Categorise incidents by type. Ex2: Prioritise incidents based on impact and urgency. Ex3: Apply appropriate response procedures per category." },
+  "RS.MA-04": { guidance: "How are incidents escalated  -  defined escalation paths per severity, executive notification thresholds, out-of-hours procedures? Is the escalation matrix documented and tested?", examples: "Ex1: Define escalation criteria and paths. Ex2: Escalate incidents when thresholds are met. Ex3: Document and test escalation procedures." },
+  "RS.MA-05": { guidance: "When does incident response transition to recovery  -  what are the criteria, who decides, and what triggers the shift? Is there a formal handover process?", examples: "Ex1: Define criteria for initiating recovery. Ex2: Apply recovery initiation criteria consistently. Ex3: Coordinate the transition from response to recovery." },
+
+  // ── RS.AN  -  Incident Analysis ───────────────────────────────────────────
+  "RS.AN-03": { guidance: "Is a structured root cause analysis performed for significant incidents  -  5 Whys, fishbone, formal PIR? Are findings documented with actions tracked to prevent recurrence?", examples: "Ex1: Perform analysis to determine root cause. Ex2: Document analysis findings. Ex3: Use findings to prevent recurrence." },
+  "RS.AN-06": { guidance: "Are all investigation actions recorded with timestamps  -  who did what, when, what was found? Is evidence integrity maintained for potential legal proceedings?", examples: "Ex1: Record actions during investigations. Ex2: Preserve integrity of investigation records. Ex3: Maintain provenance of investigation evidence." },
+  "RS.AN-07": { guidance: "Is incident data and metadata properly collected and preserved  -  forensic images, log snapshots, memory captures? Is chain of custody maintained?", examples: "Ex1: Collect incident data systematically. Ex2: Preserve metadata integrity. Ex3: Maintain chain of custody for incident evidence." },
+  "RS.AN-08": { guidance: "How is incident magnitude estimated and validated  -  number of affected records, systems compromised, financial impact, regulatory implications?", examples: "Ex1: Estimate incident magnitude. Ex2: Validate magnitude estimates as information develops. Ex3: Use magnitude to inform response and communication." },
+
+  // ── RS.CO  -  Incident Response Reporting and Communication ───────────────
+  "RS.CO-02": { guidance: "Are internal and external stakeholders notified appropriately  -  board, regulators (ICO 72hrs, NIS2), customers, partners? Is notification embedded in the IR plan with defined triggers?", examples: "Ex1: Notify internal stakeholders of incidents. Ex2: Report incidents to external stakeholders as required. Ex3: Comply with regulatory notification requirements." },
+  "RS.CO-03": { guidance: "Is information shared with the right people during and after incidents  -  threat intelligence sharing, sector notifications, law enforcement? Are there pre-approved communication templates?", examples: "Ex1: Share information with designated stakeholders. Ex2: Use approved communication methods and templates. Ex3: Coordinate information sharing with response activities." },
+
+  // ── RS.MI  -  Incident Mitigation ─────────────────────────────────────────
+  "RS.MI-01": { guidance: "How are incidents contained  -  network isolation, account disabling, system quarantine? Are containment procedures documented for common scenarios? Can you contain laterally spreading threats?", examples: "Ex1: Contain incidents to limit impact. Ex2: Implement containment strategies for different incident types. Ex3: Verify containment effectiveness." },
+  "RS.MI-02": { guidance: "How are incidents eradicated  -  malware removal, credential reset, system rebuild, vulnerability remediation? How do you verify the threat is fully removed?", examples: "Ex1: Eradicate threats from affected systems. Ex2: Remove malicious artifacts and close attack vectors. Ex3: Verify complete eradication before recovery." },
+
+  // ── RC.RP  -  Incident Recovery Plan Execution ────────────────────────────
+  "RC.RP-01": { guidance: "Once recovery is initiated, is the recovery plan actually followed  -  documented runbooks, step-by-step procedures, named owners? Are plans stored somewhere accessible if primary systems are down?", examples: "Ex1: Execute the recovery portion of the incident response plan. Ex2: Follow documented recovery procedures. Ex3: Coordinate recovery activities with response team." },
+  "RC.RP-02": { guidance: "How are recovery actions prioritised  -  by business criticality, dependency order, RTO? Is there a defined sequence for restoring services?", examples: "Ex1: Select and prioritise recovery actions. Ex2: Scope recovery based on impact assessment. Ex3: Perform recovery actions in priority order." },
+  "RC.RP-03": { guidance: "Before restoring from backup, is integrity verified  -  malware scanning of backup media, hash verification, testing in isolated environment before going live?", examples: "Ex1: Verify backup integrity before restoration. Ex2: Scan restoration assets for threats. Ex3: Test restorations in isolated environments." },
+  "RC.RP-04": { guidance: "How are critical business functions and cybersecurity capabilities re-established  -  what is the minimum viable service, what is the recovery sequence, what goes first?", examples: "Ex1: Re-establish critical mission functions. Ex2: Restore cybersecurity capabilities. Ex3: Determine post-incident operational norms." },
+  "RC.RP-05": { guidance: "After restoration, how is integrity verified  -  system validation checks, monitoring for reinfection, user acceptance testing? When is normal operating status confirmed?", examples: "Ex1: Verify integrity of restored assets. Ex2: Restore systems and services. Ex3: Confirm normal operating status." },
+  "RC.RP-06": { guidance: "What defines the end of recovery  -  all systems restored, monitoring clean for X days, lessons learned completed? Is there a formal closure process with documentation?", examples: "Ex1: Declare end of recovery based on defined criteria. Ex2: Complete incident documentation. Ex3: Transition from recovery to normal operations." },
+
+  // ── RC.CO  -  Incident Recovery Communication ─────────────────────────────
+  "RC.CO-03": { guidance: "During recovery, how are stakeholders kept informed  -  update cadence, communication channels, who coordinates? What if primary communication channels are affected?", examples: "Ex1: Communicate recovery progress to internal stakeholders. Ex2: Provide updates to external stakeholders. Ex3: Use defined communication cadences and channels." },
+  "RC.CO-04": { guidance: "Are public-facing recovery updates handled through approved methods  -  pre-approved templates, named spokesperson, PR coordination, legal review before publication?", examples: "Ex1: Share public updates using approved methods. Ex2: Ensure messaging is consistent and approved. Ex3: Coordinate public communications with legal and PR." },
+};
+
+
 const getSubcatQs = (domainId) => {
   return Object.entries(WORKSHOP_QS)
     .filter(function(entry) {
@@ -2853,18 +3102,41 @@ export default function MaturityScorecard() {
                               <div style={{ marginTop:"14px", borderTop:"1px solid #1B3A6B", paddingTop:"14px" }}>
                                 {wqs.map((item) => {
                                   const subNote = workshopNotes[item.id] || "";
+                                  const detail = NIST_DETAIL[item.id];
+                                  const isShowDetail = showWorkshop[item.id];
                                   return (
                                     <div key={item.id} style={{ marginBottom:"14px", padding:"12px 14px", borderRadius:"8px", background: subNote ? "rgba(200,241,53,0.04)" : "rgba(0,191,255,0.03)", border: "1px solid " + (subNote ? "rgba(200,241,53,0.2)" : "rgba(0,191,255,0.1)") }}>
-                                      <div style={{ display:"flex", gap:"10px", alignItems:"flex-start", marginBottom:"8px" }}>
+                                      <div style={{ display:"flex", gap:"10px", alignItems:"flex-start", marginBottom:"6px" }}>
                                         <span style={{ fontSize:"12px", fontWeight:"800", color:cat.color, minWidth:"72px", marginTop:"2px", flexShrink:0, background:cat.light, padding:"2px 6px", borderRadius:"4px", fontFamily:MONO, textAlign:"center" }}>{item.id}</span>
-                                        <span style={{ fontSize:"14px", color:"#E2EAF4", lineHeight:"1.6" }}>{item.question}</span>
+                                        <div style={{ flex:1 }}>
+                                          <span style={{ fontSize:"14px", color:"#E2EAF4", lineHeight:"1.6" }}>{item.question}</span>
+                                          {detail && (
+                                            <button onClick={()=>setShowWorkshop(p=>({...p,[item.id]:!p[item.id]}))} style={{ display:"block", marginTop:"6px", background:"none", border:"none", padding:0, cursor:"pointer", fontFamily:"inherit", fontSize:"12px", fontWeight:"700", color:"#4A6A8A" }}>
+                                              {isShowDetail ? "Hide guidance ^" : "Show assessor guidance & NIST examples v"}
+                                            </button>
+                                          )}
+                                        </div>
                                       </div>
-                                      <textarea
-                                        value={subNote}
-                                        onChange={e=>setWorkshopNotes(p=>({...p,[item.id]:e.target.value}))}
-                                        placeholder={"Evidence and notes for " + item.id + "..."}
-                                        style={{ width:"100%", minHeight:"60px", padding:"8px 10px", borderRadius:"6px", border:"1px solid " + (subNote ? "rgba(200,241,53,0.3)" : "#1B3A6B"), fontSize:"13px", fontFamily:"inherit", outline:"none", background:"#0A1932", color:"#E2EAF4", boxSizing:"border-box", lineHeight:"1.6", resize:"vertical" }}
-                                      />
+                                      {isShowDetail && detail && (
+                                        <div style={{ marginBottom:"10px", marginLeft:"82px" }}>
+                                          <div style={{ padding:"10px 12px", borderRadius:"6px", background:"rgba(30,111,217,0.08)", border:"1px solid rgba(30,111,217,0.2)", marginBottom:"8px" }}>
+                                            <div style={{ fontSize:"11px", fontWeight:"700", color:"#1E6FD9", marginBottom:"4px", letterSpacing:"0.06em", textTransform:"uppercase" }}>Assessor Guidance  -  What We Are Looking For</div>
+                                            <div style={{ fontSize:"13px", color:"#C8D8EA", lineHeight:"1.7" }}>{detail.guidance}</div>
+                                          </div>
+                                          <div style={{ padding:"10px 12px", borderRadius:"6px", background:"rgba(167,139,250,0.06)", border:"1px solid rgba(167,139,250,0.18)" }}>
+                                            <div style={{ fontSize:"11px", fontWeight:"700", color:"#A78BFA", marginBottom:"4px", letterSpacing:"0.06em", textTransform:"uppercase" }}>NIST Implementation Examples</div>
+                                            <div style={{ fontSize:"13px", color:"#B8C8DA", lineHeight:"1.7" }}>{detail.examples}</div>
+                                          </div>
+                                        </div>
+                                      )}
+                                      <div style={{ marginLeft:"82px" }}>
+                                        <textarea
+                                          value={subNote}
+                                          onChange={e=>setWorkshopNotes(p=>({...p,[item.id]:e.target.value}))}
+                                          placeholder={"Evidence and notes for " + item.id + "..."}
+                                          style={{ width:"100%", minHeight:"60px", padding:"8px 10px", borderRadius:"6px", border:"1px solid " + (subNote ? "rgba(200,241,53,0.3)" : "#1B3A6B"), fontSize:"13px", fontFamily:"inherit", outline:"none", background:"#0A1932", color:"#E2EAF4", boxSizing:"border-box", lineHeight:"1.6", resize:"vertical" }}
+                                        />
+                                      </div>
                                     </div>
                                   );
                                 })}
