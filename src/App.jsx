@@ -4,13 +4,11 @@ import * as XLSX from "xlsx";
 // --- MONO FONT  -  used for all scores, IDs and data values --------------------
 const MONO = "'IBM Plex Mono', 'JetBrains Mono', 'Courier New', monospace";
 
-
 // Pluralisation helpers - avoids > operator inside template literals
 const pl    = (n) => n !== 1 ? "s" : "";
 const plIes = (n) => n !== 1 ? "ies" : "y";
 // Helper: replace whitespace with hyphens - no regex, no forward slashes
 const slugify = (s) => (s||"untitled").trim().split(" ").join("-");
-
 
 // --- useCountUp  -  animates a number from 0 to target over duration ms --------
 function useCountUp(target, duration = 900, deps = []) {
@@ -173,237 +171,228 @@ function HexMap({ fw, catScoreFn, getMC, getML, onClick, activeId }) {
   );
 }
 
-
-// --- WORKSHOP QUESTIONS ------------------------------------------------------
+// --- WORKSHOP QUESTIONS  -  mapped to individual subcategories ----------------
+// Each key is a subcategory ID (e.g. GV.OC-01). Each value is a focused
+// discovery question targeting exactly what that subcategory assesses.
+// For CIS Controls, keys use the CIS domain + _qN format.
 const WORKSHOP_QS = {
+  // ── GV.OC  -  Organizational Context ──────────────────────────────────────
+  "GV.OC-01": "How is the organisational mission defined, and does it explicitly inform cybersecurity risk management priorities and investment decisions?",
+  "GV.OC-02": "Who are the key internal and external stakeholders with cybersecurity expectations  -  board, regulators, customers, partners  -  and how are their needs captured and addressed?",
+  "GV.OC-03": "What legal, regulatory and contractual requirements apply  -  UK GDPR, NIS2, sector-specific  -  and who owns compliance tracking against each?",
+  "GV.OC-04": "What critical objectives, capabilities and services do external stakeholders depend on, and have you identified the cybersecurity implications of disruption to each?",
+  "GV.OC-05": "What external systems, services and third parties does the organisation depend on, and are these dependencies documented with their cybersecurity risk implications?",
 
-  "GV.OC": [
-    "How are cybersecurity priorities connected to business strategy  -  is security driven by business context or handled in isolation by IT?",
-    "What regulations and contractual obligations apply to you  -  UK GDPR, NIS2, sector-specific  -  and who owns that understanding?",
-    "Have you mapped your most critical business processes and the systems, people and third parties they depend on?",
-    "Does cyber risk reach the board regularly, or does it stay within IT?"
-  ],
+  // ── GV.RM  -  Risk Management Strategy ────────────────────────────────────
+  "GV.RM-01": "Are risk management objectives formally documented and agreed at a senior level, or is risk management primarily reactive and ad hoc?",
+  "GV.RM-02": "Is there a written risk appetite and tolerance statement  -  who approved it, and does it distinguish between acceptable and unacceptable risk levels by asset class?",
+  "GV.RM-03": "Is the organisational risk tolerance communicated to all relevant parties and reviewed at a defined frequency?",
+  "GV.RM-04": "Is there a strategic direction document that defines the risk response options available  -  accept, mitigate, transfer, avoid  -  and when each is appropriate?",
+  "GV.RM-05": "How are cybersecurity risks communicated across the organisation  -  defined reporting lines, regular cadence, or only when something goes wrong?",
+  "GV.RM-06": "Is there a standardised method for calculating, documenting and prioritising cybersecurity risks  -  a risk matrix, CVSS, or equivalent methodology?",
+  "GV.RM-07": "Are strategic opportunities from cybersecurity investment  -  competitive advantage, trust, enablement  -  identified and included in risk discussions alongside threats?",
 
-  "GV.RM": [
-    "Are your cyber risk management objectives formally documented and signed off at a senior level, or does risk management happen reactively?",
-    "When a new risk is identified, how do you decide what's acceptable to carry versus what must be fixed  -  is that judgement explicit and documented?",
-    "Who is accountable for cyber risk  -  not just who manages controls, but who is answerable to the board if something goes wrong?",
-    "How often is cyber risk formally reviewed  -  risk committee, regular reporting cadence, or mainly when something goes wrong?"
-  ],
+  // ── GV.RR  -  Roles, Responsibilities & Authorities ──────────────────────
+  "GV.RR-01": "Is organisational leadership explicitly responsible and accountable for cybersecurity risk  -  documented in role descriptions with board-level ownership?",
+  "GV.RR-02": "Are cybersecurity roles and responsibilities formally defined, communicated and enforced across the organisation  -  RACI matrix, job descriptions, org chart?",
+  "GV.RR-03": "Are adequate resources  -  budget, headcount, tooling  -  allocated commensurate with the cybersecurity risk strategy and policy requirements?",
+  "GV.RR-04": "Is cybersecurity integrated into HR practices  -  background checks, role-based training requirements, security responsibilities in employment contracts?",
 
-  "GV.SC": [
-    "Is there a structured programme for managing supplier security risk, or is it handled case by case?",
-    "Before onboarding a supplier with system or data access, what does your security assessment process look like  -  questionnaire, certifications, due diligence?",
-    "Do your supplier contracts require minimum security controls, incident notification timelines and audit rights?",
-    "How do you maintain visibility of supplier security post-onboarding  -  ongoing monitoring or just at contract renewal?"
-  ],
+  // ── GV.PO  -  Policy ─────────────────────────────────────────────────────
+  "GV.PO-01": "Walk me through your security policy landscape  -  what policies exist, who approved them, how are they communicated, and is there a formal sign-off process?",
+  "GV.PO-02": "When were policies last reviewed  -  is there a defined annual cycle with named owners, and do reviews reflect changes in the threat landscape and regulatory environment?",
 
-  "GV.PO": [
-    "Walk me through your security policy landscape  -  what exists, who approved it, and how staff are made aware?",
-    "When were policies last reviewed  -  is there a defined annual cycle with a named owner, or does it happen reactively?",
-    "Where business needs conflict with policy  -  legacy systems, access exceptions  -  is there a formal exception process with documented risk acceptance and an expiry date?",
-    "How do you confirm staff have read and understood policies  -  sign-off, testing, or something else?"
-  ],
+  // ── GV.OV  -  Oversight ──────────────────────────────────────────────────
+  "GV.OV-01": "Are cybersecurity risk management outcomes regularly reviewed at a senior level to inform and adjust the overall strategy?",
+  "GV.OV-02": "Is the risk management strategy itself reviewed periodically to ensure it covers current organisational requirements, new threats and changes in the business?",
+  "GV.OV-03": "Is the cybersecurity programme's performance formally evaluated against defined metrics and adjusted when gaps are identified?",
 
-  "ID.AM": [
-    "How do you know what hardware is on your network  -  active discovery tooling or a manually maintained register  -  and how confident are you it's complete?",
-    "How do you track software across the estate  -  Intune, SCCM, manual  -  and do you have visibility of shadow IT?",
-    "Is your network topology formally documented, showing system interconnections, trust boundaries and data flows  -  and when was it last validated?",
-    "Do you maintain a register of external systems and SaaS dependencies, including what data they handle and what access they hold?"
-  ],
+  // ── GV.SC  -  Supply Chain Risk Management ────────────────────────────────
+  "GV.SC-01": "Is there a documented supply chain risk management programme with strategy, objectives and defined processes, or is supplier security handled case by case?",
+  "GV.SC-02": "Are cybersecurity roles and responsibilities for suppliers, customers and partners formally established and coordinated  -  who owns the relationship from a security perspective?",
+  "GV.SC-03": "Is supply chain risk management integrated into the broader enterprise risk management and cybersecurity risk management processes?",
+  "GV.SC-04": "Are suppliers known, inventoried and prioritised by criticality  -  do you have a tiered supplier register based on data access and system connectivity?",
+  "GV.SC-05": "Do supplier contracts include specific cybersecurity requirements  -  minimum controls, incident notification timelines, audit rights, data handling obligations?",
+  "GV.SC-06": "What due diligence is performed before entering into a new supplier relationship  -  security questionnaire, certification review, risk assessment?",
+  "GV.SC-07": "How are supplier risks monitored over the course of the relationship  -  periodic reassessment, continuous monitoring, or only at contract renewal?",
+  "GV.SC-08": "Are relevant suppliers included in incident planning, response and recovery activities  -  do they know their role if you have a major incident?",
+  "GV.SC-09": "Are supply chain security practices integrated into the broader cybersecurity and enterprise risk management programmes rather than managed in isolation?",
+  "GV.SC-10": "Do supply chain risk management plans include provisions for what happens when a supplier relationship ends  -  data return, access revocation, transition security?",
 
-  "ID.RA": [
-    "Are you running regular authenticated vulnerability scans covering the full scope  -  cloud, remote endpoints, on-premise  -  and how quickly are findings acted on?",
-    "How do you consume threat intelligence relevant to your sector  -  NCSC, ISAC, commercial feeds  -  and does it actually change your prioritisation decisions?",
-    "Walk me through your risk register  -  who maintains it, what does a typical entry include, and is it a live decision-making tool or a compliance document?",
-    "How do you prioritise which risks get fixed first  -  a documented likelihood and impact methodology, or individual judgement?"
-  ],
+  // ── ID.AM  -  Asset Management ────────────────────────────────────────────
+  "ID.AM-01": "How do you know what hardware is on your network  -  active discovery tooling, CMDB, or manual register  -  and how confident are you it is complete and current?",
+  "ID.AM-02": "How do you track software, services and systems across the estate  -  Intune, SCCM, manual  -  including SaaS, shadow IT and browser extensions?",
+  "ID.AM-03": "Is there a current network topology diagram showing system interconnections, trust boundaries and data flows  -  when was it last validated?",
+  "ID.AM-04": "Do you maintain an inventory of services provided by suppliers  -  cloud hosting, managed services, SaaS  -  including what data they process and their access levels?",
+  "ID.AM-05": "Are assets prioritised based on classification, criticality, resources and impact on the mission  -  is there a tiered approach to protection based on asset value?",
+  "ID.AM-07": "Is there an inventory of data and corresponding metadata  -  data owners, classification, location, retention requirements  -  for designated data types?",
+  "ID.AM-08": "Are systems, hardware, software, services and data managed throughout their full lifecycle  -  from procurement through operation to decommissioning?",
 
-  "ID.IM": [
-    "After an incident or near-miss, is there a formal post-incident review process with documented outputs and tracked actions, or a verbal debrief that doesn't translate into change?",
-    "When assessment or audit findings come in, is there a structured process to turn them into a prioritised remediation plan with owners and timelines?",
-    "Do you measure security programme performance with tracked KPIs  -  patch SLA compliance, phishing rates, vuln remediation  -  reported to leadership regularly?"
-  ],
+  // ── ID.RA  -  Risk Assessment ─────────────────────────────────────────────
+  "ID.RA-01": "Are vulnerabilities in assets identified, validated and recorded  -  regular authenticated scans, coverage across cloud and on-premise, tracked remediation?",
+  "ID.RA-02": "Do you receive and act on cyber threat intelligence  -  NCSC, ISAC, commercial feeds  -  and does it actually change your prioritisation decisions?",
+  "ID.RA-03": "Are internal and external threats to the organisation identified and recorded  -  threat modelling, threat register, sector-specific threat landscape analysis?",
+  "ID.RA-04": "Are potential impacts and likelihoods of threats exploiting vulnerabilities formally identified and recorded using a consistent methodology?",
+  "ID.RA-05": "Are threats, vulnerabilities, likelihoods and impacts used together to understand inherent risk and inform risk response prioritisation?",
+  "ID.RA-06": "Are risk responses chosen, prioritised, planned, tracked and communicated  -  is the risk register a live decision-making tool or a compliance document?",
+  "ID.RA-07": "How are changes and exceptions managed  -  assessed for risk impact, recorded with compensating controls and expiry dates, and tracked?",
+  "ID.RA-08": "Are there established processes for receiving, analysing and responding to vulnerability disclosures from external researchers or vendors?",
+  "ID.RA-09": "Is the authenticity and integrity of hardware and software assessed before acquisition and use  -  supply chain integrity checks, trusted sources?",
+  "ID.RA-10": "Are critical suppliers assessed for security risk prior to acquisition  -  due diligence, security questionnaires, certification requirements?",
 
-  "PR.AA": [
-    "Walk me through your joiner-mover-leaver process  -  is it HR-integrated and automated, or manual? How quickly are leavers fully disabled?",
-    "Where is MFA enforced  -  VPN, privileged accounts, cloud consoles, email  -  and what type: authenticator app, hardware token or SMS?",
-    "How do you ensure users only hold the access they need  -  defined role profiles, regular access recertification, handling of accumulated permissions after role changes?",
-    "How do you manage service accounts, API keys and certificates  -  inventoried, same provisioning discipline as user accounts, credentials rotated on a schedule?"
-  ],
+  // ── ID.IM  -  Improvement ─────────────────────────────────────────────────
+  "ID.IM-01": "Are improvements identified from security programme evaluations  -  audits, assessments, maturity reviews  -  and tracked through to implementation?",
+  "ID.IM-02": "Are improvements identified from security tests and exercises  -  penetration tests, tabletops, simulations  -  including those done in coordination with suppliers?",
+  "ID.IM-03": "Are improvements identified from the execution of operational processes and day-to-day activities  -  incident handling, change management, access reviews?",
+  "ID.IM-04": "Are incident response plans and other cybersecurity plans that affect operations established, communicated, maintained, and improved based on operational experience?",
 
-  "PR.AT": [
-    "Is security awareness training a structured platform with tracked completion and enforced renewal, and does every joiner receive it?",
-    "Do IT admins, finance teams and executives receive role-specific training beyond the standard content, given their elevated threat exposure?",
-    "Do you run phishing simulations  -  how frequently, what are click-through rates trending, and what happens to repeat failures?",
-    "When someone clicks a simulation or reports a suspicious email, is there an immediate educational response and does the data drive targeted training?"
-  ],
+  // ── PR.AA  -  Identity Management, Authentication & Access Control ────────
+  "PR.AA-01": "How are identities and credentials managed  -  is there a formal provisioning process, HR integration, and timely deprovisioning for leavers?",
+  "PR.AA-02": "Are identities proofed and bound to credentials based on interaction context  -  identity verification before account creation, credential strength based on access level?",
+  "PR.AA-03": "How are users, services and hardware authenticated  -  where is MFA enforced, what type (authenticator, hardware token, SMS), and are there known gaps?",
+  "PR.AA-04": "Are identity assertions protected, conveyed and verified  -  SSO token security, federation trust, assertion signing and validation?",
+  "PR.AA-05": "Are access permissions, entitlements and authorisations defined in policy, managed, enforced and reviewed  -  RBAC, least privilege, periodic access certification?",
+  "PR.AA-06": "Is physical access to assets managed, monitored and enforced commensurate with risk  -  server rooms, network cabinets, sensitive areas?",
 
-  "PR.DS": [
-    "Do you have a formal data classification scheme  -  Public, Internal, Confidential, Restricted  -  and do staff actually handle data accordingly day to day?",
-    "Is sensitive data encrypted at rest  -  BitLocker or FileVault on endpoints, database field or volume encryption, encrypted backup media?",
-    "Are legacy unencrypted protocols still in use anywhere, and is TLS enforced to a current standard across all services including internal communication?",
-    "Are retention periods defined per data type, enforced through automated deletion, and is hardware disposal handled through certified secure destruction?"
-  ],
+  // ── PR.AT  -  Awareness & Training ────────────────────────────────────────
+  "PR.AT-01": "Is there a structured awareness programme so all personnel can perform tasks with cybersecurity risks in mind  -  platform-based, tracked completion, annual renewal?",
+  "PR.AT-02": "Do individuals in specialised roles  -  IT admins, developers, executives, finance  -  receive role-specific training reflecting their elevated risk exposure?",
 
-  "PR.PS": [
-    "When a new system is built and deployed, is it built to a defined security baseline  -  CIS Benchmark or equivalent  -  and is configuration drift monitored after deployment?",
-    "Who owns patching, what tooling is used, and what are the SLAs for critical and high severity patches  -  how are hard-to-patch systems handled?",
-    "Is there a formal change management process  -  CAB, impact assessment, rollback plan  -  and is it consistently followed including for emergency changes?"
-  ],
+  // ── PR.DS  -  Data Security ───────────────────────────────────────────────
+  "PR.DS-01": "How is the confidentiality, integrity and availability of data at rest protected  -  encryption, access controls, backup, classification-based handling?",
+  "PR.DS-02": "How is data in transit protected  -  TLS enforcement, VPN, encrypted protocols  -  including internal system-to-system communication?",
+  "PR.DS-10": "Is data destroyed according to policy when no longer needed  -  automated deletion, certified secure disposal, documented destruction?",
+  "PR.DS-11": "Are backups of data created, protected, maintained, and tested to ensure recoverability  -  coverage, frequency, offsite storage, restoration validation?",
 
-  "DE.CM": [
-    "How do you monitor network traffic for threats  -  IDS, IPS, NDR  -  and does that cover cloud as well as on-premise, including east-west internal traffic?",
-    "Are you running traditional AV or an EDR solution  -  CrowdStrike, SentinelOne, Defender for Endpoint  -  and if still on AV, what's driving that decision?",
-    "Where does log data go  -  central SIEM or on individual systems  -  how long is it retained, and is it searchable and tamper-protected?",
-    "Do you have any UEBA capability to detect unusual account behaviour  -  logins at odd times, abnormal data access, authentication anomalies?"
-  ],
+  // ── PR.PS  -  Platform Security ───────────────────────────────────────────
+  "PR.PS-01": "Are configuration management practices established and applied  -  security baselines (CIS Benchmark), hardening standards, drift detection?",
+  "PR.PS-02": "Is software maintained, replaced and removed commensurate with risk  -  patching SLAs, end-of-life management, change management process?",
+  "PR.PS-03": "Is hardware maintained, replaced, and removed commensurate with risk  -  lifecycle management, end-of-life tracking, secure disposal?",
+  "PR.PS-04": "Are log records generated and made available for continuous monitoring  -  what is logged, completeness, retention, tamper protection?",
+  "PR.PS-05": "Is installation and execution of unauthorised software prevented  -  application allowlisting, software restriction policies, enforcement coverage?",
+  "PR.PS-06": "Are secure software development practices integrated and monitored throughout the software development life cycle  -  SDLC, code review, SAST, DAST?",
 
-  "DE.AE": [
-    "When an alert fires, who receives it, what's the triage process, and is there a defined SLA for response by severity  -  or is alert volume a problem?",
-    "How do you distinguish genuine alerts from noise  -  are baselines and thresholds defined and tuned, and how much time goes on false positives?",
-    "Do you have SIEM or XDR correlation rules that chain related events together to surface lateral movement, privilege escalation or exfiltration patterns?"
-  ],
+  // ── PR.IR  -  Technology Infrastructure Resilience ────────────────────────
+  "PR.IR-01": "Are networks and environments protected from unauthorised logical access  -  segmentation, firewall rules, network access control, zero trust principles?",
+  "PR.IR-02": "Are technology assets protected from environmental threats  -  UPS, fire suppression, climate control, physical security of data centres?",
+  "PR.IR-03": "Are mechanisms implemented to achieve resilience requirements in normal and adverse situations  -  redundancy, failover, graceful degradation?",
+  "PR.IR-04": "Is adequate resource capacity maintained to ensure availability  -  capacity planning, monitoring, auto-scaling, load management?",
 
-  "RS.MA": [
-    "Does a current IR plan exist with playbooks for realistic scenarios  -  ransomware, breach, account compromise  -  or is it a high-level document that wouldn't hold up in a crisis?",
-    "Is there a defined severity classification matrix  -  P1 to P4  -  with escalation paths, response time targets and notification obligations for each level?",
-    "Are IR team members named with defined responsibilities, including backups, documented and known before an incident  -  or worked out on the day?",
-    "Has the IR plan been tested in the last 12 months  -  tabletop, simulation or live incident?"
-  ],
+  // ── DE.CM  -  Continuous Monitoring ────────────────────────────────────────
+  "DE.CM-01": "How are networks and network services monitored for potentially adverse events  -  IDS/IPS, NDR, NetFlow analysis, cloud network monitoring?",
+  "DE.CM-02": "How is the physical environment monitored  -  CCTV, access logs, environmental sensors, intrusion detection in sensitive areas?",
+  "DE.CM-03": "How are personnel activity and technology usage monitored  -  UEBA, privileged session monitoring, DLP alerts, insider threat detection?",
+  "DE.CM-06": "How are authorised users and systems distinguished from unauthorised ones  -  NAC, device certificates, endpoint compliance checks, rogue device detection?",
+  "DE.CM-09": "Are computing hardware, software, runtime environments, and their data monitored to find potentially adverse events  -  EDR, HIDS, integrity monitoring?",
 
-  "RS.AN": [
-    "After an incident is resolved, is there a structured root cause analysis process  -  5 Whys, formal PIR  -  with documented outputs and tracked actions, or does the team move on?",
-    "Are there documented procedures for forensic evidence acquisition, chain of custody and integrity verification  -  both for investigation and potential legal or regulatory use?",
-    "During an incident, do you cross-reference suspicious IPs, malware or TTPs against threat intel to understand actor context  -  and does that change how you respond?"
-  ],
+  // ── DE.AE  -  Adverse Event Analysis ──────────────────────────────────────
+  "DE.AE-02": "When a potentially adverse event is detected, how is it analysed  -  triage SLAs, investigation process, tooling, who is responsible?",
+  "DE.AE-03": "Is information correlated from multiple sources  -  SIEM correlation rules, XDR, threat intelligence enrichment  -  to achieve integrated identification of threats?",
+  "DE.AE-04": "When an adverse event is identified, how are the estimated impact and scope understood  -  blast radius analysis, affected system mapping, data exposure assessment?",
+  "DE.AE-06": "Is information on adverse events provided to authorised staff and tools  -  alert routing, SIEM integration, on-call notification?",
+  "DE.AE-07": "Are cyber threat intelligence and other contextual information integrated into the analysis of adverse events  -  IOC enrichment, TTP mapping, MITRE ATT&CK?",
+  "DE.AE-08": "Are incidents declared when adverse events meet the defined incident criteria  -  severity classification, declaration authority, escalation triggers?",
 
-  "RS.CO": [
-    "When a significant incident occurs, is there a documented escalation path covering the exec team, board and key business functions including out-of-hours contacts?",
-    "Do you understand your regulatory notification obligations  -  ICO 72 hours, NIS2  -  who owns it and is it embedded in the IR plan with defined triggers?",
-    "Do you have pre-approved breach communication templates and a named communications lead with a clear approval chain ready to go before an incident happens?",
-    "Is your IR plan aligned to your cyber insurance policy's notification requirements?"
-  ],
+  // ── RS.MA  -  Incident Management ─────────────────────────────────────────
+  "RS.MA-01": "Is the incident response plan executed in coordination with relevant third parties  -  IR retainer, legal, regulators, insurers  -  with defined roles and contact details?",
+  "RS.MA-02": "How are incident reports triaged and validated  -  is there a defined severity classification with SLAs for each level?",
+  "RS.MA-03": "How are incidents categorised and prioritised  -  P1 through P4 with clear criteria, escalation triggers and response time targets?",
+  "RS.MA-04": "Are incidents escalated or elevated as needed  -  defined escalation paths, severity thresholds, executive notification criteria?",
+  "RS.MA-05": "Are the criteria for initiating incident recovery applied  -  when does response transition to recovery, who decides, what triggers it?",
 
-  "RC.RP": [
-    "Do critical systems have documented recovery runbooks  -  step-by-step, with owners, dependencies and configuration sources  -  stored somewhere accessible if primary systems are down?",
-    "Walk me through your backup strategy  -  coverage, frequency, tooling, storage location  -  and when did you last actually restore from backup at meaningful scale?",
-    "Have RTO and RPO been defined for each critical system, agreed with the business, and validated against your actual recovery capability?"
-  ],
+  // ── RS.AN  -  Incident Analysis ───────────────────────────────────────────
+  "RS.AN-03": "Are forensic procedures followed to better understand incidents and preserve evidence  -  chain of custody, imaging, legal admissibility?",
+  "RS.AN-06": "Are actions performed during an investigation recorded, with the records integrity and provenance preserved  -  investigation logging, chain of custody?",
+  "RS.AN-07": "Is incident data and metadata collected with integrity and provenance preserved  -  evidence collection, forensic imaging, timestamp integrity?",
+  "RS.AN-08": "Is an incidents magnitude estimated and validated  -  blast radius analysis, data exposure assessment, business impact quantification?",
 
-  "RC.CO": [
-    "During a recovery, is there a defined process for stakeholder communications  -  who communicates, to whom, how often, and through what channel if primary comms are affected?",
-    "Is the post-incident review a structured documented exercise with assigned actions that reach senior leadership, or an informal debrief?",
-    "Can you give an example of something that changed in your security programme as a direct result of a lessons-learned review?"
-  ],
+  // ── RS.CO  -  Incident Response Reporting & Communication ─────────────────
+  "RS.CO-02": "Are incidents reported consistent with established criteria  -  regulatory notifications (ICO 72hrs, NIS2), internal escalation, customer notification?",
+  "RS.CO-03": "Is information shared consistent with response plans  -  what is communicated, to whom, through what channels, and who approves external communications?",
 
-  "CIS1": [
-    "How do you maintain visibility of every authorised device on your network  -  active discovery tooling or manual register  -  and how confident are you it's complete and current?",
-    "What happens when an unauthorised device connects  -  is there NAC, DHCP monitoring or scanning alerts to detect it in near real-time, and is the response process documented?",
-    "How often is the asset inventory formally reconciled against the actual network, and who owns that process?"
-  ],
+  // ── RS.MI  -  Incident Mitigation ─────────────────────────────────────────
+  "RS.MI-01": "How are incidents contained  -  network isolation, account disabling, system quarantine  -  and are containment procedures documented for common scenarios?",
+  "RS.MI-02": "How are incidents eradicated  -  root cause removal, malware cleanup, credential reset, system rebuild  -  and how do you verify eradication is complete?",
 
-  "CIS2": [
-    "How do you maintain an accurate software inventory  -  Intune, SCCM, Jamf  -  covering installed applications, SaaS, licences and browser extensions across all platforms?",
-    "How do you prevent or detect unauthorised software  -  application allowlisting, software restriction policies  -  and how broadly is that enforced?",
-    "Does the software inventory include version numbers linked to vulnerability data, so you can quickly identify outdated or end-of-life software against a critical advisory?"
-  ],
+  // ── RC.RP  -  Incident Recovery Plan Execution ────────────────────────────
+  "RC.RP-01": "Is the recovery portion of the incident response plan executed once initiated  -  documented runbooks, tested procedures, named owners?",
+  "RC.RP-02": "How are recovery actions selected, scoped, prioritised and performed  -  business criticality drives order, RTO/RPO defined per system?",
+  "RC.RP-03": "Is the integrity of backups and restoration assets verified before using them for recovery  -  backup testing, integrity checks, malware scanning?",
+  "RC.RP-04": "How are critical mission functions and cybersecurity capabilities re-established  -  priority order, dependency mapping, minimum viable service?",
+  "RC.RP-05": "How is the integrity of restored assets verified and normal operating status confirmed  -  validation checks, monitoring, user acceptance?",
+  "RC.RP-06": "Is the end of incident recovery declared based on criteria, and incident-related documentation completed  -  closure criteria, lessons learned, final report?",
 
-  "CIS3": [
-    "Do you have a formal data classification scheme and do staff genuinely handle data according to it day to day, not just on paper?",
-    "Is sensitive data encrypted at rest  -  endpoints, databases, file stores, backup media  -  and is TLS enforced for all data in transit including internal system communication?",
-    "Are retention periods defined per data type, aligned to legal obligations, enforced through automated deletion, and is hardware disposal certified secure?"
-  ],
+  // ── RC.CO  -  Incident Recovery Communication ─────────────────────────────
+  "RC.CO-03": "How are recovery activities and progress communicated to designated internal and external stakeholders  -  update cadence, channels, accountability?",
+  "RC.CO-04": "Are public updates on incident recovery shared using approved methods and messaging  -  press releases, customer notifications, regulatory updates?",
 
-  "CIS4": [
-    "Is every new system built to a documented security baseline  -  CIS Benchmark, NCSC guidance or your own standard  -  enforced consistently, not left to individual engineers?",
-    "How do you ensure default credentials are changed before any system goes into production  -  is there a build checklist with an explicit verification step?",
-    "How do you detect configuration drift after deployment  -  CIS-CAT, DSC, CSPM for cloud  -  and is there alerting when a system deviates from its approved baseline?"
-  ],
+  // ── CIS Controls  -  3 questions per control area ─────────────────────────
+  "CIS1_q0": "How do you maintain visibility of every authorised device on your network  -  active discovery tooling or manual register  -  and how confident are you it is complete?",
+  "CIS1_q1": "What happens when an unauthorised device connects  -  NAC, DHCP monitoring, scanning alerts  -  and is the response process documented?",
+  "CIS1_q2": "How often is the asset inventory formally reconciled against the actual network, and who owns that process?",
+  "CIS2_q0": "How do you maintain an accurate software inventory covering installed applications, SaaS, licences and browser extensions across all platforms?",
+  "CIS2_q1": "How do you prevent or detect unauthorised software  -  application allowlisting, software restriction policies  -  and how broadly is that enforced?",
+  "CIS2_q2": "Does the software inventory include version numbers linked to vulnerability data for identifying outdated or end-of-life software?",
+  "CIS3_q0": "Do you have a formal data classification scheme and do staff genuinely handle data according to it day to day?",
+  "CIS3_q1": "Is sensitive data encrypted at rest and in transit  -  endpoints, databases, file stores, backup media, TLS for all internal and external communication?",
+  "CIS3_q2": "Are retention periods defined per data type, aligned to legal obligations, enforced through automated deletion, and is hardware disposal certified secure?",
+  "CIS4_q0": "Is every new system built to a documented security baseline  -  CIS Benchmark, NCSC guidance  -  enforced consistently, not left to individual engineers?",
+  "CIS4_q1": "How do you ensure default credentials are changed before any system goes into production  -  is there a build checklist with explicit verification?",
+  "CIS4_q2": "How do you detect configuration drift after deployment  -  CIS-CAT, DSC, CSPM for cloud  -  and is there alerting when a system deviates from baseline?",
+  "CIS5_q0": "Walk me through your JML process  -  is it HR-integrated with a defined SLA? How quickly are leavers fully disabled?",
+  "CIS5_q1": "Do IT admins and privileged users have separate dedicated accounts for elevated activity, distinct from their day-to-day standard account?",
+  "CIS5_q2": "How do you identify dormant accounts  -  automated detection, or only surfaced at audit?",
+  "CIS6_q0": "How is access provisioned against defined role profiles with minimum necessary permissions, and what prevents privilege creep?",
+  "CIS6_q1": "Where is MFA enforced  -  VPN, RDP, cloud admin, email, privileged accounts  -  and are there known exceptions?",
+  "CIS6_q2": "How regularly do line managers formally certify their team's access is still appropriate?",
+  "CIS7_q0": "Are vulnerability scans authenticated and covering the full scope  -  cloud, remote endpoints, on-premise  -  and who acts on the output?",
+  "CIS7_q1": "Are there defined remediation SLAs by severity  -  Critical 48hrs, High 7 days  -  tracked and reported?",
+  "CIS7_q2": "When was the last penetration test, what was the scope, was it CREST-accredited, and are findings tracked to remediation?",
+  "CIS8_q0": "What are you logging  -  authentication, privileged activity, network devices, cloud management plane  -  and where are the gaps?",
+  "CIS8_q1": "Are logs forwarded to a central SIEM or sitting on individual systems  -  is storage tamper-protected with write-once enforcement?",
+  "CIS8_q2": "How long is log data retained  -  12 months defined formally, or based on platform defaults?",
+  "CIS9_q0": "Walk me through your email security stack  -  gateway filtering, sandboxing, impersonation protection?",
+  "CIS9_q1": "How do you block malicious domains and control web access  -  DNS filtering, web proxy, or relying on endpoint AV?",
+  "CIS9_q2": "Are SPF, DKIM and DMARC configured for all sending domains  -  is DMARC in enforcement mode?",
+  "CIS10_q0": "Is anti-malware deployed across all endpoints, servers, mobile devices and non-Windows platforms  -  and are there coverage gaps?",
+  "CIS10_q1": "Are you running traditional AV or EDR  -  CrowdStrike, SentinelOne, Defender for Endpoint  -  and if still on AV, what is blocking the move?",
+  "CIS10_q2": "Are definition and agent updates applied automatically, with monitoring for endpoints falling behind?",
+  "CIS11_q0": "Walk me through backup coverage  -  what is included, frequency, tooling, storage location  -  and are there gaps like SaaS or cloud configs?",
+  "CIS11_q1": "Could ransomware reach your backups  -  is there an air-gapped or immutable copy following the 3-2-1 principle?",
+  "CIS11_q2": "When did you last restore from backup at meaningful scale, validate it came back within RTO, and how is testing documented?",
+  "CIS12_q0": "Are critical systems isolated in their own network segments with controlled traffic flows, or is this largely a flat network?",
+  "CIS12_q1": "Is there a documented firewall rule set with business justifications reviewed on a defined schedule?",
+  "CIS12_q2": "How is remote access controlled  -  VPN with MFA, no direct RDP exposure, sessions logged?",
+  "CIS13_q0": "What capability do you have to detect threats in network traffic  -  IDS, IPS, NDR  -  covering cloud as well as on-premise?",
+  "CIS13_q1": "Where is IDS/IPS deployed, are signatures current, alerts integrated into SIEM?",
+  "CIS13_q2": "Are DNS queries routed through a security-aware resolver blocking malicious domains and C2 infrastructure?",
+  "CIS14_q0": "Is security awareness training structured with tracked completion, enforced renewal and onboarding for every joiner?",
+  "CIS14_q1": "Do IT admins, finance teams and executives receive role-specific training beyond standard content?",
+  "CIS14_q2": "Do you run phishing simulations, and is the data used to target training at higher-risk individuals?",
+  "CIS15_q0": "Before onboarding a supplier with system or data access, is there a structured risk-tiered security assessment?",
+  "CIS15_q1": "Do supplier contracts include minimum security controls, incident notification timelines and audit rights?",
+  "CIS15_q2": "Are supplier remote sessions time-limited and logged, and is access periodically reviewed?",
+  "CIS16_q0": "Are security requirements, threat modelling and secure code review built into development as standard?",
+  "CIS16_q1": "Is SAST integrated into CI/CD, and do externally-facing apps receive independent penetration testing?",
+  "CIS16_q2": "Is software composition analysis part of the build pipeline to identify vulnerable dependencies?",
+  "CIS17_q0": "Does a current IR plan exist with scenario-specific playbooks  -  ransomware, breach, account compromise?",
+  "CIS17_q1": "Has the IR plan been tested through a tabletop or simulation in the last year  -  and what changed as a result?",
+  "CIS17_q2": "After incidents, is there a structured PIR with documented actions tracked to closure?",
+  "CIS18_q0": "When was the last penetration test, what was the scope, and was it carried out by a CREST or CHECK-accredited firm?",
+  "CIS18_q1": "Did the test include social engineering  -  phishing or vishing  -  alongside technical testing?",
+  "CIS18_q2": "Are pentest findings logged in a tracked remediation plan with owners, target dates and retest before closure?",
+};
 
-  "CIS5": [
-    "Walk me through your JML process  -  is it HR-integrated with a defined SLA, or manual? How quickly are leavers fully disabled after their last day?",
-    "Do IT admins and privileged users have separate dedicated accounts for elevated activity, distinct from their day-to-day standard account?",
-    "How do you identify dormant accounts  -  former staff, decommissioned service accounts, shared accounts  -  and is detection automated or only surfaced at audit?"
-  ],
-
-  "CIS6": [
-    "How is access provisioned against defined role profiles with minimum necessary permissions, and what prevents privilege creep when someone changes roles?",
-    "Where is MFA enforced  -  VPN, RDP, cloud admin consoles, email, privileged accounts, internet-facing apps  -  and are there known exceptions that haven't been addressed?",
-    "How regularly do line managers formally certify their team's access is still appropriate  -  and is access that can't be justified removed promptly?"
-  ],
-
-  "CIS7": [
-    "Are vulnerability scans authenticated and covering the full scope  -  cloud workloads, remote endpoints, on-premise  -  and who reviews output and acts on it?",
-    "Are there defined remediation SLAs by severity  -  Critical 48hrs, High 7 days  -  tracked and reported, and how are hard-to-patch systems handled?",
-    "When was the last penetration test, what was the scope, was it CREST-accredited, and are findings tracked through to verified remediation?"
-  ],
-
-  "CIS8": [
-    "What are you logging  -  authentication events, privileged activity, network devices, cloud management plane, key application logs  -  and where are the gaps?",
-    "Are logs forwarded to a central SIEM or sitting on individual systems  -  is storage tamper-protected with write-once or append-only enforcement?",
-    "How long is log data retained  -  is 12 months total with hot and cold tiers defined formally, or based on platform defaults?"
-  ],
-
-  "CIS9": [
-    "Walk me through your email security stack  -  gateway filtering, attachment sandboxing, impersonation protection, and integration with Microsoft or Google native security?",
-    "How do you block malicious domains and control web access  -  DNS filtering like Umbrella or Cloudflare Gateway, web proxy, or relying on endpoint AV post-click?",
-    "Are SPF, DKIM and DMARC configured for all sending domains including subsidiaries  -  and is DMARC in enforcement mode with quarantine or reject policy?"
-  ],
-
-  "CIS10": [
-    "Is anti-malware deployed across all endpoints, servers, mobile devices and non-Windows platforms  -  and are there known coverage gaps or unmanaged systems?",
-    "Are you running traditional signature AV or an EDR solution  -  CrowdStrike, SentinelOne, Defender for Endpoint  -  and if still on AV, what's blocking the move to EDR?",
-    "Are definition and agent updates applied automatically, and is there monitoring to identify endpoints that have fallen behind  -  particularly those travelling off-network?"
-  ],
-
-  "CIS11": [
-    "Walk me through backup coverage  -  what's included, frequency, tooling, storage location  -  and are there gaps like SaaS data or cloud configurations not covered?",
-    "Could ransomware reach your backups  -  is there an air-gapped or immutable copy following the 3-2-1 principle, or are backups on the same accessible network?",
-    "When did you last restore from backup at meaningful scale, validate it came back within RTO, and how is that testing documented?"
-  ],
-
-  "CIS12": [
-    "Are critical systems  -  domain controllers, finance platforms, production databases  -  isolated in their own network segments with controlled traffic flows, or is this largely a flat network?",
-    "Is there a documented firewall rule set with business justifications for each rule, reviewed on a defined schedule  -  when did you last do a full rule review?",
-    "How is remote access controlled  -  VPN with MFA, no direct RDP or SMB internet exposure, sessions logged  -  and is unusual access visible in your monitoring?"
-  ],
-
-  "CIS13": [
-    "What capability do you have to detect threats in network traffic  -  IDS, IPS, NDR  -  covering cloud as well as on-premise, including east-west lateral movement?",
-    "Where is IDS or IPS deployed, are signatures current, alerts integrated into SIEM, and is there a response process  -  or is it deployed but effectively unmonitored?",
-    "Are DNS queries routed through a security-aware resolver blocking malicious domains and C2 infrastructure  -  and does that cover users working off the corporate network?"
-  ],
-
-  "CIS14": [
-    "Is security awareness training a structured platform with tracked completion, enforced renewal and onboarding for every joiner  -  or more informal and optional?",
-    "Do IT admins, finance teams and executives receive role-specific training beyond standard content, reflecting their actual threat exposure?",
-    "Do you run phishing simulations, what are click-through rates trending over time, and is the data used to target training at higher-risk individuals?"
-  ],
-
-  "CIS15": [
-    "Before onboarding a supplier with system or data access, is there a structured assessment  -  risk-tiered questionnaire, ISO 27001, Cyber Essentials  -  or is it mainly commercial due diligence?",
-    "Do supplier contracts include minimum security controls, incident notification timelines, data handling obligations and the right to audit?",
-    "Are supplier remote sessions time-limited and logged, is access periodically reviewed for continued necessity, or is supplier access persistent and largely unmonitored?"
-  ],
-
-  "CIS16": [
-    "Are security requirements, threat modelling and secure code review built into development as standard  -  or is security largely a post-development consideration?",
-    "Is SAST integrated into the CI/CD pipeline, is DAST or API testing run against deployed applications, and do externally-facing apps receive independent penetration testing?",
-    "Is software composition analysis  -  Snyk, Dependabot or equivalent  -  part of the build pipeline to continuously identify vulnerable open source dependencies?"
-  ],
-
-  "CIS17": [
-    "Does a current IR plan exist with scenario-specific playbooks  -  ransomware, breach, account compromise  -  updated in the last 12 months and accessible if primary systems are down?",
-    "Has the IR plan been tested through a tabletop, simulation or live incident in the last year  -  and what changed as a result?",
-    "After incidents, is there a structured PIR with documented actions tracked to closure, or an informal debrief that doesn't consistently produce lasting change?"
-  ],
-
-  "CIS18": [
-    "When was the last penetration test, what was the scope  -  external perimeter, internal network, applications, cloud  -  and was it carried out by a CREST or CHECK-accredited firm?",
-    "Did the test include social engineering  -  phishing or vishing  -  alongside technical testing to give a realistic picture of the attack surface?",
-    "Are pentest findings logged in a tracked remediation plan with owners and target dates, with a retest conducted before Critical and High findings are closed?"
-  ]
+// Helper: get all workshop questions for a domain (matches by prefix)
+// Returns array of { id, question } sorted by subcategory ID
+const getSubcatQs = (domainId) => {
+  return Object.entries(WORKSHOP_QS)
+    .filter(function(entry) {
+      const k = entry[0];
+      return k.startsWith(domainId + "-") || k.startsWith(domainId + "_q");
+    })
+    .map(function(entry) { return { id: entry[0], question: entry[1] }; })
+    .sort(function(a, b) { return a.id < b.id ? -1 : a.id > b.id ? 1 : 0; });
 };
 
 // --- RECOMMENDATIONS LIBRARY -------------------------------------------------
@@ -520,7 +509,30 @@ const RECS = {
   "CIS17_q2": { action: "Track post-incident improvements to closure", detail: "Maintain an improvement register capturing all lessons learned actions; assign owners and target dates and report progress to senior management monthly.", effort: "Low", priority: "High", ref: "CIS Control 17.8" },
   "CIS18_q0": { action: "Commission annual penetration testing from a CREST-accredited firm", detail: "Engage a CREST or CHECK-accredited firm for annual penetration testing; ensure scope covers external perimeter, internal network and where applicable web applications.", effort: "Medium", priority: "High", ref: "CIS Control 18.1" },
   "CIS18_q1": { action: "Expand penetration test scope to cover social engineering", detail: "Include phishing and vishing scenarios in annual penetration tests to assess human control effectiveness alongside technical controls.", effort: "Medium", priority: "Medium", ref: "CIS Control 18.2" },
-  "CIS18_q2": { action: "Track all penetration test findings to verified remediation", detail: "Log all findings in a remediation tracker with severity, owner and target date; conduct a retest for all Critical and High findings before sign-off.", effort: "Low", priority: "High", ref: "CIS Control 18.5" }
+  "CIS18_q2": { action: "Track all penetration test findings to verified remediation", detail: "Log all findings in a remediation tracker with severity, owner and target date; conduct a retest for all Critical and High findings before sign-off.", effort: "Low", priority: "High", ref: "CIS Control 18.5" },
+  "ID.IM_q3": { action: "Establish and maintain cybersecurity plans", detail: "Ensure incident response, disaster recovery and business continuity plans are documented, communicated to relevant parties, and improved based on operational experience and exercises.", effort: "Medium", priority: "High", ref: "NIST CSF 2.0 ID.IM-04" },
+  "PR.DS_q2": { action: "Implement data-in-use protection controls", detail: "Deploy controls to protect data while actively being processed including memory encryption, secure enclaves, and runtime application self-protection (RASP) where appropriate.", effort: "High", priority: "Medium", ref: "NIST CSF 2.0 PR.DS-10" },
+  "PR.DS_q3": { action: "Implement and test backup and recovery procedures", detail: "Establish backup procedures for all critical data following the 3-2-1 rule; schedule quarterly restoration tests and document RTO/RPO compliance.", effort: "Medium", priority: "Critical", ref: "NIST CSF 2.0 PR.DS-11" },
+  "PR.PS_q2": { action: "Implement hardware lifecycle management", detail: "Maintain a hardware lifecycle register tracking warranty, end-of-life dates and replacement schedules; implement secure disposal procedures for decommissioned hardware.", effort: "Medium", priority: "High", ref: "NIST CSF 2.0 PR.PS-03" },
+  "PR.PS_q3": { action: "Implement comprehensive audit logging", detail: "Enable audit logging on all critical systems covering authentication, privileged activity and configuration changes; define minimum log standards and verify completeness.", effort: "Medium", priority: "High", ref: "NIST CSF 2.0 PR.PS-04" },
+  "PR.PS_q4": { action: "Implement application allowlisting", detail: "Deploy application allowlisting or software restriction policies (AppLocker, WDAC) to prevent execution of unauthorised software on endpoints and servers.", effort: "High", priority: "High", ref: "NIST CSF 2.0 PR.PS-05" },
+  "PR.PS_q5": { action: "Adopt a secure software development lifecycle", detail: "Integrate security requirements, threat modelling, secure code review, SAST and DAST into the development process; train developers on OWASP Top 10.", effort: "High", priority: "High", ref: "NIST CSF 2.0 PR.PS-06" },
+  "PR.IR_q2": { action: "Implement resilience mechanisms for critical systems", detail: "Deploy redundancy, failover and graceful degradation mechanisms for critical infrastructure; test resilience through chaos engineering or failover exercises.", effort: "High", priority: "High", ref: "NIST CSF 2.0 PR.IR-03" },
+  "PR.IR_q3": { action: "Implement capacity management and monitoring", detail: "Establish capacity planning processes, deploy monitoring for resource utilisation, and implement auto-scaling or load management for critical services.", effort: "Medium", priority: "Medium", ref: "NIST CSF 2.0 PR.IR-04" },
+  "DE.CM_q4": { action: "Implement computing environment monitoring", detail: "Deploy EDR, host-based IDS and file integrity monitoring across all computing environments to detect adverse events at the endpoint and runtime level.", effort: "Medium", priority: "High", ref: "NIST CSF 2.0 DE.CM-09" },
+  "DE.AE_q3": { action: "Implement alert routing to authorised staff", detail: "Configure SIEM and monitoring tools to route alerts to named responders via defined channels with escalation rules for unacknowledged alerts.", effort: "Medium", priority: "High", ref: "NIST CSF 2.0 DE.AE-06" },
+  "DE.AE_q4": { action: "Integrate threat intelligence into event analysis", detail: "Connect threat intelligence feeds to SIEM and investigation workflows to enrich alerts with IOC context, TTP mapping and actor attribution.", effort: "High", priority: "High", ref: "NIST CSF 2.0 DE.AE-07" },
+  "DE.AE_q5": { action: "Define and enforce incident declaration criteria", detail: "Document clear criteria for when adverse events constitute a declared incident including severity thresholds, declaration authority and escalation triggers.", effort: "Low", priority: "High", ref: "NIST CSF 2.0 DE.AE-08" },
+  "RS.MA_q3": { action: "Define incident escalation procedures", detail: "Document escalation paths for each incident severity level including named contacts, out-of-hours procedures and executive notification thresholds.", effort: "Low", priority: "High", ref: "NIST CSF 2.0 RS.MA-04" },
+  "RS.MA_q4": { action: "Define incident recovery initiation criteria", detail: "Establish documented criteria for transitioning from incident response to recovery mode including decision authority, prerequisite conditions and communication protocols.", effort: "Low", priority: "High", ref: "NIST CSF 2.0 RS.MA-05" },
+  "RS.AN_q0": { action: "Implement root cause analysis process", detail: "Define an RCA methodology (5 Whys, fishbone) for all P1/P2 incidents; document findings and track remediation actions to prevent recurrence.", effort: "Low", priority: "High", ref: "NIST CSF 2.0 RS.AN-03" },
+  "RS.AN_q1": { action: "Implement investigation action logging", detail: "Document all actions taken during incident investigations with timestamps, maintain chain of custody records and preserve evidence integrity.", effort: "Medium", priority: "High", ref: "NIST CSF 2.0 RS.AN-06" },
+  "RS.AN_q2": { action: "Establish incident data collection and preservation", detail: "Define procedures for collecting and preserving incident data and metadata including forensic imaging, log preservation and timestamp integrity verification.", effort: "Medium", priority: "High", ref: "NIST CSF 2.0 RS.AN-07" },
+  "RS.AN_q3": { action: "Implement incident magnitude estimation", detail: "Define procedures for estimating and validating incident scope including blast radius analysis, data exposure assessment and business impact quantification.", effort: "Medium", priority: "High", ref: "NIST CSF 2.0 RS.AN-08" },
+  "RC.RP_q5": { action: "Define incident closure criteria and documentation", detail: "Establish criteria for declaring recovery complete including validation checks, lessons learned documentation and final incident report requirements.", effort: "Low", priority: "High", ref: "NIST CSF 2.0 RC.RP-06" },
+  "RC.CO_q0": { action: "Establish recovery progress communications", detail: "Define update cadences and templates for keeping internal and external stakeholders informed during recovery operations.", effort: "Low", priority: "High", ref: "NIST CSF 2.0 RC.CO-03" },
+  "RC.CO_q1": { action: "Prepare public incident recovery communications", detail: "Develop pre-approved public communication templates and designate a named spokesperson for incident recovery updates.", effort: "Medium", priority: "High", ref: "NIST CSF 2.0 RC.CO-04" }
+
 };
 
 // --- LevelBlue Brand Tokens ---------------------------------------------------
@@ -542,60 +554,59 @@ const LB = {
 };
 
 const FRAMEWORKS = {
-  "NIST CSF 2.0": [
-    { id:"GV", name:"Govern", color:"#1E6FD9", light:"rgba(30,111,217,0.15)", description:"Organisational context, risk strategy, roles, policy & supply chain", domains:[
-      { id:"GV.OC", name:"Organizational Context", questions:[
+    "NIST CSF 2.0": [
+    { id:"GV", name:"Govern", color:"#1E6FD9", light:"rgba(30,111,217,0.15)", description:"Organisational context, risk strategy, supply chain, roles, policy & oversight", domains:[
+      { id:"GV.OC", name:"Organisational Context", questions:[
         "GV.OC-01  -  The organizational mission is understood and informs cybersecurity risk management",
-        "GV.OC-02  -  Internal and external stakeholders are understood and their needs regarding cybersecurity risk management are considered",
-        "GV.OC-03  -  Legal, regulatory, and contractual requirements regarding cybersecurity are understood and managed",
-        "GV.OC-04  -  Critical objectives, capabilities, and services that external stakeholders depend on are understood and communicated",
+        "GV.OC-02  -  Internal and external stakeholders are understood, and their needs and expectations regarding cybersecurity risk management are understood and considered",
+        "GV.OC-03  -  Legal, regulatory, and contractual requirements regarding cybersecurity  -  including privacy and civil liberties obligations  -  are understood and managed",
+        "GV.OC-04  -  Critical objectives, capabilities, and services that external stakeholders depend on or expect are understood and communicated",
         "GV.OC-05  -  Outcomes, capabilities, and services that the organization depends on are understood and communicated"
       ]},
       { id:"GV.RM", name:"Risk Management Strategy", questions:[
         "GV.RM-01  -  Risk management objectives are established and agreed to by organizational stakeholders",
         "GV.RM-02  -  Risk appetite and risk tolerance statements are established, communicated, and maintained",
-        "GV.RM-03  -  Organizational risk tolerance is determined, communicated, and reviewed",
+        "GV.RM-03  -  Cybersecurity risk management activities and outcomes are included in enterprise risk management processes",
         "GV.RM-04  -  Strategic direction that describes appropriate risk response options is established and communicated",
-        "GV.RM-05  -  Lines of communication across the organization are established for cybersecurity risks",
-        "GV.RM-06  -  A standardized method for calculating, documenting, categorizing, and prioritizing cybersecurity risks is established",
-        "GV.RM-07  -  Strategic opportunities (positive risks) are characterized and included in cybersecurity risk discussions"
+        "GV.RM-05  -  Lines of communication across the organization are established for cybersecurity risks, including risks from suppliers and other third parties",
+        "GV.RM-06  -  A standardized method for calculating, documenting, categorizing, and prioritizing cybersecurity risks is established and communicated",
+        "GV.RM-07  -  Strategic opportunities (i.e., positive risks) are characterized and are included in organizational cybersecurity risk discussions"
       ]},
-      { id:"GV.RR", name:"Roles, Responsibilities & Authorities", questions:[
-        "GV.RR-01  -  Organizational leadership is responsible and accountable for cybersecurity risk and fosters a risk-aware culture",
+      { id:"GV.SC", name:"Cybersecurity Supply Chain Risk Management", questions:[
+        "GV.SC-01  -  A cybersecurity supply chain risk management program, strategy, objectives, policies, and processes are established and agreed to by organizational stakeholders",
+        "GV.SC-02  -  Cybersecurity roles and responsibilities for suppliers, customers, and partners are established, communicated, and coordinated internally and externally",
+        "GV.SC-03  -  Cybersecurity supply chain risk management is integrated into cybersecurity and enterprise risk management, risk assessment, and improvement processes",
+        "GV.SC-04  -  Suppliers are known and prioritized by criticality",
+        "GV.SC-05  -  Requirements to address cybersecurity risks in supply chains are established, prioritized, and integrated into contracts and other types of agreements with suppliers and other relevant third parties",
+        "GV.SC-06  -  Planning and due diligence are performed to reduce risks before entering into formal supplier or other third-party relationships",
+        "GV.SC-07  -  The risks posed by a supplier, their products and services, and other third parties are understood, recorded, prioritized, assessed, responded to, and monitored over the course of the relationship",
+        "GV.SC-08  -  Relevant suppliers and other third parties are included in incident planning, response, and recovery activities",
+        "GV.SC-09  -  Supply chain security practices are integrated into cybersecurity and enterprise risk management programs, and their performance is monitored throughout the technology product and service life cycle",
+        "GV.SC-10  -  Cybersecurity supply chain risk management plans include provisions for activities that occur after the conclusion of a partnership or service agreement"
+      ]},
+      { id:"GV.RR", name:"Roles, Responsibilities, and Authorities", questions:[
+        "GV.RR-01  -  Organizational leadership is responsible and accountable for cybersecurity risk and fosters a culture that is risk-aware, ethical, and continually improving",
         "GV.RR-02  -  Roles, responsibilities, and authorities related to cybersecurity risk management are established, communicated, understood, and enforced",
-        "GV.RR-03  -  Adequate resources are allocated commensurate with the cybersecurity risk strategy, roles, and policies",
+        "GV.RR-03  -  Adequate resources are allocated commensurate with the cybersecurity risk strategy, roles, responsibilities, and policies",
         "GV.RR-04  -  Cybersecurity is included in human resources practices"
       ]},
-      { id:"GV.PO", name:"Policy", questions:[
-        "GV.PO-01  -  Policy for managing cybersecurity risks is established, communicated, and enforced",
-        "GV.PO-02  -  Policy for managing cybersecurity risks is reviewed, updated, and enforced to reflect changes in requirements and threats"
+      { id:"GV.PO", name:"Policies, Processes, and Procedures", questions:[
+        "GV.PO-01  -  Policy for managing cybersecurity risks is established based on organizational context, cybersecurity strategy, and priorities and is communicated and enforced",
+        "GV.PO-02  -  Policy for managing cybersecurity risks is reviewed, updated, communicated, and enforced to reflect changes in requirements, threats, technology, and organizational mission"
       ]},
       { id:"GV.OV", name:"Oversight", questions:[
         "GV.OV-01  -  Cybersecurity risk management strategy outcomes are reviewed to inform and adjust strategy and direction",
         "GV.OV-02  -  The cybersecurity risk management strategy is reviewed and adjusted to ensure coverage of organizational requirements and risks",
         "GV.OV-03  -  Organizational cybersecurity risk management performance is evaluated and reviewed for adjustments needed"
-      ]},
-      { id:"GV.SC", name:"Supply Chain Risk Management", questions:[
-        "GV.SC-01  -  A cybersecurity supply chain risk management program, strategy, objectives, policies, and processes are established",
-        "GV.SC-02  -  Cybersecurity roles and responsibilities for suppliers, customers, and partners are established and coordinated",
-        "GV.SC-03  -  Cybersecurity supply chain risk management is integrated into cybersecurity and enterprise risk management processes",
-        "GV.SC-04  -  Suppliers are known and prioritized by criticality",
-        "GV.SC-05  -  Requirements to address cybersecurity risks in supply chains are integrated into contracts with suppliers",
-        "GV.SC-06  -  Planning and due diligence are performed to reduce risks before entering formal supplier relationships",
-        "GV.SC-07  -  The risks posed by suppliers are understood, recorded, assessed, responded to, and monitored over the course of the relationship",
-        "GV.SC-08  -  Relevant suppliers are included in incident planning, response, and recovery activities",
-        "GV.SC-09  -  Supply chain security practices are integrated into cybersecurity and enterprise risk management programs",
-        "GV.SC-10  -  Cybersecurity supply chain risk management plans include provisions for activities after the conclusion of a partnership"
       ]}
     ]},
     { id:"ID", name:"Identify", color:"#00BFFF", light:"rgba(0,191,255,0.12)", description:"Asset management, risk assessment & improvement", domains:[
       { id:"ID.AM", name:"Asset Management", questions:[
         "ID.AM-01  -  Inventories of hardware managed by the organization are maintained",
         "ID.AM-02  -  Inventories of software, services, and systems managed by the organization are maintained",
-        "ID.AM-03  -  Representations of the organization's authorized network communication and internal and external data flows are maintained",
+        "ID.AM-03  -  Representations of the organization's authorized network communication and internal and external network data flows are maintained",
         "ID.AM-04  -  Inventories of services provided by suppliers are maintained",
         "ID.AM-05  -  Assets are prioritized based on classification, criticality, resources, and impact on the mission",
-        "ID.AM-06  -  Cybersecurity roles and responsibilities for the entire workforce and third parties are established, communicated, and enforced",
         "ID.AM-07  -  Inventories of data and corresponding metadata for designated data types are maintained",
         "ID.AM-08  -  Systems, hardware, software, services, and data are managed throughout their life cycles"
       ]},
@@ -612,9 +623,10 @@ const FRAMEWORKS = {
         "ID.RA-10  -  Critical suppliers are assessed prior to acquisition"
       ]},
       { id:"ID.IM", name:"Improvement", questions:[
-        "ID.IM-01  -  Improvements are identified from security program evaluations",
-        "ID.IM-02  -  Improvements are identified from security tests and exercises, including those done in coordination with suppliers",
-        "ID.IM-03  -  Improvements are identified from execution of operational processes, procedures, and activities"
+        "ID.IM-01  -  Improvements are identified from evaluations of security tests and exercises, including those done in coordination with suppliers and relevant third parties",
+        "ID.IM-02  -  Improvements are identified from security tests and exercises, including those done in coordination with suppliers and relevant third parties",
+        "ID.IM-03  -  Improvements to asset inventory are identified from execution of operational processes, procedures, and activities",
+        "ID.IM-04  -  Incident response plans and other cybersecurity plans that affect operations are established, communicated, maintained, and improved"
       ]}
     ]},
     { id:"PR", name:"Protect", color:"#C8F135", light:"rgba(200,241,53,0.12)", description:"Identity, awareness, data security, platform security & resilience", domains:[
@@ -623,32 +635,32 @@ const FRAMEWORKS = {
         "PR.AA-02  -  Identities are proofed and bound to credentials based on the context of interactions",
         "PR.AA-03  -  Users, services, and hardware are authenticated",
         "PR.AA-04  -  Identity assertions are protected, conveyed, and verified",
-        "PR.AA-05  -  Access permissions, entitlements, and authorizations are defined in policy, managed, enforced, and reviewed",
+        "PR.AA-05  -  Access permissions, entitlements, and authorizations are defined in a policy, managed, enforced, and reviewed, and incorporate the principles of least privilege and separation of duties",
         "PR.AA-06  -  Physical access to assets is managed, monitored, and enforced commensurate with risk"
       ]},
-      { id:"PR.AT", name:"Awareness & Training", questions:[
-        "PR.AT-01  -  Personnel are provided with awareness and training so that they possess the knowledge and skills to perform general tasks with cybersecurity risks in mind",
+      { id:"PR.AT", name:"Awareness and Training", questions:[
+        "PR.AT-01  -  Personnel are provided cybersecurity awareness and training so that they can perform their cybersecurity-related tasks",
         "PR.AT-02  -  Individuals in specialized roles are provided with awareness and training so that they possess the knowledge and skills to perform relevant tasks with cybersecurity risks in mind"
       ]},
       { id:"PR.DS", name:"Data Security", questions:[
         "PR.DS-01  -  The confidentiality, integrity, and availability of data-at-rest are protected",
         "PR.DS-02  -  The confidentiality, integrity, and availability of data-in-transit are protected",
-        "PR.DS-03  -  Data leakage and exfiltration activities are anticipated, resisted, detected, and mitigated",
-        "PR.DS-04  -  Adequate capacity to ensure availability is maintained",
-        "PR.DS-05  -  Protections against data leaks are implemented",
-        "PR.DS-06  -  Integrity checking mechanisms are used to verify software, firmware, and information integrity",
-        "PR.DS-07  -  The development and testing environment(s) are separate from the production environment",
-        "PR.DS-08  -  Integrity checking mechanisms are used to verify hardware integrity",
-        "PR.DS-09  -  Data is managed throughout its life cycle",
-        "PR.DS-10  -  Data is destroyed according to policy when no longer needed"
+        "PR.DS-10  -  The confidentiality, integrity, and availability of data-in-use are protected",
+        "PR.DS-11  -  Backups of data are created, protected, maintained, and tested"
       ]},
       { id:"PR.PS", name:"Platform Security", questions:[
-        "PR.PS-01  -  Configuration management practices are established and applied",
-        "PR.PS-02  -  Software is maintained, replaced, and removed commensurate with risk"
+        "PR.PS-01  -  The configuration of IT and OT assets is managed through secure configuration management practices",
+        "PR.PS-02  -  Software is maintained, replaced, and removed commensurate with risk",
+        "PR.PS-03  -  Hardware is maintained, replaced, and removed commensurate with risk",
+        "PR.PS-04  -  Log records are generated and made available for continuous monitoring",
+        "PR.PS-05  -  Installation and execution of unauthorized software is prevented",
+        "PR.PS-06  -  Secure software development practices are integrated, and their performance is monitored throughout the software development life cycle"
       ]},
       { id:"PR.IR", name:"Technology Infrastructure Resilience", questions:[
         "PR.IR-01  -  Networks and environments are protected from unauthorized logical access and usage",
-        "PR.IR-02  -  The organization's technology assets are protected from environmental threats"
+        "PR.IR-02  -  The organization's technology assets are protected from environmental threats and hazards",
+        "PR.IR-03  -  Mechanisms are implemented to achieve resilience requirements in normal and adverse situations",
+        "PR.IR-04  -  Adequate resource capacity to ensure availability is maintained"
       ]}
     ]},
     { id:"DE", name:"Detect", color:"#F59E0B", light:"rgba(245,158,11,0.12)", description:"Continuous monitoring and adverse event analysis", domains:[
@@ -656,35 +668,35 @@ const FRAMEWORKS = {
         "DE.CM-01  -  Networks and network services are monitored to find potentially adverse events",
         "DE.CM-02  -  The physical environment is monitored to find potentially adverse events",
         "DE.CM-03  -  Personnel activity and technology usage are monitored to find potentially adverse events",
-        "DE.CM-04  -  External service provider activities and services are monitored to find potentially adverse events",
-        "DE.CM-05  -  Vulnerability scans are performed regularly and patch status is assessed",
-        "DE.CM-06  -  Authorized users and systems are distinguished from unauthorized users and systems"
+        "DE.CM-06  -  External service provider activities and services are monitored to find potentially adverse events",
+        "DE.CM-09  -  Computing hardware and software, runtime environments, and their data are monitored to find potentially adverse events"
       ]},
       { id:"DE.AE", name:"Adverse Event Analysis", questions:[
-        "DE.AE-01  -  A baseline of network operations and expected data flows for users and systems is established and managed",
         "DE.AE-02  -  Potentially adverse events are analyzed to better understand associated activities",
-        "DE.AE-03  -  Information is correlated from multiple sources to achieve integrated identification of adverse events",
+        "DE.AE-03  -  Information is correlated from multiple sources",
         "DE.AE-04  -  The estimated impact and scope of adverse events are understood",
-        "DE.AE-05  -  Alerts are generated and communicated by cybersecurity technologies to the appropriate personnel"
+        "DE.AE-06  -  Information on adverse events is provided to authorized staff and tools",
+        "DE.AE-07  -  Cyber threat intelligence and other contextual information are integrated into the analysis",
+        "DE.AE-08  -  Incidents are declared when adverse events meet the defined incident criteria"
       ]}
     ]},
     { id:"RS", name:"Respond", color:"#F87171", light:"rgba(248,113,113,0.12)", description:"Incident management, analysis, communication & mitigation", domains:[
       { id:"RS.MA", name:"Incident Management", questions:[
         "RS.MA-01  -  The incident response plan is executed in coordination with relevant third parties once an incident is declared",
-        "RS.MA-02  -  Incident reports are triaged and validated, and security alerts are triaged appropriately",
-        "RS.MA-03  -  Incidents are categorized and prioritized"
+        "RS.MA-02  -  Incident reports are triaged and validated",
+        "RS.MA-03  -  Incidents are categorized and prioritized",
+        "RS.MA-04  -  Incidents are escalated or elevated as needed",
+        "RS.MA-05  -  The criteria for initiating incident recovery are applied"
       ]},
       { id:"RS.AN", name:"Incident Analysis", questions:[
-        "RS.AN-01  -  Notifications from detection systems are investigated to understand the nature of the incident",
-        "RS.AN-02  -  The impact of the incident is understood",
-        "RS.AN-03  -  Forensics are performed to better understand the incident and support evidence preservation",
-        "RS.AN-04  -  Incidents are categorized consistent with response plans",
-        "RS.AN-05  -  Processes are established to receive, analyze, and respond to vulnerabilities disclosed to the organization"
+        "RS.AN-03  -  Analysis is performed to establish what has taken place during an incident and the root cause of the incident",
+        "RS.AN-06  -  Actions performed during an investigation are recorded, and the records' integrity and provenance are preserved",
+        "RS.AN-07  -  Incident data and metadata are collected, and their integrity and provenance are preserved",
+        "RS.AN-08  -  An incident's magnitude is estimated and validated"
       ]},
-      { id:"RS.CO", name:"Incident Response Reporting & Communication", questions:[
-        "RS.CO-01  -  Personnel know their roles and order of operations when a response is needed",
-        "RS.CO-02  -  Incidents are reported consistent with established criteria",
-        "RS.CO-03  -  Information is shared consistent with response plans"
+      { id:"RS.CO", name:"Incident Response Reporting and Communication", questions:[
+        "RS.CO-02  -  Internal and external stakeholders are notified of incidents",
+        "RS.CO-03  -  Information is shared with designated internal and external stakeholders"
       ]},
       { id:"RS.MI", name:"Incident Mitigation", questions:[
         "RS.MI-01  -  Incidents are contained",
@@ -693,20 +705,20 @@ const FRAMEWORKS = {
     ]},
     { id:"RC", name:"Recover", color:"#A78BFA", light:"rgba(167,139,250,0.12)", description:"Incident recovery planning and communications", domains:[
       { id:"RC.RP", name:"Incident Recovery Plan Execution", questions:[
-        "RC.RP-01  -  The recovery portion of the incident response plan is executed once initiated",
+        "RC.RP-01  -  The recovery portion of the incident response plan is executed once initiated from the current cybersecurity incident",
         "RC.RP-02  -  Recovery actions are selected, scoped, prioritized, and performed",
         "RC.RP-03  -  The integrity of backups and other restoration assets is verified before using them for restoration",
-        "RC.RP-04  -  Critical mission functions and cybersecurity capabilities are re-established",
-        "RC.RP-05  -  The integrity of restored assets is verified, systems and services are restored, and normal operating status is confirmed"
+        "RC.RP-04  -  Critical mission functions and cybersecurity risk management are considered to establish post-incident norms",
+        "RC.RP-05  -  The integrity of restored assets is verified, systems and services are restored, and normal operating status is confirmed",
+        "RC.RP-06  -  The end of incident recovery is declared based on criteria, and incident-related documentation is completed"
       ]},
       { id:"RC.CO", name:"Incident Recovery Communication", questions:[
-        "RC.CO-01  -  Public relations are managed during and following cybersecurity incidents",
-        "RC.CO-02  -  Reputation of the organization is repaired following an incident",
-        "RC.CO-03  -  Recovery activities and progress in restoring normal operations are communicated to designated internal and external stakeholders"
+        "RC.CO-03  -  Recovery activities and progress in restoring operational capabilities are communicated to designated internal and external stakeholders",
+        "RC.CO-04  -  Public updates on incident recovery are shared using approved methods and messaging"
       ]}
     ]}
   ],
-  "CIS Controls v8": [
+    "CIS Controls v8": [
     { id: "IG1", name: "Basic Hygiene",   color: "#1E6FD9", light: "rgba(30,111,217,0.15)", description: "Essential cyber hygiene  -  every organisation", domains: [
       { id: "CIS1", name: "Inventory of Enterprise Assets", questions: ["An inventory of authorised hardware assets is maintained","Unauthorised hardware is detected and addressed","Asset inventory is reviewed and updated regularly"] },
       { id: "CIS2", name: "Inventory of Software Assets",   questions: ["An inventory of authorised software is maintained","Unauthorised software is blocked or removed","Software inventory includes version and patch status"] },
@@ -765,8 +777,8 @@ const NIST_DOCS = [
   { id:"d07", cat:"Identify",      priority:"High",     label:"IT Asset Inventory  -  Hardware",                      subcats:["ID.AM-01","ID.AM-08"] },
   { id:"d08", cat:"Identify",      priority:"High",     label:"Software Asset Inventory / Licence Register",        subcats:["ID.AM-02","ID.AM-08"] },
   { id:"d09", cat:"Identify",      priority:"High",     label:"Network Topology / Architecture Diagrams",           subcats:["ID.AM-03"] },
-  { id:"d10", cat:"Identify",      priority:"High",     label:"Data Flow Diagrams",                                 subcats:["ID.AM-03","PR.DS-03"] },
-  { id:"d11", cat:"Identify",      priority:"Medium",   label:"Data Classification Policy / Register",              subcats:["PR.DS-09","ID.AM-07"] },
+  { id:"d10", cat:"Identify",      priority:"High",     label:"Data Flow Diagrams",                                 subcats:["ID.AM-03","PR.DS-01"] },
+  { id:"d11", cat:"Identify",      priority:"Medium",   label:"Data Classification Policy / Register",              subcats:["PR.DS-01","ID.AM-07"] },
   { id:"d12", cat:"Identify",      priority:"Critical", label:"Risk Register with Treatment Plans",                 subcats:["ID.RA-06","GV.RM-05"] },
   { id:"d13", cat:"Identify",      priority:"High",     label:"Business Impact Assessment (BIA)",                   subcats:["GV.OC-04","GV.OC-05"] },
   { id:"d14", cat:"Identify",      priority:"Medium",   label:"Previous Assessment / Audit Reports",                subcats:["ID.IM-01","ID.IM-02"] },
@@ -775,16 +787,16 @@ const NIST_DOCS = [
   { id:"d17", cat:"Protect",       priority:"High",     label:"Security Awareness Training Records",                subcats:["PR.AT-01","PR.AT-02"] },
   { id:"d18", cat:"Protect",       priority:"High",     label:"Patch Management Policy / Compliance Reports",       subcats:["PR.PS-02"] },
   { id:"d19", cat:"Protect",       priority:"Medium",   label:"Change Management Policy / CAB Records",             subcats:["PR.PS-02"] },
-  { id:"d20", cat:"Protect",       priority:"Medium",   label:"Data Retention & Secure Disposal Policy",            subcats:["PR.DS-09","PR.DS-10"] },
+  { id:"d20", cat:"Protect",       priority:"Medium",   label:"Data Retention & Secure Disposal Policy",            subcats:["PR.DS-01","PR.DS-10"] },
   { id:"d21", cat:"Protect",       priority:"High",     label:"Encryption Standards / Key Management Policy",       subcats:["PR.DS-01","PR.DS-02"] },
   { id:"d22", cat:"Protect",       priority:"High",     label:"Secure Configuration Baselines (CIS / NCSC)",        subcats:["PR.PS-01"] },
   { id:"d23", cat:"Protect",       priority:"Critical", label:"Backup & Recovery Procedures",                       subcats:["RC.RP-01","RC.RP-03"] },
   { id:"d24", cat:"Detect",        priority:"High",     label:"SIEM / Log Management Configuration & Evidence",     subcats:["DE.CM-01","DE.AE-03"] },
-  { id:"d25", cat:"Detect",        priority:"High",     label:"Vulnerability Scan Reports (last 3 months)",         subcats:["DE.CM-05","ID.RA-01"] },
+  { id:"d25", cat:"Detect",        priority:"High",     label:"Vulnerability Scan Reports (last 3 months)",         subcats:["DE.CM-09","ID.RA-01"] },
   { id:"d26", cat:"Detect",        priority:"High",     label:"Penetration Test Report (last 12 months)",           subcats:["ID.IM-02","ID.RA-01"] },
   { id:"d27", cat:"Detect",        priority:"High",     label:"EDR / AV Deployment Evidence",                       subcats:["DE.CM-03"] },
-  { id:"d28", cat:"Respond",       priority:"Critical", label:"Incident Response Plan (IRP)",                       subcats:["RS.MA-01","RS.CO-01"] },
-  { id:"d29", cat:"Respond",       priority:"Medium",   label:"Incident Log / Register",                            subcats:["RS.AN-01","RS.AN-02"] },
+  { id:"d28", cat:"Respond",       priority:"Critical", label:"Incident Response Plan (IRP)",                       subcats:["RS.MA-01","RS.CO-02"] },
+  { id:"d29", cat:"Respond",       priority:"Medium",   label:"Incident Log / Register",                            subcats:["RS.AN-03","RS.AN-08"] },
   { id:"d30", cat:"Respond",       priority:"High",     label:"Regulatory Notification Procedures (ICO / NIS2)",    subcats:["RS.CO-02"] },
   { id:"d31", cat:"Respond",       priority:"High",     label:"Business Continuity Plan (BCP)",                     subcats:["RS.MI-01","RC.RP-04"] },
   { id:"d32", cat:"Recover",       priority:"Critical", label:"Disaster Recovery Plan (DRP)",                       subcats:["RC.RP-01","RC.RP-04"] },
@@ -1237,13 +1249,13 @@ export default function MaturityScorecard() {
         sections.push("");
         sections.push("[SECTION: " + domain.id + "] " + domain.name);
         sections.push("-" .repeat(40));
-        const wqs = WORKSHOP_QS[domain.id] || [];
+        const wqs = getSubcatQs(domain.id);
         if (wqs.length > 0) {
-          sections.push("Key areas to cover:");
-          wqs.slice(0, 3).forEach(function(q, i) {
-            sections.push("  " + (i + 1) + ". " + q.slice(0, 120));
+          sections.push("Subcategories to cover:");
+          wqs.slice(0, 5).forEach(function(item, i) {
+            sections.push("  " + item.id + ": " + item.question.slice(0, 120));
           });
-          if (wqs.length > 3) sections.push("  ... and " + (wqs.length - 3) + " more questions");
+          if (wqs.length > 5) sections.push("  ... and " + (wqs.length - 5) + " more subcategories");
         }
         sections.push("");
         sections.push("[Add your notes for " + domain.id + " here]");
@@ -1585,9 +1597,12 @@ export default function MaturityScorecard() {
         const domId = entry[0];
         const paras = entry[1];
         if (paras.length > 0) {
-          const existing = merged[domId] || "";
+          // Distribute to the first subcategory of this domain
+          const subcatQs = getSubcatQs(domId);
+          const targetKey = subcatQs.length > 0 ? subcatQs[0].id : domId;
+          const existing = merged[targetKey] || "";
           const imported = "[Imported from " + notesImportPreview.fileName + "]\n" + paras.join("\n\n");
-          merged[domId] = existing ? existing + "\n\n" + imported : imported;
+          merged[targetKey] = existing ? existing + "\n\n" + imported : imported;
         }
       });
       return merged;
@@ -1645,8 +1660,8 @@ export default function MaturityScorecard() {
       const catGaps = gaps.filter(g=>g.cat.id===cat.id);
       const tgtV = parseFloat(catTarget(cat) || scV);
       const gap = (tgtV - scV).toFixed(2);
-      // Collect any workshop notes for this function's categories
-      const catWorkshopNotes = cat.domains.map(d=>workshopNotes[d.id]).filter(Boolean);
+      // Collect any workshop notes for this function's subcategories
+      const catWorkshopNotes = cat.domains.flatMap(function(d) { return getSubcatQs(d.id).map(function(item) { return workshopNotes[item.id]; }).filter(Boolean); });
       // Collect missing docs for this function
       const catMissingDocs = NIST_DOCS.filter(d => d.cat === (cat.id==="GV"?"Governance":cat.id==="ID"?"Identify":cat.id==="PR"?"Protect":cat.id==="DE"?"Detect":cat.id==="RS"?"Respond":"Recover") && (!docsProvided[d.id] || docsProvided[d.id]==="no"));
 
@@ -1870,16 +1885,22 @@ export default function MaturityScorecard() {
     XLSX.utils.book_append_sheet(wb, wsGaps, "Gaps and Recommendations");
 
     // Sheet 4: Workshop Notes
-    const workshopRows = [["Domain ID","Domain Name","Workshop Questions","Workshop Notes"]];
+    const workshopRows = [["Domain ID","Domain Name","Subcategory","Workshop Question","Workshop Notes"]];
     fw.forEach(cat => {
       cat.domains.forEach(domain => {
-        const qs = (WORKSHOP_QS[domain.id] || []).join("\n");
-        const wn = workshopNotes[domain.id] || "";
-        workshopRows.push([domain.id, domain.name, qs, wn]);
+        const subcatQs = getSubcatQs(domain.id);
+        if (subcatQs.length > 0) {
+          subcatQs.forEach(function(item, idx) {
+            const subNote = workshopNotes[item.id] || "";
+            workshopRows.push([idx === 0 ? domain.id : "", idx === 0 ? domain.name : "", item.id, item.question, subNote]);
+          });
+        } else {
+          workshopRows.push([domain.id, domain.name, "", "", ""]);
+        }
       });
     });
     const wsWorkshop = XLSX.utils.aoa_to_sheet(workshopRows);
-    wsWorkshop["!cols"] = [{wch:12},{wch:28},{wch:60},{wch:60}];
+    wsWorkshop["!cols"] = [{wch:12},{wch:28},{wch:16},{wch:80},{wch:60}];
     XLSX.utils.book_append_sheet(wb, wsWorkshop, "Workshop Notes");
 
     // Sheet 5: Documentation Review
@@ -2241,8 +2262,8 @@ export default function MaturityScorecard() {
         
         {view !== "home" && (()=>{
           const docsReviewedCount = NIST_DOCS.filter(d => docsProvided[d.id] === "yes" || docsProvided[d.id] === "partial" || docsProvided[d.id] === "no" || docsProvided[d.id] === "na").length;
-          const workshopNotesCount = fw.flatMap(c=>c.domains).filter(d => workshopNotes[d.id]?.trim()).length;
-          const totalDomains = fw.flatMap(c=>c.domains).length;
+          const workshopNotesCount = fw.flatMap(c=>c.domains).flatMap(function(d) { return getSubcatQs(d.id); }).filter(function(item) { return workshopNotes[item.id]?.trim(); }).length;
+          const totalDomains = fw.flatMap(c=>c.domains.flatMap(d=>d.questions)).length;
           const missingDocs = NIST_DOCS.filter(d => !docsProvided[d.id] || docsProvided[d.id]==="no").length;
           const stages = [
             { id:"setup",    label:"Setup",    icon:"⚙",
@@ -2777,7 +2798,7 @@ export default function MaturityScorecard() {
             <div style={{ display:"grid", gridTemplateColumns:"200px 1fr", gap:"18px" }}>
               <div style={{ display:"flex", flexDirection:"column", gap:"6px" }}>
                 {fw.map(cat=>{
-                  const wCaptured = cat.domains.filter(d=>workshopNotes[d.id]&&workshopNotes[d.id].trim()).length;
+                  const wCaptured = cat.domains.flatMap(function(d) { return getSubcatQs(d.id); }).filter(function(item) { return workshopNotes[item.id]?.trim(); }).length;
                   return (
                     <button key={cat.id} onClick={()=>setActiveSection(cat.id===activeSection?null:cat.id)} style={{ padding:"11px 13px", borderRadius:"9px", textAlign:"left", border:"2px solid " + (activeSection===cat.id?cat.color:"#1B3A6B"), background:activeSection===cat.id?cat.light:"#0A1932", cursor:"pointer", fontFamily:"inherit" }}>
                       <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
@@ -2790,8 +2811,8 @@ export default function MaturityScorecard() {
                 })}
                 <div style={{ ...card, marginTop:"6px", padding:"13px" }}>
                   <div style={{ fontSize:"13px", color:"#4A6A8A", marginBottom:"4px", fontWeight:"600" }}>NOTES CAPTURED</div>
-                  <div style={{ fontSize:"24px", fontWeight:"800", color:"#00BFFF" }}>{fw.flatMap(c=>c.domains).filter(d=>workshopNotes[d.id]&&workshopNotes[d.id].trim()).length}</div>
-                  <div style={{ fontSize:"13px", color:"#8BAAC8" }}>of {fw.flatMap(c=>c.domains).length} categories</div>
+                  <div style={{ fontSize:"24px", fontWeight:"800", color:"#00BFFF" }}>{fw.flatMap(c=>c.domains).flatMap(function(d) { return getSubcatQs(d.id); }).filter(function(item) { return workshopNotes[item.id]?.trim(); }).length}</div>
+                  <div style={{ fontSize:"13px", color:"#8BAAC8" }}>of {fw.flatMap(c=>c.domains.flatMap(d=>d.questions)).length} subcategories</div>
                 </div>
               </div>
 
@@ -2813,8 +2834,8 @@ export default function MaturityScorecard() {
                       </div>
                       {cat.domains.map(domain => {
                         const isOpen = expandedDomains[domain.id] !== false;
-                        const wqs = WORKSHOP_QS[domain.id] || [];
-                        const hasNotes = workshopNotes[domain.id]?.trim();
+                        const wqs = getSubcatQs(domain.id);
+                        const hasNotes = wqs.some(function(item) { return workshopNotes[item.id]?.trim(); });
                         return (
                           <div key={domain.id} style={{ ...card, marginBottom:"10px", borderLeft: hasNotes?`3px solid #C8F135`:"3px solid transparent" }}>
                             <button onClick={()=>setExpandedDomains(p=>({...p,[domain.id]:!isOpen}))} style={{ width:"100%", background:"none", border:"none", cursor:"pointer", textAlign:"left", padding:0, display:"flex", justifyContent:"space-between", alignItems:"center", fontFamily:"inherit" }}>
@@ -2824,30 +2845,29 @@ export default function MaturityScorecard() {
                                 <span style={{ fontSize:"12px", color:"#4A6A8A", marginLeft:"8px" }}>({wqs.length} questions)</span>
                               </div>
                               <div style={{ display:"flex", alignItems:"center", gap:"8px" }}>
-                                {hasNotes && <span style={{ fontSize:"12px", color:"#C8F135", fontWeight:"700" }}>{"✓"} Notes</span>}
+                                {hasNotes && <span style={{ fontSize:"12px", color:"#C8F135", fontWeight:"700" }}>{"✓"} {wqs.filter(function(item) { return workshopNotes[item.id]?.trim(); }).length} noted</span>}
                                 <span style={{ color:"#4A6A8A", fontSize:"13px" }}>{isOpen?"^":"v"}</span>
                               </div>
                             </button>
                             {isOpen && (
                               <div style={{ marginTop:"14px", borderTop:"1px solid #1B3A6B", paddingTop:"14px" }}>
-                                {wqs.length > 0 && (
-                                  <div style={{ marginBottom:"16px" }}>
-                                    <div style={{ fontSize:"13px", fontWeight:"700", color:"#00BFFF", marginBottom:"10px", letterSpacing:"0.05em", textTransform:"uppercase" }}>Discovery Questions</div>
-                                    {wqs.map((q,i) => (
-                                      <div key={i} style={{ display:"flex", gap:"10px", marginBottom:"12px", alignItems:"flex-start", padding:"10px 12px", background:"rgba(0,191,255,0.05)", borderRadius:"7px", border:"1px solid rgba(0,191,255,0.12)" }}>
-                                        <span style={{ fontSize:"14px", fontWeight:"800", color:"#00BFFF", minWidth:"22px", marginTop:"1px", flexShrink:0 }}>{i+1}.</span>
-                                        <span style={{ fontSize:"15px", color:"#E2EAF4", lineHeight:"1.6" }}>{q}</span>
+                                {wqs.map((item) => {
+                                  const subNote = workshopNotes[item.id] || "";
+                                  return (
+                                    <div key={item.id} style={{ marginBottom:"14px", padding:"12px 14px", borderRadius:"8px", background: subNote ? "rgba(200,241,53,0.04)" : "rgba(0,191,255,0.03)", border: "1px solid " + (subNote ? "rgba(200,241,53,0.2)" : "rgba(0,191,255,0.1)") }}>
+                                      <div style={{ display:"flex", gap:"10px", alignItems:"flex-start", marginBottom:"8px" }}>
+                                        <span style={{ fontSize:"12px", fontWeight:"800", color:cat.color, minWidth:"72px", marginTop:"2px", flexShrink:0, background:cat.light, padding:"2px 6px", borderRadius:"4px", fontFamily:MONO, textAlign:"center" }}>{item.id}</span>
+                                        <span style={{ fontSize:"14px", color:"#E2EAF4", lineHeight:"1.6" }}>{item.question}</span>
                                       </div>
-                                    ))}
-                                  </div>
-                                )}
-                                <div style={{ fontSize:"13px", fontWeight:"700", color:"#00BFFF", marginBottom:"7px", letterSpacing:"0.05em", textTransform:"uppercase" }}>Evidence & Workshop Notes</div>
-                                <textarea
-                                  value={workshopNotes[domain.id]||""}
-                                  onChange={e=>setWorkshopNotes(p=>({...p,[domain.id]:e.target.value}))}
-                                  placeholder={`Capture client responses, examples and context for ${domain.name}. These notes will be visible alongside each subcategory when you move to scoring.`}
-                                  style={{ width:"100%", minHeight:"110px", padding:"10px 12px", borderRadius:"7px", border:"1px solid " + (hasNotes?"rgba(200,241,53,0.35)":"#1B3A6B"), fontSize:"14px", fontFamily:"inherit", outline:"none", background:"#0A1932", color:"#E2EAF4", boxSizing:"border-box", lineHeight:"1.6", resize:"vertical" }}
-                                />
+                                      <textarea
+                                        value={subNote}
+                                        onChange={e=>setWorkshopNotes(p=>({...p,[item.id]:e.target.value}))}
+                                        placeholder={"Evidence and notes for " + item.id + "..."}
+                                        style={{ width:"100%", minHeight:"60px", padding:"8px 10px", borderRadius:"6px", border:"1px solid " + (subNote ? "rgba(200,241,53,0.3)" : "#1B3A6B"), fontSize:"13px", fontFamily:"inherit", outline:"none", background:"#0A1932", color:"#E2EAF4", boxSizing:"border-box", lineHeight:"1.6", resize:"vertical" }}
+                                      />
+                                    </div>
+                                  );
+                                })}
                               </div>
                             )}
                           </div>
@@ -2933,7 +2953,7 @@ export default function MaturityScorecard() {
                         const isOpen = expandedDomains[domain.id] !== false;
                         const ds = domainScore(domain);
                         const dt = domainTarget(domain);
-                        const wNote = workshopNotes[domain.id];
+                        const wNote = null; // notes now per-subcategory
                         return (
                           <div key={domain.id} style={{ ...card, marginBottom:"10px" }}>
                             <button onClick={()=>setExpandedDomains(p=>({...p,[domain.id]:!isOpen}))} style={{ width:"100%", background:"none", border:"none", cursor:"pointer", textAlign:"left", padding:0, display:"flex", justifyContent:"space-between", alignItems:"center", fontFamily:"inherit" }}>
@@ -2950,19 +2970,13 @@ export default function MaturityScorecard() {
 
                             {isOpen && (
                               <div style={{ marginTop:"14px", borderTop:"1px solid #1B3A6B", paddingTop:"14px" }}>
-                                
-                                {wNote && (
-                                  <div style={{ marginBottom:"16px", padding:"12px 14px", borderRadius:"8px", background:"rgba(200,241,53,0.06)", border:"1px solid rgba(200,241,53,0.2)" }}>
-                                    <div style={{ fontSize:"12px", fontWeight:"700", color:"#C8F135", marginBottom:"5px", letterSpacing:"0.06em", textTransform:"uppercase" }}>Workshop Notes</div>
-                                    <div style={{ fontSize:"14px", color:"#8BAAC8", lineHeight:"1.6", whiteSpace:"pre-wrap" }}>{wNote}</div>
-                                  </div>
-                                )}
 
                                 {domain.questions.map((q, qi) => {
-                                  const key = `${domain.id}_q${qi}`;
+                                  const key = domain.id + "_q" + qi;
                                   const cur = scores[key];
                                   const [subId, ...rest] = q.split("  -  ");
                                   const qText = rest.join("  -  ") || q;
+                                  const subNote = workshopNotes[subId] || "";
                                   return (
                                     <div key={qi} style={{ marginBottom:"18px", paddingBottom:"18px", borderBottom: qi<domain.questions.length-1?"1px solid #0D1F3C":"none" }}>
                                       <div style={{ display:"flex", gap:"8px", marginBottom:"8px", alignItems:"flex-start" }}>
@@ -2970,7 +2984,12 @@ export default function MaturityScorecard() {
                                         <span style={{ fontSize:"15px", color:"#E2EAF4", lineHeight:"1.5", fontWeight:"500" }}>{isNIST ? qText : q}</span>
                                       </div>
 
-                                      
+                                      {subNote && (
+                                        <div style={{ marginBottom:"8px", padding:"9px 12px", borderRadius:"6px", background:"rgba(200,241,53,0.06)", border:"1px solid rgba(200,241,53,0.2)" }}>
+                                          <div style={{ fontSize:"11px", fontWeight:"700", color:"#C8F135", marginBottom:"3px", letterSpacing:"0.06em", textTransform:"uppercase" }}>Workshop Notes  -  {subId}</div>
+                                          <div style={{ fontSize:"13px", color:"#8BAAC8", lineHeight:"1.6", whiteSpace:"pre-wrap" }}>{subNote}</div>
+                                        </div>
+                                      )}
                                       {notes[key] && (
                                         <div style={{ marginBottom:"8px", padding:"9px 12px", borderRadius:"5px", background:"rgba(0,191,255,0.06)", border:"1px solid rgba(0,191,255,0.15)", fontSize:"13px", color:"#8BAAC8", fontStyle:"italic" }}>
                                           Doc {notes[key]}
@@ -3523,29 +3542,35 @@ export default function MaturityScorecard() {
                   <div key={cat.id} style={{ ...card, marginBottom:"10px", borderLeft:`4px solid ${cat.color}` }}>
                     <div style={{ fontSize:"13px", fontWeight:"800", color:cat.color, letterSpacing:"0.1em", marginBottom:"12px" }}>{cat.id}  -  {cat.name}</div>
                     {cat.domains.map(domain=>{
-                      const wqs=WORKSHOP_QS[domain.id]||[];
-                      const wn=workshopNotes[domain.id];
+                      const wqs=getSubcatQs(domain.id);
+                      const notedCount = wqs.filter(function(item) { return workshopNotes[item.id]?.trim(); }).length;
                       return (
                         <div key={domain.id} style={{ marginBottom:"14px", paddingBottom:"14px", borderBottom:"1px solid #1B3A6B" }}>
                           <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:"8px" }}>
                             <div>
                               <span style={{ fontSize:"12px", fontWeight:"700", color:cat.color, letterSpacing:"0.08em" }}>{domain.id}</span>
                               <span style={{ fontSize:"15px", fontWeight:"700", color:"#E2EAF4", marginLeft:"8px" }}>{domain.name}</span>
+                              <span style={{ fontSize:"12px", color:"#4A6A8A", marginLeft:"6px" }}>({wqs.length} subcategories)</span>
                             </div>
-                            {wn&&<span style={{ fontSize:"12px", color:"#C8F135", fontWeight:"700", background:"rgba(200,241,53,0.12)", padding:"2px 8px", borderRadius:"4px" }}>Notes captured</span>}
+                            {notedCount > 0 && <span style={{ fontSize:"12px", color:"#C8F135", fontWeight:"700", background:"rgba(200,241,53,0.12)", padding:"2px 8px", borderRadius:"4px" }}>{notedCount} noted</span>}
                           </div>
-                          {wqs.length>0&&(
-                            <div style={{ fontSize:"13px", color:"#4A6A8A", marginBottom:"8px" }}>
-                              {wqs.slice(0,2).map((q,i)=><div key={i} style={{ marginBottom:"2px" }}>* {q}</div>)}
-                              {wqs.length>2&&<div style={{ color:"#4A6A8A" }}>+ {wqs.length-2} more questions</div>}
-                            </div>
-                          )}
-                          <textarea
-                            value={workshopNotes[domain.id]||""}
-                            onChange={e=>setWorkshopNotes(p=>({...p,[domain.id]:e.target.value}))}
-                            placeholder="No notes captured yet  -  add them here or during the assessment..."
-                            style={{ width:"100%", minHeight:"70px", padding:"8px 10px", borderRadius:"6px", border:"1px solid #1B3A6B", fontSize:"14px", fontFamily:"inherit", outline:"none", background:"#0A1932", color:"#E2EAF4", boxSizing:"border-box", lineHeight:"1.5", resize:"vertical" }}
-                          />
+                          {wqs.map(function(item) {
+                            const subNote = workshopNotes[item.id] || "";
+                            return (
+                              <div key={item.id} style={{ marginBottom:"8px", padding:"8px 10px", borderRadius:"6px", background: subNote ? "rgba(200,241,53,0.04)" : "#0A1932", border: "1px solid " + (subNote ? "rgba(200,241,53,0.2)" : "#1B3A6B") }}>
+                                <div style={{ display:"flex", alignItems:"center", gap:"6px", marginBottom:"4px" }}>
+                                  <span style={{color:cat.color,fontWeight:"700",fontFamily:MONO,fontSize:"11px"}}>{item.id}</span>
+                                  <span style={{ fontSize:"12px", color:"#4A6A8A" }}>{item.question.slice(0,80)}...</span>
+                                </div>
+                                <textarea
+                                  value={subNote}
+                                  onChange={e=>setWorkshopNotes(p=>({...p,[item.id]:e.target.value}))}
+                                  placeholder={"Notes for " + item.id + "..."}
+                                  style={{ width:"100%", minHeight:"50px", padding:"6px 8px", borderRadius:"5px", border:"1px solid " + (subNote ? "rgba(200,241,53,0.25)" : "#1B3A6B"), fontSize:"13px", fontFamily:"inherit", outline:"none", background:"rgba(0,0,0,0.2)", color:"#E2EAF4", boxSizing:"border-box", lineHeight:"1.5", resize:"vertical" }}
+                                />
+                              </div>
+                            );
+                          })}
                         </div>
                       );
                     })}
