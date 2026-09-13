@@ -8,6 +8,9 @@
     "build": "vite build",
     "preview": "vite preview",
     "predeploy": "npm run build",
+    "qa": "node tools/report-qa/cli.mjs",
+    "qa:test": "node --test tools/report-qa/test.mjs",
+    "qa:rules": "node tools/report-qa/cli.mjs --list-rules",
     "deploy": "gh-pages -d dist"
   },
   "dependencies": {

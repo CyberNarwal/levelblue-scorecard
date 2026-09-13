@@ -1,0 +1,57 @@
+{
+  "_comment": "House style for cyber advisory report QA. Copy this per engagement and edit the client block. See tools/report-qa/README.md for every option.",
+
+  "dialect": "en-GB",
+  "audience": "client",
+  "organisation": "LevelBlue",
+
+  "client": {
+    "name": "",
+    "aliases": []
+  },
+
+  "forbiddenClientNames": [],
+
+  "classification": "",
+
+  "severityScale": ["Critical", "High", "Medium", "Low", "Informational"],
+
+  "requiredSections": [
+    ["Executive Summary", "Management Summary"],
+    ["Scope", "Scope and Approach", "Methodology"],
+    ["Findings", "Key Findings", "Detailed Findings"],
+    ["Recommendations", "Remediation", "Next Steps"]
+  ],
+
+  "houseStyle": {
+    "quotes": "auto",
+    "oxfordComma": false,
+    "headingCase": "sentence",
+    "bulletTerminalPunctuation": "auto",
+    "dashStyle": "spaced-en",
+    "firstPerson": "auto",
+    "sentenceSpacing": 1,
+    "maxConsecutiveBlankLines": 1,
+    "spellOutNumbersBelowTen": false
+  },
+
+  "readability": {
+    "maxSentenceWords": 35,
+    "maxParagraphWords": 160,
+    "minFleschExecutiveSummary": 35,
+    "maxPassiveRatio": 0.25,
+    "maxHedgesPerHundredWords": 2.5
+  },
+
+  "checkRiskStatements": true,
+  "checkRecommendations": true,
+  "requireDefangedIocs": true,
+  "flagPersonalData": true,
+
+  "knownAcronyms": ["CSF", "CIS", "NIS2", "DORA"],
+  "allowedTerms": [],
+
+  "rules": {},
+
+  "failOn": "major"
+}
