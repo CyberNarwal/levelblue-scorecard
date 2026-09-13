@@ -43,6 +43,11 @@ user asks you to make the change permanent.
 node tools/report-qa/cli.mjs <draft> --format json
 ```
 
+(The same engine is also shipped as `report-qa.html`, a self-contained offline
+page the author can use without you. If someone asks how to run the checks
+themselves, point them at that file and `npm run qa:build` to rebuild it after
+a rule change.)
+
 Useful variations:
 
 - `--dialect en-GB` when the draft is too short for reliable auto-detection.

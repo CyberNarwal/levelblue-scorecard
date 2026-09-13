@@ -9,39 +9,48 @@
  * unresolved comments, tracked changes and leftover highlighting.
  */
 
-import { inflateRawSync, inflateSync } from 'node:zlib';
+import { inflateRaw, inflateZlib } from './inflate.mjs';
 
 const EOCD_SIGNATURE = 0x06054b50;
 const CENTRAL_SIGNATURE = 0x02014b50;
 
-/** Read a ZIP archive into a Map of entry name -> Buffer. */
-export function readZip(buffer) {
+const utf8 = new TextDecoder('utf-8');
+
+// Little-endian reads and UTF-8 decoding done by hand, so this file depends on
+// nothing but Uint8Array and runs unchanged in Node and in the browser.
+const readU16 = (b, at) => b[at] | (b[at + 1] << 8);
+const readU32 = (b, at) => (b[at] | (b[at + 1] << 8) | (b[at + 2] << 16) | (b[at + 3] << 24)) >>> 0;
+const decode = (b, from, to) => utf8.decode(b.subarray(from, to));
+
+/** Read a ZIP archive into a Map of entry name -> Uint8Array. */
+export function readZip(input) {
+  const buffer = input instanceof Uint8Array ? input : new Uint8Array(input);
   const eocd = findEndOfCentralDirectory(buffer);
   if (eocd === -1) throw new Error('Not a valid ZIP/DOCX file (no end-of-central-directory record).');
 
-  const entryCount = buffer.readUInt16LE(eocd + 10);
-  let pointer = buffer.readUInt32LE(eocd + 16);
+  const entryCount = readU16(buffer, eocd + 10);
+  let pointer = readU32(buffer, eocd + 16);
   const entries = new Map();
 
   for (let i = 0; i < entryCount; i += 1) {
-    if (buffer.readUInt32LE(pointer) !== CENTRAL_SIGNATURE) break;
-    const method = buffer.readUInt16LE(pointer + 10);
-    const compressedSize = buffer.readUInt32LE(pointer + 20);
-    const nameLength = buffer.readUInt16LE(pointer + 28);
-    const extraLength = buffer.readUInt16LE(pointer + 30);
-    const commentLength = buffer.readUInt16LE(pointer + 32);
-    const localOffset = buffer.readUInt32LE(pointer + 42);
-    const name = buffer.toString('utf8', pointer + 46, pointer + 46 + nameLength);
+    if (readU32(buffer, pointer) !== CENTRAL_SIGNATURE) break;
+    const method = readU16(buffer, pointer + 10);
+    const compressedSize = readU32(buffer, pointer + 20);
+    const nameLength = readU16(buffer, pointer + 28);
+    const extraLength = readU16(buffer, pointer + 30);
+    const commentLength = readU16(buffer, pointer + 32);
+    const localOffset = readU32(buffer, pointer + 42);
+    const name = decode(buffer, pointer + 46, pointer + 46 + nameLength);
 
-    const localNameLength = buffer.readUInt16LE(localOffset + 26);
-    const localExtraLength = buffer.readUInt16LE(localOffset + 28);
+    const localNameLength = readU16(buffer, localOffset + 26);
+    const localExtraLength = readU16(buffer, localOffset + 28);
     const dataStart = localOffset + 30 + localNameLength + localExtraLength;
     const data = buffer.subarray(dataStart, dataStart + compressedSize);
 
     try {
-      if (method === 0) entries.set(name, Buffer.from(data));
-      else if (method === 8) entries.set(name, inflateRawSync(data));
-      else if (method === 9) entries.set(name, inflateSync(data));
+      if (method === 0) entries.set(name, data.slice());
+      else if (method === 8) entries.set(name, inflateRaw(data));
+      else if (method === 9) entries.set(name, inflateZlib(data));
     } catch {
       // A part we cannot inflate is skipped rather than failing the whole read.
     }
@@ -53,7 +62,7 @@ export function readZip(buffer) {
 function findEndOfCentralDirectory(buffer) {
   const min = Math.max(0, buffer.length - 66_000);
   for (let i = buffer.length - 22; i >= min; i -= 1) {
-    if (buffer.readUInt32LE(i) === EOCD_SIGNATURE) return i;
+    if (readU32(buffer, i) === EOCD_SIGNATURE) return i;
   }
   return -1;
 }
@@ -210,14 +219,14 @@ export function extractDocx(buffer) {
   if (!documentXml) throw new Error('DOCX is missing word/document.xml.');
 
   const state = { commentAnchors: [], insertions: [], deletions: [], highlights: [] };
-  const bodyXml = documentXml.toString('utf8');
+  const bodyXml = utf8.decode(documentXml);
   const paragraphs = parseBody(bodyXml, 'body', state);
 
   const headerFooterText = [];
   for (const [name, data] of entries) {
     if (!/^word\/(header|footer)\d*\.xml$/.test(name)) continue;
     const region = name.includes('header') ? 'header' : 'footer';
-    for (const p of parseBody(data.toString('utf8'), region, { commentAnchors: [], insertions: [], deletions: [], highlights: [] })) {
+    for (const p of parseBody(utf8.decode(data), region, { commentAnchors: [], insertions: [], deletions: [], highlights: [] })) {
       if (p.text.trim()) headerFooterText.push(p.text.trim());
     }
   }
@@ -227,13 +236,13 @@ export function extractDocx(buffer) {
   if (commentsXml) {
     const re = /<w:comment\s[^>]*w:author="([^"]*)"[^>]*>([\s\S]*?)<\/w:comment>/g;
     let m;
-    while ((m = re.exec(commentsXml.toString('utf8'))) !== null) {
+    while ((m = re.exec(utf8.decode(commentsXml))) !== null) {
       comments.push({ author: decodeEntities(m[1]), text: paragraphText(m[2]).trim() });
     }
   }
 
   const meta = {
-    ...parseCoreProperties(entries.get('docProps/core.xml')?.toString('utf8')),
+    ...parseCoreProperties(entries.has('docProps/core.xml') ? utf8.decode(entries.get('docProps/core.xml')) : undefined),
     headerFooterText,
     comments,
     trackedInsertions: state.insertions.length,

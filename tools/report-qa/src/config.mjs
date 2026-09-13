@@ -6,9 +6,6 @@
  * that has no view is no use. Everything here can be overridden per report.
  */
 
-import { readFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
-
 export const DEFAULT_CONFIG = {
   /** 'en-GB' | 'en-US' | 'auto' - 'auto' infers from the draft's own spellings. */
   dialect: 'auto',
@@ -98,7 +95,7 @@ export function severityRank(severity) {
 export { SEVERITIES };
 
 /** Deep merge for plain objects; arrays are replaced wholesale. */
-function merge(base, override) {
+export function merge(base, override) {
   if (!override || typeof override !== 'object' || Array.isArray(override)) return override ?? base;
   const out = { ...base };
   for (const [key, value] of Object.entries(override)) {
@@ -114,47 +111,15 @@ function merge(base, override) {
   return out;
 }
 
-/**
- * Load configuration, layering: defaults <- config file <- CLI overrides.
- * Returns { config, configPath } so the report can say where the rules came from.
- */
-export function loadConfig({ configPath, overrides = {}, cwd = process.cwd() } = {}) {
-  let fileConfig = {};
-  let resolved = null;
-
-  const candidates = configPath
-    ? [resolve(cwd, configPath)]
-    : searchUpwards(cwd, 'report-qa.config.json');
-
-  for (const candidate of candidates) {
-    try {
-      fileConfig = JSON.parse(readFileSync(candidate, 'utf8'));
-      resolved = candidate;
-      break;
-    } catch (error) {
-      if (configPath) throw new Error(`Could not read config ${candidate}: ${error.message}`);
-    }
-  }
-
-  const config = merge(merge(DEFAULT_CONFIG, fileConfig), overrides);
+/** Apply overrides to the defaults and validate the result. */
+export function resolveConfig(...layers) {
+  const config = layers.filter(Boolean).reduce((acc, layer) => merge(acc, layer), DEFAULT_CONFIG);
   validate(config);
-  return { config, configPath: resolved };
+  return config;
 }
 
-function searchUpwards(from, filename) {
-  const found = [];
-  let current = resolve(from);
-  for (let i = 0; i < 6; i += 1) {
-    found.push(resolve(current, filename));
-    found.push(resolve(current, 'tools', 'report-qa', filename));
-    const parent = dirname(current);
-    if (parent === current) break;
-    current = parent;
-  }
-  return found;
-}
-
-function validate(config) {
+/** Reject configurations that would fail confusingly later. */
+export function validate(config) {
   if (!['en-GB', 'en-US', 'auto'].includes(config.dialect)) {
     throw new Error(`dialect must be "en-GB", "en-US" or "auto" (got "${config.dialect}").`);
   }

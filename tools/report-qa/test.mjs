@@ -11,7 +11,8 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import test from 'node:test';
 
-import { DEFAULT_CONFIG, loadConfig } from './src/config.mjs';
+import { DEFAULT_CONFIG } from './src/config.mjs';
+import { loadConfig } from './src/config-node.mjs';
 import { parseMarkdown } from './src/document.mjs';
 import { ALL_RULES, analyse } from './src/engine.mjs';
 import { extractDocx } from './src/extract/docx.mjs';
@@ -276,6 +277,19 @@ test('secrets are blockers and are masked in the output', () => {
   assert.equal(findings[0].severity, 'blocker');
   assert.ok(!findings[0].excerpt.includes('AKIAIOSFODNN7EXAMPLE'), 'the secret must not be reprinted');
   assert.ok(findings[0].excerpt.includes('configuration'), 'surrounding words stay readable');
+});
+
+test('a secret never appears in any excerpt, including a neighbouring finding\'s', () => {
+  // The password and the key are close enough that each sits inside the other's
+  // context window, so per-finding masking alone would leak both.
+  const source = 'The file contained password = Summer2026!Trading and the key AKIAIOSFODNN7EXAMPLE was there too.\n';
+  const result = check(source);
+  assert.ok(findingsFor(result, 'confidentiality/secret').length >= 2, 'precondition: both secrets detected');
+  for (const finding of result.findings) {
+    const excerpt = finding.excerpt || '';
+    assert.ok(!excerpt.includes('AKIAIOSFODNN7EXAMPLE'), `${finding.rule} reprinted the access key`);
+    assert.ok(!excerpt.includes('Summer2026!Trading'), `${finding.rule} reprinted the password`);
+  }
 });
 
 test("another client's name in the draft is a blocker", () => {

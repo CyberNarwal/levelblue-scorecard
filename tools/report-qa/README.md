@@ -7,6 +7,25 @@ rule can catch, so the reviewing agent (`.claude/skills/report-qa/`) can spend
 its attention on the things a rule cannot: whether the argument holds, whether
 the severity is justified, whether the remediation advice is actually correct.
 
+## The offline page
+
+`report-qa.html` in the project root is the whole tool as one self-contained
+file. Open it in a browser, drag a draft onto it, read the findings. No install,
+no terminal, no server, and no network: the file can be copied to a machine with
+the Wi-Fi off and it still works. Client drafts never leave the computer.
+
+Rebuild it after changing any rule:
+
+```bash
+npm run qa:build                          # writes report-qa.html
+```
+
+The build fails rather than emitting a page that contains a `fetch`, an external
+script or stylesheet, or a WebSocket - the offline guarantee is enforced, not
+just intended.
+
+## The command line
+
 ```bash
 npm run qa -- path/to/draft.docx          # check a draft
 npm run qa -- draft.md --fix              # apply the unambiguous corrections
@@ -133,25 +152,37 @@ the same `Document` - one normalised string plus blocks with absolute offsets -
 so no rule needs to know what the draft was authored in, and `--fix` can apply
 edits back-to-front without invalidating positions.
 
-**The core is environment-agnostic.** `src/` uses no Node APIs except in
-`extract/docx.mjs` (zlib) and `load.mjs` (fs), so the engine can be imported
-into the browser app later without a rewrite.
+**The engine is environment-agnostic.** Nothing under `src/` touches a Node API
+except `config-node.mjs` and `load.mjs`, which exist only to read from disk.
+DEFLATE is implemented in `extract/inflate.mjs` rather than imported from
+`node:zlib`, and the ZIP reader works on plain `Uint8Array`, so the same DOCX
+parser runs in Node and in the browser. That is what makes the offline page
+possible without a second implementation to keep in sync.
+
+**Secrets are masked document-wide, not per finding.** Excerpts are cut only
+after every rule has run, from a copy of the text with all sensitive spans
+replaced. Masking each finding's own match is not enough: a credential one line
+away still lands inside a neighbouring finding's context window.
 
 ## Layout
 
 ```
 cli.mjs                    argument parsing, output, exit codes
+build-standalone.mjs       bundles the engine into one offline HTML file
+browser/                   the offline page: UI, template, browser file loading
 src/engine.mjs             runs rules, suppresses, de-duplicates, sorts
 src/document.mjs           the Document model and the Markdown parser
-src/config.mjs             defaults, merge, validation
+src/config.mjs             defaults, merge, validation (no Node APIs)
+src/config-node.mjs        reading report-qa.config.json from disk
 src/load.mjs               format detection and dispatch
 src/fix.mjs                back-to-front application of safe corrections
 src/report.mjs             text, Markdown and JSON output
 src/text.mjs               offsets, sentence splitting, readability
 src/extract/docx.mjs       zero-dependency ZIP + WordprocessingML reader
+src/extract/inflate.mjs    DEFLATE decompression, so DOCX works in a browser
 src/data/                  dialect pairs, security terms, writing-quality lists
 src/rules/                 the nine rule families
-test.mjs                   52 tests, run with npm run qa:test
+test.mjs                   53 tests, run with npm run qa:test
 samples/                   a deliberately flawed draft in .md and .docx
 ```
 

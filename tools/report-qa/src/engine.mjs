@@ -17,7 +17,7 @@ import { rules as punctuationRules } from './rules/punctuation.mjs';
 import { rules as structureRules } from './rules/structure.mjs';
 import { rules as terminologyRules } from './rules/terminology.mjs';
 import { rules as whitespaceRules } from './rules/whitespace.mjs';
-import { countWords } from './text.mjs';
+import { countWords, excerptAround } from './text.mjs';
 
 export const ALL_RULES = [
   ...confidentialityRules,
@@ -75,7 +75,6 @@ export function analyse(doc, { config, now = new Date() } = {}) {
         column: position.column,
         start: raw.start,
         end: raw.end,
-        excerpt: raw.documentLevel ? null : buildExcerpt(doc, raw),
         occurrences: raw.occurrences,
         aggregate: Boolean(raw.aggregate),
         documentLevel: Boolean(raw.documentLevel),
@@ -84,6 +83,16 @@ export function analyse(doc, { config, now = new Date() } = {}) {
         redact: Boolean(raw.redact),
       });
     }
+  }
+
+  // Excerpts are built only once every rule has run, against a copy of the text
+  // with EVERY sensitive span masked. Doing it per finding would mask a
+  // credential in its own excerpt but still reprint it in the context window of
+  // a neighbouring finding a line away - which is how a secret escapes a QA
+  // report that believed it was redacting.
+  const maskedText = maskSensitiveSpans(doc.text, findings);
+  for (const finding of findings) {
+    finding.excerpt = finding.documentLevel ? null : excerptAround(maskedText, finding.start, finding.end);
   }
 
   const deduped = dedupe(findings);
@@ -161,17 +170,21 @@ function isSuppressed(suppressions, line, ruleId) {
 }
 
 /**
- * Build the context excerpt, masking only the flagged span when a rule marks
- * it sensitive - so a leaked key is not reprinted in the QA output, while the
- * surrounding sentence stays readable enough to locate.
+ * Return a copy of the text with every span a rule marked sensitive replaced by
+ * asterisks. The replacement is the same length as the original, so all finding
+ * offsets stay valid and excerpts can be cut from this copy directly.
  */
-function buildExcerpt(doc, raw) {
-  const excerpt = doc.excerpt(raw.start, raw.end);
-  if (!raw.redact) return excerpt;
-  const matched = doc.text.slice(raw.start, raw.end).replace(/\s+/g, ' ').trim();
-  if (!matched) return excerpt;
-  const masked = matched.replace(/[^\s]/g, '*').slice(0, 16);
-  return excerpt.split(matched).join(masked);
+function maskSensitiveSpans(text, findings) {
+  const spans = findings.filter((f) => f.redact && f.end > f.start);
+  if (!spans.length) return text;
+
+  const chars = [...text];
+  for (const span of spans) {
+    for (let i = Math.max(0, span.start); i < Math.min(chars.length, span.end); i += 1) {
+      if (!/\s/.test(chars[i])) chars[i] = '*';
+    }
+  }
+  return chars.join('');
 }
 
 function buildStats(doc, findings, detection, dialect) {

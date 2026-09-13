@@ -23,7 +23,8 @@
 import { writeFileSync } from 'node:fs';
 import { relative } from 'node:path';
 
-import { loadConfig, severityRank, SEVERITIES } from './src/config.mjs';
+import { severityRank, SEVERITIES } from './src/config.mjs';
+import { loadConfig } from './src/config-node.mjs';
 import { ALL_RULES, analyse } from './src/engine.mjs';
 import { applyFixes } from './src/fix.mjs';
 import { loadDocument } from './src/load.mjs';

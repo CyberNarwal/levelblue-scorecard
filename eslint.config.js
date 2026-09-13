@@ -7,8 +7,23 @@ import { defineConfig, globalIgnores } from 'eslint/config'
 export default defineConfig([
   globalIgnores(['dist']),
   {
-    // The report-QA tool is Node, not browser, and ships as ES modules.
+    // The standalone QA page runs in a browser, from a file:// URL.
+    files: ['tools/report-qa/browser/**/*.mjs'],
+    extends: [js.configs.recommended],
+    languageOptions: {
+      ecmaVersion: 'latest',
+      sourceType: 'module',
+      globals: {
+        ...globals.browser,
+        // Replaced at build time with the house config from report-qa.config.json.
+        __HOUSE_CONFIG__: 'readonly',
+      },
+    },
+  },
+  {
+    // The rest of the report-QA tool is Node, not browser, and ships as ES modules.
     files: ['tools/**/*.mjs'],
+    ignores: ['tools/report-qa/browser/**/*.mjs'],
     extends: [js.configs.recommended],
     languageOptions: {
       ecmaVersion: 'latest',
