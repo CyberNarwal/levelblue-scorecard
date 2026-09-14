@@ -17,6 +17,7 @@ export default defineConfig([
         ...globals.browser,
         // Replaced at build time with the house config from report-qa.config.json.
         __HOUSE_CONFIG__: 'readonly',
+        __BUILD_INFO__: 'readonly',
       },
     },
   },

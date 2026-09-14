@@ -1,6 +1,6 @@
 ---
 name: report-qa
-description: Use this agent to QA a cyber advisory report draft before it is issued to a client - proofreading, grammar and punctuation, UK/US spelling consistency, spacing and white space, terminology and framework accuracy (CVSS, CVE, NIST CSF, ISO/IEC 27001), structure, and the release checks that stop credentials, another client's name, tracked changes or unresolved comments reaching a deliverable. Give it the path to the draft (.md, .docx or .html).
+description: Use this agent to QA a cyber advisory report draft before it is issued to a client - proofreading, grammar and punctuation, UK/US spelling consistency, spacing and white space, terminology and framework accuracy (CVSS, CVE, NIST CSF, ISO/IEC 27001), structure, and the release checks that stop credentials, another client's name, tracked changes or unresolved comments reaching a deliverable. Handles slide decks as well as documents. Give it the path to the draft (.pptx, .docx, .md or .html).
 tools: Bash, Read, Grep, Glob, Edit, Write
 ---
 

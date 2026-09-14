@@ -14,6 +14,7 @@ import { collectDialectEvidence, detectDialect, rules as dialectRules } from './
 import { rules as languageRules } from './rules/language.mjs';
 import { rules as numberRules } from './rules/numbers.mjs';
 import { rules as punctuationRules } from './rules/punctuation.mjs';
+import { rules as slideRules } from './rules/slides.mjs';
 import { rules as structureRules } from './rules/structure.mjs';
 import { rules as terminologyRules } from './rules/terminology.mjs';
 import { rules as whitespaceRules } from './rules/whitespace.mjs';
@@ -21,6 +22,7 @@ import { countWords, excerptAround } from './text.mjs';
 
 export const ALL_RULES = [
   ...confidentialityRules,
+  ...slideRules,
   ...structureRules,
   ...cyberRules,
   ...numberRules,
@@ -61,6 +63,7 @@ export function analyse(doc, { config, now = new Date() } = {}) {
       const severity = setting && setting !== 'off' ? setting : (raw.severity || rule.severity);
       const position = doc.position(raw.start);
       if (isSuppressed(suppressions, position.line, rule.id)) continue;
+      const block = doc.blockAt(raw.start);
 
       findings.push({
         rule: rule.id,
@@ -73,6 +76,8 @@ export function analyse(doc, { config, now = new Date() } = {}) {
         note: raw.note,
         line: position.line,
         column: position.column,
+        slide: raw.documentLevel ? undefined : block?.slide,
+        region: raw.documentLevel ? undefined : block?.region,
         start: raw.start,
         end: raw.end,
         occurrences: raw.occurrences,
@@ -207,6 +212,7 @@ function buildStats(doc, findings, detection, dialect) {
     listItems: doc.blocks.filter((b) => b.type === 'listItem').length,
     tableRows: doc.blocks.filter((b) => b.type === 'tableRow').length,
     sentences: doc.sentences().length,
+    slides: doc.meta.slideCount,
     dialect,
     dialectEvidence: { british: detection.gb, american: detection.us },
     total: findings.length,

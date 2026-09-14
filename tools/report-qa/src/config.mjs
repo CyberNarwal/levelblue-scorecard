@@ -55,6 +55,13 @@ export const DEFAULT_CONFIG = {
     spellOutNumbersBelowTen: false,
   },
 
+  /** Slide-deck limits. Only used when the draft is a .pptx. */
+  slides: {
+    maxWordsPerSlide: 75,
+    maxBulletsPerSlide: 8,
+    maxBulletDepth: 3,
+  },
+
   readability: {
     maxSentenceWords: 35,
     maxParagraphWords: 160,

@@ -10,7 +10,8 @@ the severity is justified, whether the remediation advice is actually correct.
 ## The offline page
 
 `report-qa.html` in the project root is the whole tool as one self-contained
-file. Open it in a browser, drag a draft onto it, read the findings. No install,
+file. See [DISTRIBUTION.md](DISTRIBUTION.md) for getting it to a team.
+Open it in a browser, drag a draft onto it, read the findings. No install,
 no terminal, no server, and no network: the file can be copied to a machine with
 the Wi-Fi off and it still works. Client drafts never leave the computer.
 
@@ -37,10 +38,12 @@ npm run qa:test                           # run the test suite
 
 | Format | Support |
 |---|---|
-| `.md`, `.txt` | Full, including `--fix` |
+| `.pptx` | Full, read-only. Slides, titles, bullets, tables, **speaker notes**, comments, and the text in slide layouts and masters. Findings are reported by slide number |
 | `.docx` | Full, read-only. Also reads tracked changes, comments, highlighting, headers, footers and document properties |
+| `.md`, `.txt` | Full, including `--fix` |
 | `.html` | Converted to text, read-only |
 | `.pdf` | **Refused on purpose.** Text extraction from PDF is unreliable enough that QA on the result is worse than no QA. Check the source document |
+| `.doc`, `.ppt` | Refused. Save as the modern format first |
 
 ## Severities
 
@@ -57,7 +60,7 @@ threshold, 2 could not run.
 
 ## What it checks
 
-92 rules in nine families. `npm run qa:rules` prints the current list.
+103 rules in ten families. `npm run qa:rules` prints the current list.
 
 - **Spacing** - double spaces, trailing whitespace, stacked blank lines (and
   stacked empty paragraphs in Word), invisible characters pasted in from Word or
@@ -91,6 +94,12 @@ threshold, 2 could not run.
   executive summary, passive voice (weighted in recommendations), hedging
   density, unsupportable absolute claims, wordiness, vague quantifiers where a
   number belongs, confusable words, repeated sentence openers, tense drift.
+- **Slides** (.pptx only) - slides with no title, too much text on one slide,
+  too many or too deeply nested bullets, empty slides, duplicate titles,
+  PowerPoint's own prompt text left in a placeholder ("Click to edit Master
+  title style"), speaker notes present in a client deliverable, internal
+  remarks inside those notes, another client's name surviving in the slide
+  layouts or masters, and unresolved comments.
 - **Confidentiality and release readiness** - credentials and secrets, another
   client's name, missing or conflicting classification markings, internal-only
   content in a client deliverable, tracked changes, unresolved comments,
@@ -147,10 +156,12 @@ explicit exception lists rather than trusting a suffix pattern. Every rule in
 the test suite has a test that it stays quiet on correct input, not just a test
 that it fires.
 
-**Everything is offsets.** Extractors for Markdown, DOCX and HTML all produce
-the same `Document` - one normalised string plus blocks with absolute offsets -
-so no rule needs to know what the draft was authored in, and `--fix` can apply
-edits back-to-front without invalidating positions.
+**Everything is offsets.** Extractors for Markdown, DOCX, PPTX and HTML all
+produce the same `Document` - one normalised string plus blocks with absolute
+offsets - so no rule needs to know what the draft was authored in, and `--fix`
+can apply edits back-to-front without invalidating positions. A block may carry
+a `slide` number, which is what lets a deck's findings be reported as
+"Slide 4" instead of a line number that would mean nothing to the author.
 
 **The engine is environment-agnostic.** Nothing under `src/` touches a Node API
 except `config-node.mjs` and `load.mjs`, which exist only to read from disk.
@@ -178,12 +189,15 @@ src/load.mjs               format detection and dispatch
 src/fix.mjs                back-to-front application of safe corrections
 src/report.mjs             text, Markdown and JSON output
 src/text.mjs               offsets, sentence splitting, readability
-src/extract/docx.mjs       zero-dependency ZIP + WordprocessingML reader
-src/extract/inflate.mjs    DEFLATE decompression, so DOCX works in a browser
+src/extract/ooxml.mjs      shared ZIP, entity and relationship handling
+src/extract/docx.mjs       WordprocessingML reader
+src/extract/pptx.mjs       PresentationML reader, including speaker notes
+src/extract/inflate.mjs    DEFLATE decompression, so Office files work in a browser
 src/data/                  dialect pairs, security terms, writing-quality lists
 src/rules/                 the nine rule families
-test.mjs                   53 tests, run with npm run qa:test
-samples/                   a deliberately flawed draft in .md and .docx
+test.mjs                   64 tests, run with npm run qa:test
+samples/                   deliberately flawed samples: .md, .docx and .pptx
+DISTRIBUTION.md            getting the offline page to a team
 ```
 
 ## Adding a rule

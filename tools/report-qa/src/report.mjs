@@ -41,6 +41,8 @@ export function formatJson(result, meta) {
       confidence: f.confidence,
       line: f.line,
       column: f.column,
+      slide: f.slide,
+      region: f.region,
       message: f.message,
       suggestion: f.suggestion,
       note: f.note,
@@ -60,7 +62,10 @@ export function formatText(result, meta, { colour = true, quiet = false } = {}) 
 
   if (!quiet) {
     lines.push(c(BOLD, `Report QA: ${meta.source}`));
-    lines.push(c(DIM, `${stats.words} words / ${stats.sentences} sentences / ${stats.headings} headings  -  dialect ${describeDialect(stats)}`));
+    const shape = meta.format === 'pptx'
+      ? `${stats.slides} slides / ${stats.words} words`
+      : `${stats.words} words / ${stats.sentences} sentences / ${stats.headings} headings`;
+    lines.push(c(DIM, `${shape}  -  dialect ${describeDialect(stats)}`));
     if (meta.configPath) lines.push(c(DIM, `config: ${meta.configPath}`));
     lines.push('');
   }
@@ -76,7 +81,7 @@ export function formatText(result, meta, { colour = true, quiet = false } = {}) 
       lines.push(c(BOLD, `${LABEL[finding.severity]} (${stats.bySeverity[finding.severity]})`));
       lastSeverity = finding.severity;
     }
-    const location = finding.documentLevel ? 'document' : `${finding.line}:${finding.column}`;
+    const location = locationOf(finding, false);
     lines.push(`  ${c(COLOUR[finding.severity], location.padEnd(9))} ${finding.message}`);
     if (finding.excerpt) lines.push(`  ${' '.repeat(9)} ${c(DIM, finding.excerpt)}`);
     if (finding.suggestion) lines.push(`  ${' '.repeat(9)} ${c(DIM, `→ ${finding.suggestion}`)}`);
@@ -109,6 +114,7 @@ export function formatMarkdown(result, meta) {
   out.push(`| Minor | ${stats.bySeverity.minor} |`);
   out.push(`| Nits | ${stats.bySeverity.nit} |`);
   out.push(`| Words | ${stats.words} |`);
+  if (stats.slides) out.push(`| Slides | ${stats.slides} |`);
   out.push('');
 
   if (!findings.length) {
@@ -127,7 +133,7 @@ export function formatMarkdown(result, meta) {
     out.push(`## ${LABEL[severity]} (${group.length})`);
     out.push('');
     for (const finding of group) {
-      const location = finding.documentLevel ? '**Document**' : `**Line ${finding.line}**`;
+      const location = `**${locationOf(finding, true)}**`;
       out.push(`- ${location} - ${finding.message}`);
       if (finding.excerpt) out.push(`  - Context: \`${finding.excerpt.replace(/`/g, "'")}\``);
       if (finding.suggestion) out.push(`  - Suggested: ${finding.suggestion}`);
@@ -142,6 +148,20 @@ export function formatMarkdown(result, meta) {
     out.push('');
   }
   return out.join('\n');
+}
+
+/**
+ * Where a finding is, in terms the author can act on: a slide number in a deck,
+ * a line in a document. Speaker notes are called out because a reader of the
+ * deck will not see them on the slide.
+ */
+function locationOf(finding, verbose) {
+  if (finding.documentLevel) return verbose ? 'Document' : 'document';
+  if (finding.slide) {
+    const where = finding.region === 'notes' ? `Slide ${finding.slide} notes` : `Slide ${finding.slide}`;
+    return verbose ? where : where.replace('Slide ', 'S');
+  }
+  return verbose ? `Line ${finding.line}` : `${finding.line}:${finding.column}`;
 }
 
 function summaryLine(stats, c) {

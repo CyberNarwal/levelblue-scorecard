@@ -70,6 +70,19 @@ export class Document {
     return false;
   }
 
+  /**
+   * The block containing an offset. Used to label a finding with the slide it
+   * sits on, which is the only location that means anything in a deck.
+   */
+  blockAt(offset) {
+    let found = null;
+    for (const block of this.blocks) {
+      if (block.start > offset) break;
+      if (offset <= block.end) found = block;
+    }
+    return found;
+  }
+
   /** Blocks carrying prose that language and punctuation rules should read. */
   proseBlocks() {
     return this.blocks.filter((b) => b.type === 'paragraph' || b.type === 'listItem' || b.type === 'caption');
@@ -306,6 +319,7 @@ export function documentFromParagraphs(paragraphs, { source, format, meta }) {
       cells: p.cells,
       style: p.style,
       region: p.region,
+      slide: p.slide,
     });
     parts.push(content);
     offset += content.length + 1;

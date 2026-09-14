@@ -16,6 +16,8 @@ import { loadConfig } from './src/config-node.mjs';
 import { parseMarkdown } from './src/document.mjs';
 import { ALL_RULES, analyse } from './src/engine.mjs';
 import { extractDocx } from './src/extract/docx.mjs';
+import { extractPptx } from './src/extract/pptx.mjs';
+import { inflateRaw } from './src/extract/inflate.mjs';
 import { applyFixes } from './src/fix.mjs';
 import { loadDocument } from './src/load.mjs';
 import { suffixDialect } from './src/data/dialect.mjs';
@@ -463,4 +465,115 @@ test('clean, well-written UK prose produces no findings above minor', () => {
     [],
     'clean prose must not produce blockers or majors',
   );
+});
+
+// ---------------------------------------------------------------------- pptx
+
+/** Analyse the deck fixture with the given config overrides. */
+function checkDeck(overrides = {}) {
+  const doc = loadDocument(join(here, 'samples', 'sample-deck.pptx'));
+  const config = { ...structuredClone(DEFAULT_CONFIG), ...overrides };
+  return { doc, ...analyse(doc, { config, now: NOW }) };
+}
+
+test('PPTX extraction recovers slides, titles, bullets, tables and notes', () => {
+  const buffer = readFileSync(join(here, 'samples', 'sample-deck.pptx'));
+  const { paragraphs, meta } = extractPptx(buffer);
+
+  assert.equal(meta.slideCount, 5);
+  assert.equal(meta.slides[0].title, 'Cyber Security Posture Review');
+  assert.equal(meta.slides[1].title, 'Executive Summary');
+  assert.ok(paragraphs.some((p) => p.type === 'listItem' && p.slide === 2));
+  assert.ok(paragraphs.some((p) => p.type === 'tableRow' && p.slide === 5 && p.cells.includes('Critical')));
+  assert.ok(paragraphs.some((p) => p.type === 'notes' && p.slide === 2));
+  assert.equal(meta.notes.length, 1);
+  assert.equal(meta.notes[0].slide, 2);
+  assert.equal(meta.comments.length, 1);
+  assert.equal(meta.comments[0].author, 'A. Reviewer');
+  assert.ok(meta.templateText.some((t) => /Contoso/.test(t.text)));
+});
+
+test('slide order follows the presentation part, not file names', () => {
+  const { meta } = extractPptx(readFileSync(join(here, 'samples', 'sample-deck.pptx')));
+  assert.deepEqual(meta.slides.map((s) => s.number), [1, 2, 3, 4, 5]);
+});
+
+test('every finding in a deck is located by slide, not by line', () => {
+  const result = checkDeck();
+  const located = result.findings.filter((f) => !f.documentLevel);
+  assert.ok(located.length > 0);
+  assert.ok(located.every((f) => typeof f.slide === 'number'), 'every non-document finding names a slide');
+  assert.ok(result.findings.filter((f) => f.documentLevel).every((f) => f.slide === undefined));
+});
+
+test('internal remarks in speaker notes are a blocker naming the slide', () => {
+  const findings = findingsFor(checkDeck(), 'slides/internal-content-in-notes');
+  assert.ok(findings.length >= 3);
+  assert.ok(findings.every((f) => f.severity === 'blocker'));
+  assert.ok(findings.some((f) => /day rate/.test(f.message)));
+  assert.ok(findings.every((f) => f.slide === 2 && f.region === 'notes'));
+});
+
+test("PowerPoint's own prompt text left on a slide is a blocker", () => {
+  const findings = findingsFor(checkDeck(), 'slides/layout-prompt-text');
+  assert.equal(findings.length, 1);
+  assert.equal(findings[0].slide, 4);
+  assert.equal(findings[0].severity, 'blocker');
+});
+
+test("another client's name hidden in the slide layouts is caught", () => {
+  const clean = findingsFor(checkDeck(), 'slides/template-leakage');
+  assert.deepEqual(clean, [], 'nothing to report until the names are configured');
+  const findings = findingsFor(checkDeck({ forbiddenClientNames: ['Contoso'] }), 'slides/template-leakage');
+  assert.equal(findings.length, 1);
+  assert.match(findings[0].message, /slideLayouts/);
+});
+
+test('deck density, titles and bullet depth are reported per slide', () => {
+  const result = checkDeck();
+  assert.equal(findingsFor(result, 'slides/text-density')[0].slide, 2);
+  assert.equal(findingsFor(result, 'slides/missing-title')[0].slide, 3);
+  assert.equal(findingsFor(result, 'slides/bullet-depth')[0].slide, 2);
+  assert.equal(findingsFor(result, 'slides/duplicate-title')[0].slide, 5);
+});
+
+test('slide rules stay silent on documents, and document rules on decks', () => {
+  const markdown = check('# Heading one\n\nSome ordinary prose here for the check.\n');
+  assert.ok(![...rulesHit(markdown)].some((r) => r.startsWith('slides/')), 'no slide rules on a document');
+  const deck = checkDeck();
+  assert.ok(!rulesHit(deck).has('confidentiality/unresolved-comments'), 'the Word comment rule defers to slides/comments');
+  assert.deepEqual(deck.errors, []);
+});
+
+test('spelling and security rules still apply to slide text', () => {
+  const hit = rulesHit(checkDeck({ dialect: 'en-GB' }));
+  assert.ok(hit.has('dialect/mixed-spelling'), 'American spellings on a slide are still reported');
+  assert.ok(hit.has('terminology/canonical-name'), 'terminology rules still apply');
+});
+
+test('legacy .ppt is refused with a useful message', () => {
+  assert.throws(() => loadDocument('deck.ppt'), /Save as \.pptx/);
+});
+
+// ------------------------------------------------------------------- inflate
+
+test('the DEFLATE decoder matches zlib across block types and levels', async () => {
+  const { deflateRawSync, inflateRawSync } = await import('node:zlib');
+  const cases = [
+    Buffer.alloc(0),
+    Buffer.from('a'),
+    Buffer.from('abcabcabc'.repeat(400)),
+    Buffer.alloc(120000, 65),
+    readFileSync(join(here, 'samples', 'sample-deck.pptx')),
+  ];
+  for (const data of cases) {
+    for (const level of [0, 1, 6, 9]) {
+      const packed = deflateRawSync(data, { level });
+      assert.deepEqual(
+        Buffer.from(inflateRaw(packed)),
+        inflateRawSync(packed),
+        `mismatch at level ${level} for ${data.length} bytes`,
+      );
+    }
+  }
 });

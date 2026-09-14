@@ -14,6 +14,7 @@
  */
 
 import { createRequire } from 'node:module';
+import { execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -45,8 +46,26 @@ function houseConfig() {
   }
 }
 
+/**
+ * A version the team can compare against the shared copy. The date is what
+ * matters day to day; the commit is there so a build can be traced back.
+ */
+function buildInfo() {
+  const date = new Date().toISOString().slice(0, 10);
+  let commit = '';
+  try {
+    commit = execFileSync('git', ['rev-parse', '--short', 'HEAD'], { cwd: repoRoot, stdio: ['ignore', 'pipe', 'ignore'] })
+      .toString().trim();
+  } catch {
+    // Built outside a checkout; the date alone still identifies the version.
+  }
+  return { date, commit };
+}
+
 async function build({ outFile }) {
   const esbuild = loadEsbuild();
+  const info = buildInfo();
+  const { ALL_RULES } = await import('./src/engine.mjs');
 
   const result = await esbuild.build({
     entryPoints: [join(here, 'browser', 'app.mjs')],
@@ -59,6 +78,7 @@ async function build({ outFile }) {
     legalComments: 'none',
     define: {
       __HOUSE_CONFIG__: JSON.stringify(houseConfig()),
+      __BUILD_INFO__: JSON.stringify({ ...info, rules: ALL_RULES.length }),
     },
   });
 
@@ -91,7 +111,7 @@ async function build({ outFile }) {
   }
 
   writeFileSync(outFile, html, 'utf8');
-  return { html, bundleBytes: Buffer.byteLength(safeBundle), totalBytes: Buffer.byteLength(html) };
+  return { html, info, rules: ALL_RULES.length, bundleBytes: Buffer.byteLength(safeBundle), totalBytes: Buffer.byteLength(html) };
 }
 
 function parseArgs(argv) {
@@ -111,11 +131,13 @@ function parseArgs(argv) {
 
 try {
   const options = parseArgs(process.argv.slice(2));
-  const { bundleBytes, totalBytes } = await build(options);
+  const { bundleBytes, totalBytes, info, rules } = await build(options);
   const kb = (n) => `${(n / 1024).toFixed(0)} kB`;
   process.stdout.write(
     `Built ${options.outFile}\n`
-    + `  engine ${kb(bundleBytes)}, page ${kb(totalBytes)} - self-contained, no network access\n`,
+    + `  version ${info.date}${info.commit ? ` (${info.commit})` : ''}, ${rules} checks\n`
+    + `  engine ${kb(bundleBytes)}, page ${kb(totalBytes)} - self-contained, no network access\n`
+    + '  Share this one file. Replacing it is the update.\n',
   );
 } catch (error) {
   process.stderr.write(`${error.message}\n`);

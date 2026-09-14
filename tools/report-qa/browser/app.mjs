@@ -12,10 +12,14 @@ import { resolveConfig, SEVERITIES } from '../src/config.mjs';
 import { documentFromParagraphs, parseMarkdown } from '../src/document.mjs';
 import { analyse } from '../src/engine.mjs';
 import { extractDocx } from '../src/extract/docx.mjs';
+import { extractPptx } from '../src/extract/pptx.mjs';
 import { formatMarkdown } from '../src/report.mjs';
 
 /** House defaults baked in at build time from report-qa.config.json. */
 const BUILT_IN_CONFIG = typeof __HOUSE_CONFIG__ === 'undefined' ? {} : __HOUSE_CONFIG__;
+
+/** Build stamp, so someone can tell whether their copy is the current one. */
+const BUILD = typeof __BUILD_INFO__ === 'undefined' ? { date: 'dev', rules: 0 } : __BUILD_INFO__;
 
 const SEVERITY_LABEL = { blocker: 'Blocker', major: 'Major', minor: 'Minor', nit: 'Nit' };
 const SEVERITY_BLURB = {
@@ -90,6 +94,16 @@ async function readDocument(file) {
   }
   if (extension === '.doc') {
     throw new Error('This is the old Word format. Open it in Word, "Save As" .docx, and try again.');
+  }
+
+  if (extension === '.ppt') {
+    throw new Error('This is the old PowerPoint format. Open it, "Save As" .pptx, and try again.');
+  }
+
+  if (extension === '.pptx' || extension === '.pptm' || extension === '.potx') {
+    const buffer = new Uint8Array(await file.arrayBuffer());
+    const { paragraphs, meta } = extractPptx(buffer);
+    return documentFromParagraphs(paragraphs, { source: name, format: 'pptx', meta });
   }
 
   if (extension === '.docx' || extension === '.docm') {
@@ -169,7 +183,10 @@ function renderFindings(result, doc) {
   const dialect = stats.dialect === 'en-GB' ? 'British English'
     : stats.dialect === 'en-US' ? 'American English'
       : 'no clear dialect';
-  el('meta').textContent = `${doc.source} - ${stats.words} words, ${stats.headings} headings - reads as ${dialect}`;
+  const shape = doc.format === 'pptx'
+    ? `${doc.meta.slideCount} slides, ${stats.words} words`
+    : `${stats.words} words, ${stats.headings} headings`;
+  el('meta').textContent = `${doc.source} - ${shape} - reads as ${dialect}`;
 
   const counts = el('counts');
   counts.replaceChildren(...SEVERITIES.map((severity) => {
@@ -198,7 +215,9 @@ function renderFindings(result, doc) {
 
     for (const finding of group) {
       const item = text('article', 'finding');
-      const where = finding.documentLevel ? 'Whole document' : `Line ${finding.line}`;
+      const where = finding.documentLevel ? 'Whole file'
+        : finding.slide ? `Slide ${finding.slide}${finding.region === 'notes' ? ' notes' : ''}`
+          : `Line ${finding.line}`;
       const head = text('div', 'finding-head');
       head.append(text('span', 'where', where));
       head.append(text('span', 'msg', finding.message));
@@ -291,6 +310,11 @@ function fallbackCopy(value, done) {
 
 function init() {
   applySettingsToForm(loadSettings());
+
+  const version = el('version');
+  if (version) {
+    version.textContent = `Version ${BUILD.date}${BUILD.commit ? ` (${BUILD.commit})` : ''} - ${BUILD.rules} checks`;
+  }
 
   const dropzone = el('dropzone');
   const input = el('file');

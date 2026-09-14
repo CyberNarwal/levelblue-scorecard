@@ -1,85 +1,17 @@
 /**
  * Zero-dependency DOCX reader.
  *
- * A .docx is a ZIP of XML parts. We read the central directory ourselves and
- * inflate the parts we care about, then pull paragraphs out of the WordprocessingML
- * with targeted regexes rather than a full XML parser. That is enough to recover
- * paragraph text, heading levels, list structure, tables, and - importantly for
- * report QA - the things that should never survive into a client deliverable:
- * unresolved comments, tracked changes and leftover highlighting.
+ * A .docx is a ZIP of XML parts. The archive reading and entity decoding are
+ * shared with the PowerPoint reader in ooxml.mjs; this file handles
+ * WordprocessingML itself, pulling out paragraph text, heading levels, list
+ * structure, tables, and - importantly for report QA - the things that should
+ * never survive into a client deliverable: unresolved comments, tracked changes
+ * and leftover highlighting.
  */
 
-import { inflateRaw, inflateZlib } from './inflate.mjs';
+import { decodeEntities, decodeText, parseCoreProperties, readPart, readZip } from './ooxml.mjs';
 
-const EOCD_SIGNATURE = 0x06054b50;
-const CENTRAL_SIGNATURE = 0x02014b50;
-
-const utf8 = new TextDecoder('utf-8');
-
-// Little-endian reads and UTF-8 decoding done by hand, so this file depends on
-// nothing but Uint8Array and runs unchanged in Node and in the browser.
-const readU16 = (b, at) => b[at] | (b[at + 1] << 8);
-const readU32 = (b, at) => (b[at] | (b[at + 1] << 8) | (b[at + 2] << 16) | (b[at + 3] << 24)) >>> 0;
-const decode = (b, from, to) => utf8.decode(b.subarray(from, to));
-
-/** Read a ZIP archive into a Map of entry name -> Uint8Array. */
-export function readZip(input) {
-  const buffer = input instanceof Uint8Array ? input : new Uint8Array(input);
-  const eocd = findEndOfCentralDirectory(buffer);
-  if (eocd === -1) throw new Error('Not a valid ZIP/DOCX file (no end-of-central-directory record).');
-
-  const entryCount = readU16(buffer, eocd + 10);
-  let pointer = readU32(buffer, eocd + 16);
-  const entries = new Map();
-
-  for (let i = 0; i < entryCount; i += 1) {
-    if (readU32(buffer, pointer) !== CENTRAL_SIGNATURE) break;
-    const method = readU16(buffer, pointer + 10);
-    const compressedSize = readU32(buffer, pointer + 20);
-    const nameLength = readU16(buffer, pointer + 28);
-    const extraLength = readU16(buffer, pointer + 30);
-    const commentLength = readU16(buffer, pointer + 32);
-    const localOffset = readU32(buffer, pointer + 42);
-    const name = decode(buffer, pointer + 46, pointer + 46 + nameLength);
-
-    const localNameLength = readU16(buffer, localOffset + 26);
-    const localExtraLength = readU16(buffer, localOffset + 28);
-    const dataStart = localOffset + 30 + localNameLength + localExtraLength;
-    const data = buffer.subarray(dataStart, dataStart + compressedSize);
-
-    try {
-      if (method === 0) entries.set(name, data.slice());
-      else if (method === 8) entries.set(name, inflateRaw(data));
-      else if (method === 9) entries.set(name, inflateZlib(data));
-    } catch {
-      // A part we cannot inflate is skipped rather than failing the whole read.
-    }
-    pointer += 46 + nameLength + extraLength + commentLength;
-  }
-  return entries;
-}
-
-function findEndOfCentralDirectory(buffer) {
-  const min = Math.max(0, buffer.length - 66_000);
-  for (let i = buffer.length - 22; i >= min; i -= 1) {
-    if (readU32(buffer, i) === EOCD_SIGNATURE) return i;
-  }
-  return -1;
-}
-
-const ENTITIES = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ' };
-
-function decodeEntities(value) {
-  return value.replace(/&(#x?[0-9a-fA-F]+|[a-zA-Z]+);/g, (whole, body) => {
-    if (body[0] === '#') {
-      const code = body[1] === 'x' || body[1] === 'X'
-        ? parseInt(body.slice(2), 16)
-        : parseInt(body.slice(1), 10);
-      return Number.isFinite(code) ? String.fromCodePoint(code) : whole;
-    }
-    return ENTITIES[body] ?? whole;
-  });
-}
+export { readZip };
 
 /** Pull the visible text out of one <w:p> element. */
 function paragraphText(xml) {
@@ -188,26 +120,6 @@ function collectObservations(chunk, state, paragraphIndex) {
   if (highlight) state.highlights.push({ line: paragraphIndex + 1, colour: highlight[1] });
 }
 
-/** Read docProps/core.xml into a plain metadata object. */
-function parseCoreProperties(xml) {
-  if (!xml) return {};
-  const pick = (tag) => {
-    const m = xml.match(new RegExp(`<${tag}[^>]*>([\\s\\S]*?)</${tag}>`));
-    return m ? decodeEntities(m[1]).trim() : undefined;
-  };
-  return {
-    title: pick('dc:title'),
-    subject: pick('dc:subject'),
-    author: pick('dc:creator'),
-    lastModifiedBy: pick('cp:lastModifiedBy'),
-    revision: pick('cp:revision'),
-    created: pick('dcterms:created'),
-    modified: pick('dcterms:modified'),
-    category: pick('cp:category'),
-    keywords: pick('cp:keywords'),
-  };
-}
-
 /**
  * Extract a DOCX buffer into { paragraphs, meta }.
  * Headers and footers are appended as their own region so classification
@@ -219,14 +131,14 @@ export function extractDocx(buffer) {
   if (!documentXml) throw new Error('DOCX is missing word/document.xml.');
 
   const state = { commentAnchors: [], insertions: [], deletions: [], highlights: [] };
-  const bodyXml = utf8.decode(documentXml);
+  const bodyXml = decodeText(documentXml);
   const paragraphs = parseBody(bodyXml, 'body', state);
 
   const headerFooterText = [];
   for (const [name, data] of entries) {
     if (!/^word\/(header|footer)\d*\.xml$/.test(name)) continue;
     const region = name.includes('header') ? 'header' : 'footer';
-    for (const p of parseBody(utf8.decode(data), region, { commentAnchors: [], insertions: [], deletions: [], highlights: [] })) {
+    for (const p of parseBody(decodeText(data), region, { commentAnchors: [], insertions: [], deletions: [], highlights: [] })) {
       if (p.text.trim()) headerFooterText.push(p.text.trim());
     }
   }
@@ -236,13 +148,13 @@ export function extractDocx(buffer) {
   if (commentsXml) {
     const re = /<w:comment\s[^>]*w:author="([^"]*)"[^>]*>([\s\S]*?)<\/w:comment>/g;
     let m;
-    while ((m = re.exec(utf8.decode(commentsXml))) !== null) {
+    while ((m = re.exec(decodeText(commentsXml))) !== null) {
       comments.push({ author: decodeEntities(m[1]), text: paragraphText(m[2]).trim() });
     }
   }
 
   const meta = {
-    ...parseCoreProperties(entries.has('docProps/core.xml') ? utf8.decode(entries.get('docProps/core.xml')) : undefined),
+    ...parseCoreProperties(readPart(entries, 'docProps/core.xml')),
     headerFooterText,
     comments,
     trackedInsertions: state.insertions.length,

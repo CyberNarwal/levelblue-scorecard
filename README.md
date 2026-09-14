@@ -7,13 +7,17 @@ advisory reports that come out of it.
 
 **Open `report-qa.html` in a browser and drag a report draft onto it.**
 
+Takes **PowerPoint (.pptx)**, Word (.docx), Markdown and HTML.
+
 It checks spelling and grammar (British or American, consistently), spacing and
-white space, punctuation, terminology, CVSS/CVE/NIST CSF accuracy, document
-structure, and the things that must never reach a client - credentials, another
-client's name, tracked changes, unresolved comments, placeholder text.
+white space, punctuation, terminology, CVSS/CVE/NIST CSF accuracy, document and
+slide structure, and the things that must never reach a client - credentials,
+another client's name left in a template or slide master, tracked changes,
+unresolved comments, speaker notes, placeholder text.
 
 It runs entirely on your own computer. Nothing is uploaded and it works offline.
 
+Sharing it with a team: [`tools/report-qa/DISTRIBUTION.md`](tools/report-qa/DISTRIBUTION.md).
 Full documentation, configuration and the command-line version:
 [`tools/report-qa/README.md`](tools/report-qa/README.md).
 

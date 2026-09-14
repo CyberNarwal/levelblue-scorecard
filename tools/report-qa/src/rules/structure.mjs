@@ -5,7 +5,7 @@
 
 import { PLACEHOLDERS } from '../data/terms.mjs';
 
-const SCOPE = ['paragraph', 'listItem', 'heading', 'caption', 'tableRow'];
+const SCOPE = ['paragraph', 'listItem', 'heading', 'caption', 'tableRow', 'notes'];
 
 export const rules = [
   {
@@ -136,7 +136,7 @@ export const rules = [
       return [{
         start: 0,
         end: Math.min(1, doc.text.length),
-        message: `The draft has no section matching: ${missing.map((m) => `"${Array.isArray(m) ? m[0] : m}"`).join(', ')}.`,
+        message: `The draft has no ${doc.format === 'pptx' ? 'slide titled' : 'section matching'}: ${missing.map((m) => `"${Array.isArray(m) ? m[0] : m}"`).join(', ')}.`,
         note: 'Configured in report-qa.config.json under requiredSections.',
         documentLevel: true,
       }];

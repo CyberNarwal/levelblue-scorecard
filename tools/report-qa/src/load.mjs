@@ -7,6 +7,7 @@ import { basename, extname } from 'node:path';
 
 import { documentFromParagraphs, parseMarkdown } from './document.mjs';
 import { extractDocx } from './extract/docx.mjs';
+import { extractPptx } from './extract/pptx.mjs';
 
 const TEXT_FORMATS = new Set(['.md', '.markdown', '.txt', '.text', '.rst', '.adoc']);
 
@@ -17,6 +18,15 @@ export function loadDocument(path) {
   if (extension === '.docx' || extension === '.docm') {
     const { paragraphs, meta } = extractDocx(readFileSync(path));
     return documentFromParagraphs(paragraphs, { source, format: 'docx', meta });
+  }
+
+  if (extension === '.pptx' || extension === '.pptm' || extension === '.potx') {
+    const { paragraphs, meta } = extractPptx(readFileSync(path));
+    return documentFromParagraphs(paragraphs, { source, format: 'pptx', meta });
+  }
+
+  if (extension === '.ppt') {
+    throw new Error('Legacy .ppt is not supported. Save as .pptx and re-run.');
   }
 
   if (extension === '.html' || extension === '.htm') {

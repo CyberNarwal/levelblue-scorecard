@@ -35,6 +35,12 @@
     "spellOutNumbersBelowTen": false
   },
 
+  "slides": {
+    "maxWordsPerSlide": 75,
+    "maxBulletsPerSlide": 8,
+    "maxBulletDepth": 3
+  },
+
   "readability": {
     "maxSentenceWords": 35,
     "maxParagraphWords": 160,

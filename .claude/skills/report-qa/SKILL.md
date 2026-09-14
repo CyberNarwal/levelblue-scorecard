@@ -1,6 +1,6 @@
 ---
 name: report-qa
-description: QA a cyber advisory report draft before it goes to a client - grammar, punctuation, UK/US spelling consistency, spacing and white space, terminology, CVSS/CVE/NIST CSF accuracy, structure, and the confidentiality checks that stop credentials, another client's name, tracked changes or unresolved comments reaching a deliverable. Use whenever someone asks to proofread, QA, review, check or sanity-check a report, assessment, advisory, findings document or deliverable draft (.md, .docx, .html).
+description: QA a cyber advisory report draft or slide deck before it goes to a client - grammar, punctuation, UK/US spelling consistency, spacing and white space, terminology, CVSS/CVE/NIST CSF accuracy, structure, and the confidentiality checks that stop credentials, another client's name, tracked changes, unresolved comments or speaker notes reaching a deliverable. Use whenever someone asks to proofread, QA, review, check or sanity-check a report, assessment, advisory, findings document, board pack or deliverable draft (.pptx, .docx, .md, .html).
 ---
 
 # Cyber advisory report QA
@@ -56,8 +56,14 @@ Useful variations:
 - `--only confidentiality,structure/placeholder-text` for a fast pre-send check.
 
 `.docx` is read directly, including tracked changes, comments, highlighting,
-headers and footers. **PDF is refused on purpose** - text extraction is too
+headers and footers. `.pptx` is read too - slides, tables, speaker notes,
+comments, and the text in slide layouts and masters - and findings in a deck are
+reported by slide number. **PDF is refused on purpose** - text extraction is too
 unreliable to QA against. Ask for the source document.
+
+When the draft is a deck, weight your own reading differently: the argument
+lives in the slide titles read in sequence, and the speaker notes are the part
+the author forgot ships with the file. Read the notes.
 
 If the tool reports `ruleErrors`, say so; those checks did not run.
 

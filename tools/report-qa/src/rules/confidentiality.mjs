@@ -14,7 +14,9 @@
 import { SECRET_PATTERNS } from '../data/terms.mjs';
 import { escapeRegExp } from '../text.mjs';
 
-const SCOPE = ['paragraph', 'listItem', 'heading', 'caption', 'tableRow', 'code'];
+// Speaker notes are included deliberately: they ship inside the file and are
+// exactly where internal remarks and credentials end up.
+const SCOPE = ['paragraph', 'listItem', 'heading', 'caption', 'tableRow', 'code', 'notes'];
 
 export const rules = [
   {
@@ -126,7 +128,10 @@ export const rules = [
       if (ctx.config.audience !== 'client') return [];
       const findings = [];
       const pattern = /\b(?:internal use only|internal only|do not distribute|not for (?:client|external) (?:distribution|release)|draft - not for issue|for internal review|delivery team only|margin|day rate|chargeable|upsell|cross-sell|commercially sensitive)\b/gi;
-      for (const { match, start, end } of doc.scan(pattern, { types: SCOPE, skipOpaque: false })) {
+      // Speaker notes are left to slides/internal-content-in-notes, which can
+      // name the slide and explain that notes ship inside the file.
+      const scope = SCOPE.filter((type) => type !== 'notes');
+      for (const { match, start, end } of doc.scan(pattern, { types: scope, skipOpaque: false })) {
         findings.push({
           start,
           end,
@@ -164,6 +169,8 @@ export const rules = [
     category: 'Release readiness',
     severity: 'blocker',
     check(doc) {
+      // Decks are covered by slides/comments, which can name the slide.
+      if (doc.format === 'pptx') return [];
       const comments = doc.meta.comments || [];
       if (!comments.length) return [];
       const preview = comments.slice(0, 3)
