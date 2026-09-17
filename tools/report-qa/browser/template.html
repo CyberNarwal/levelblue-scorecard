@@ -59,9 +59,11 @@ body {
   padding-inline: 20px;
 }
 .wrap { max-width: 860px; margin: 0 auto; }
-header h1 { font-size: 28px; margin: 0 0 8px; letter-spacing: -0.01em; font-weight: 700; color: var(--ink); }
-header h1 .slash { color: var(--accent); font-weight: 700; }
-header p { margin: 0 0 20px; color: var(--muted); font-size: 15px; }
+header { display: flex; align-items: center; gap: 16px; margin-bottom: 24px; }
+header .logo { width: 120px; height: 50px; flex-shrink: 0; }
+header .logo svg { width: 100%; height: 100%; }
+header .text h1 { font-size: 24px; margin: 0; letter-spacing: -0.01em; font-weight: 700; color: var(--ink); }
+header .text p { margin: 4px 0 0; color: var(--muted); font-size: 14px; }
 .offline {
   display: inline-flex; gap: 7px; align-items: center;
   background: var(--ok-bg); color: var(--ok);
@@ -179,10 +181,18 @@ footer p { margin: 0 0 8px; }
 <body>
 <div class="wrap">
   <header>
-    <h1>LevelBlue<span class="slash">/</span> Report QA</h1>
-    <p>Quality assurance for cyber advisory reports and presentations</p>
-    <div class="offline">🔒 Runs entirely on this computer - nothing is uploaded</div>
+    <div class="logo">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 80">
+        <text x="8" y="55" font-size="48" font-weight="700" fill="#0a1929" font-family="system-ui, -apple-system, sans-serif">LevelBlue</text>
+        <text x="158" y="55" font-size="48" font-weight="700" fill="#0052ff" font-family="system-ui, -apple-system, sans-serif">/</text>
+      </svg>
+    </div>
+    <div class="text">
+      <h1>Report QA</h1>
+      <p>Quality assurance for cyber advisory reports</p>
+    </div>
   </header>
+  <div class="offline">🔒 Runs entirely on this computer - nothing is uploaded</div>
 
   <div class="dropzone" id="dropzone" tabindex="0" role="button" aria-label="Choose or drop a report draft">
     <strong>Drop your draft here, or click to choose</strong>
