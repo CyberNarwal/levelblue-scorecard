@@ -25,21 +25,35 @@ The build fails rather than emitting a page that contains a `fetch`, an external
 script or stylesheet, or a WebSocket - the offline guarantee is enforced, not
 just intended.
 
+## Reading the findings
+
 Every finding quotes the draft's own words with the flagged run highlighted, so
 a reviewer can match it against the slide in front of them without hunting for
 the rule's meaning. Whitespace faults are highlighted too, which is the only way
 a double space or a stray tab is visible at all.
 
+The list is built to be read top-down in one screen rather than scrolled:
+
+- Findings are gathered under the rule that raised them. A rule that fired eight
+  times is one row with a count and a preview of the flagged words, not eight
+  rows repeating the same explanation. Open it for the eight places.
+- Blockers and majors start open, because they decide whether the draft can go
+  out. Minors and nits start shut.
+- **Show** filters the list to one severity. `Blocker` alone is the go/no-go
+  view; clicking it again clears the filter.
+- Printing opens everything first, so a collapsed group cannot silently vanish
+  from a PDF.
+
 ## Handing findings back
 
-Four buttons copy the findings in the shape the next person needs:
+**Copy** puts the findings on the clipboard in the shape the next person needs:
 
 | Button | For |
 |---|---|
-| Blockers only | The go/no-go call - what stops the draft being issued, and nothing else |
-| Copy for comments | One block per finding, to paste into the comment on that slide or paragraph |
-| Summary document | One line per finding, blockers first, to attach to the mail back to the author |
-| Copy report | The full markdown report, for a review thread |
+| For comments | One block per finding, to paste into the comment on that slide or paragraph |
+| Summary | One line per finding, blockers first, to attach to the mail back to the author |
+| Blocker list | Only what stops the draft being issued |
+| Full report | The full markdown report, for a review thread |
 
 All four quote the flagged text, because "line 42 has an American spelling" sends
 the author looking and `Found: "color"` does not.

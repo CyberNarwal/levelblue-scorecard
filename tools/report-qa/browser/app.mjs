@@ -140,6 +140,9 @@ function htmlToText(html) {
 
 let lastResult = null;
 
+/** Which severity the list is filtered to; 'all' means no filter. */
+const view = { filter: 'all' };
+
 /** Decide the headline the author actually needs. */
 function verdictFor(stats) {
   if (stats.bySeverity.blocker) {
@@ -176,54 +179,161 @@ function locationLabel(finding) {
   return `Line ${finding.line}`;
 }
 
+/** The flagged words, normalised for comparison and for a collapsed preview. */
+function matchOf(finding) {
+  return finding.excerptParts?.match?.replace(/\s+/g, ' ').trim() || '';
+}
+
 /**
- * One finding, as two lines: the draft's own words with the flagged text
- * highlighted, then the explanation underneath.
+ * Gather a severity's findings by the rule that raised them.
  *
- * The quote leads because the first question a reviewer asks is "what, exactly?"
- * - a rule name and a category answer that far more slowly than seeing the
- * offending words sitting in their own sentence.
+ * One rule firing eight times was eight rows repeating the same explanation,
+ * which is most of what made a long report unreadable. As one row carrying a
+ * count it is a single decision, and the eight places are a click away.
  */
-function renderFinding(finding) {
-  const item = text('article', 'finding');
+function byRule(findings) {
+  const groups = new Map();
+  for (const finding of findings) {
+    let group = groups.get(finding.rule);
+    if (!group) {
+      group = { rule: finding.rule, title: finding.title, note: finding.note, items: [] };
+      groups.set(finding.rule, group);
+    }
+    group.items.push(finding);
+  }
+  return [...groups.values()];
+}
+
+/** A whitespace-only replacement has to be quoted or it renders as nothing. */
+function fixLabel(suggestion) {
+  return /^\s*$/.test(suggestion) ? `"${suggestion}"` : suggestion;
+}
+
+/** One place the rule fired: where it is, the draft's words, the replacement. */
+function renderOccurrence(finding) {
   const row = text('div', 'row');
   row.append(text('span', 'where', locationLabel(finding)));
 
-  const parts = finding.excerptParts;
-  if (parts && parts.match) {
+  const match = matchOf(finding);
+  if (match) {
+    const parts = finding.excerptParts;
     const quote = text('span', 'quote');
     if (parts.before) quote.append(text('span', 'ctx', parts.before));
     quote.append(text('mark', null, parts.match));
     if (parts.after) quote.append(text('span', 'ctx', parts.after));
     row.append(quote);
   } else {
-    row.append(text('span', 'quote headline', finding.message));
+    // Nothing to quote, so the message is the only thing that says what is wrong.
+    row.append(text('span', 'quote plain', finding.message));
   }
 
-  if (finding.occurrences > 1) {
-    row.append(text('span', 'times', `×${finding.occurrences}`));
-  }
-  if (finding.suggestion) {
-    // A replacement that is only whitespace has to be quoted or the row shows
-    // an arrow pointing at nothing.
-    const fix = /^\s*$/.test(finding.suggestion) ? `"${finding.suggestion}"` : finding.suggestion;
-    row.append(text('span', 'fix', `→ ${fix}`));
-  }
-  item.append(row);
+  if (finding.suggestion) row.append(text('span', 'fix', `→ ${fixLabel(finding.suggestion)}`));
+  return row;
+}
 
-  // The message is the explanation once the quote has already shown the fault,
-  // so it is not repeated when there was no quote to explain.
-  const why = text('p', 'why');
-  if (parts && parts.match) why.append(text('span', 'why-msg', finding.message));
-  if (finding.note) why.append(text('span', 'why-note', finding.note));
-  why.append(text('span', 'rule', finding.rule));
-  item.append(why);
+/**
+ * One rule's findings. A rule that fired once is a plain block; one that fired
+ * repeatedly collapses, with the flagged words on the summary line so the group
+ * can often be judged without opening it.
+ */
+function renderRuleGroup(group) {
+  const many = group.items.length > 1;
+  const box = text(many ? 'details' : 'div', 'rule-group');
+  const head = text(many ? 'summary' : 'div', 'rule-head');
 
-  return item;
+  head.append(text('span', 'rule-title', group.title || group.rule));
+  head.append(text('span', 'count', String(group.items.length)));
+
+  if (many) {
+    const words = [];
+    for (const item of group.items) {
+      const match = matchOf(item);
+      if (match && !words.includes(match)) words.push(match);
+      if (words.length === 4) break;
+    }
+    if (words.length) {
+      const more = words.length < group.items.length ? '…' : '';
+      head.append(text('span', 'preview', words.join(', ') + more));
+    }
+  }
+  box.append(head);
+
+  const body = text('div', 'rule-body');
+  for (const finding of group.items) body.append(renderOccurrence(finding));
+  if (group.note) body.append(text('p', 'note', group.note));
+  body.append(text('p', 'rule', group.rule));
+  box.append(body);
+
+  return box;
+}
+
+/** Render the list for whatever severity the reader is currently looking at. */
+function renderList() {
+  const { findings } = lastResult.result;
+  const shown = view.filter === 'all'
+    ? findings
+    : findings.filter((f) => f.severity === view.filter);
+
+  const list = el('findings');
+  list.replaceChildren();
+
+  if (!shown.length) {
+    list.append(text('p', 'empty', view.filter === 'all'
+      ? 'No mechanical findings. Still read it yourself for argument and accuracy.'
+      : `Nothing at this level. Clear the filter to see the other ${findings.length}.`));
+    return;
+  }
+
+  for (const severity of SEVERITIES) {
+    const group = shown.filter((f) => f.severity === severity);
+    if (!group.length) continue;
+
+    const section = text('details', `sev ${severity}`);
+    // Blockers and majors decide whether the draft can go out, so they start
+    // open; the long tail starts shut or the list is a wall again.
+    section.open = view.filter !== 'all' || severity === 'blocker' || severity === 'major';
+
+    const heading = text('summary', 'sev-head');
+    heading.append(text('span', `dot ${severity}`));
+    heading.append(text('span', 'sev-name', SEVERITY_LABEL[severity]));
+    heading.append(text('span', 'count', String(group.length)));
+    heading.append(text('span', 'sev-blurb', SEVERITY_BLURB[severity]));
+    section.append(heading);
+
+    const body = text('div', 'sev-body');
+    for (const ruleGroup of byRule(group)) body.append(renderRuleGroup(ruleGroup));
+    section.append(body);
+    list.append(section);
+  }
+}
+
+/** The severity chips double as the filter, which is what "blockers only" means. */
+function renderChips() {
+  const { stats } = lastResult.result;
+  const counts = el('counts');
+  const chip = (key, label, n) => {
+    const node = text('button', `chip ${key}${n ? '' : ' zero'}${view.filter === key ? ' on' : ''}`);
+    node.type = 'button';
+    node.disabled = !n;
+    node.setAttribute('aria-pressed', String(view.filter === key));
+    node.append(text('span', 'chip-n', String(n)));
+    node.append(text('span', 'chip-l', label));
+    node.addEventListener('click', () => {
+      view.filter = view.filter === key ? 'all' : key;
+      renderChips();
+      renderList();
+    });
+    return node;
+  };
+
+  counts.replaceChildren(
+    chip('all', 'All', stats.total),
+    ...SEVERITIES.map((s) => chip(s, SEVERITY_LABEL[s], stats.bySeverity[s] || 0)),
+  );
 }
 
 function renderFindings(result, doc) {
-  const { stats, findings } = result;
+  const { stats } = result;
   const verdict = verdictFor(stats);
 
   const banner = el('verdict');
@@ -241,36 +351,8 @@ function renderFindings(result, doc) {
     : `${stats.words} words, ${stats.headings} headings`;
   el('meta').textContent = `${doc.source} - ${shape} - reads as ${dialect}`;
 
-  const counts = el('counts');
-  counts.replaceChildren(...SEVERITIES.map((severity) => {
-    const chip = text('div', `chip ${severity}${stats.bySeverity[severity] ? '' : ' zero'}`);
-    chip.append(text('span', 'chip-n', String(stats.bySeverity[severity] || 0)));
-    chip.append(text('span', 'chip-l', SEVERITY_LABEL[severity]));
-    return chip;
-  }));
-
-  const list = el('findings');
-  list.replaceChildren();
-
-  if (!findings.length) {
-    list.append(text('p', 'empty', 'No mechanical findings. Still read it yourself for argument and accuracy.'));
-  }
-
-  for (const severity of SEVERITIES) {
-    const group = findings.filter((f) => f.severity === severity);
-    if (!group.length) continue;
-
-    const section = text('section', 'group');
-    const heading = text('h2', null, `${SEVERITY_LABEL[severity]} (${group.length})`);
-    heading.prepend(text('span', `dot ${severity}`));
-    section.append(heading);
-    section.append(text('p', 'group-blurb', SEVERITY_BLURB[severity]));
-
-    for (const finding of group) {
-      section.append(renderFinding(finding));
-    }
-    list.append(section);
-  }
+  renderChips();
+  renderList();
 
   el('results').hidden = false;
   el('error').hidden = true;
@@ -294,7 +376,13 @@ async function handleFile(file) {
     const doc = await readDocument(file);
     const result = analyse(doc, { config, now: new Date() });
     lastResult = { result, doc };
+    view.filter = 'all';
     renderFindings(result, doc);
+    // The drop target shrinks to a line once it has done its job, so the
+    // findings start near the top of the window instead of below a banner.
+    document.body.classList.add('has-result');
+    el('drop-title').textContent = `Checked ${file.name}`;
+    el('drop-hint').textContent = 'Drop another draft, or click to choose';
     el('status').textContent = '';
   } catch (error) {
     lastResult = null;
@@ -303,79 +391,32 @@ async function handleFile(file) {
   }
 }
 
-function copyReport() {
-  if (!lastResult) return;
-  const markdown = formatMarkdown(lastResult.result, {
-    source: lastResult.doc.source,
-    format: lastResult.doc.format,
-    now: new Date(),
-  });
-  const button = el('copy');
-  const done = (label) => {
-    button.textContent = label;
-    setTimeout(() => { button.textContent = 'Copy report'; }, 1800);
-  };
-  if (navigator.clipboard?.writeText) {
-    navigator.clipboard.writeText(markdown).then(() => done('Copied'), () => fallbackCopy(markdown, done));
-  } else {
-    fallbackCopy(markdown, done);
-  }
-}
+/** The hand-off formats, by the id of the button that copies each one. */
+const EXPORTS = {
+  'copy-comments': { label: 'For comments', format: formatComments },
+  'copy-summary': { label: 'Summary', format: formatSummaryDocument },
+  'copy-blockers': { label: 'Blocker list', format: formatBlockersOnly },
+  'copy-report': { label: 'Full report', format: formatMarkdown },
+};
 
-function exportComments() {
+function copyExport(id) {
   if (!lastResult) return;
-  const text = formatComments(lastResult.result, {
+  const { label, format } = EXPORTS[id];
+  const body = format(lastResult.result, {
     source: lastResult.doc.source,
     format: lastResult.doc.format,
     now: new Date(),
   });
-  const button = el('export-comments');
-  const done = (label) => {
-    button.textContent = label;
-    setTimeout(() => { button.textContent = 'Copy for comments'; }, 1800);
-  };
-  if (navigator.clipboard?.writeText) {
-    navigator.clipboard.writeText(text).then(() => done('Copied'), () => fallbackCopy(text, done));
-  } else {
-    fallbackCopy(text, done);
-  }
-}
 
-function exportSummary() {
-  if (!lastResult) return;
-  const text = formatSummaryDocument(lastResult.result, {
-    source: lastResult.doc.source,
-    format: lastResult.doc.format,
-    now: new Date(),
-  });
-  const button = el('export-summary');
-  const done = (label) => {
-    button.textContent = label;
-    setTimeout(() => { button.textContent = 'Copy summary'; }, 1800);
+  const button = el(id);
+  const done = (result) => {
+    button.textContent = result;
+    setTimeout(() => { button.textContent = label; }, 1800);
   };
   if (navigator.clipboard?.writeText) {
-    navigator.clipboard.writeText(text).then(() => done('Copied'), () => fallbackCopy(text, done));
+    navigator.clipboard.writeText(body).then(() => done('Copied'), () => fallbackCopy(body, done));
   } else {
-    fallbackCopy(text, done);
-  }
-}
-
-function exportBlockersOnly() {
-  if (!lastResult) return;
-  const text = formatBlockersOnly(lastResult.result, {
-    source: lastResult.doc.source,
-    format: lastResult.doc.format,
-    now: new Date(),
-  });
-  const button = el('export-blockers');
-  const done = (label) => {
-    button.textContent = label;
-    setTimeout(() => { button.textContent = 'Copy blockers'; }, 1800);
-  };
-  if (navigator.clipboard?.writeText) {
-    navigator.clipboard.writeText(text).then(() => done('Copied'), () => fallbackCopy(text, done));
-  } else {
-    fallbackCopy(text, done);
+    fallbackCopy(body, done);
   }
 }
 
@@ -437,10 +478,23 @@ function init() {
   window.addEventListener('dragover', (event) => event.preventDefault());
   window.addEventListener('drop', (event) => event.preventDefault());
 
-  el('copy').addEventListener('click', copyReport);
-  el('export-comments').addEventListener('click', exportComments);
-  el('export-summary').addEventListener('click', exportSummary);
-  el('export-blockers').addEventListener('click', exportBlockersOnly);
+  for (const id of Object.keys(EXPORTS)) {
+    el(id).addEventListener('click', () => copyExport(id));
+  }
+
+  el('expand').addEventListener('click', () => {
+    const groups = document.querySelectorAll('#findings details');
+    const closed = [...groups].some((d) => !d.open);
+    for (const group of groups) group.open = closed;
+    el('expand').textContent = closed ? 'Collapse all' : 'Expand all';
+  });
+
+  // A collapsed group prints as its summary line only, which would silently
+  // drop findings from a printed or PDF'd report.
+  window.addEventListener('beforeprint', () => {
+    for (const group of document.querySelectorAll('#findings details')) group.open = true;
+  });
+
   el('settings-toggle').addEventListener('click', () => {
     const panel = el('settings');
     panel.hidden = !panel.hidden;
