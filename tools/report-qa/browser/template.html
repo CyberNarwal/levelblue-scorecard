@@ -59,12 +59,14 @@ body {
   padding-inline: 20px;
 }
 .wrap { max-width: 860px; margin: 0 auto; }
-header { display: flex; align-items: center; gap: 20px; margin-bottom: 28px; }
-header .logo { display: flex; align-items: baseline; gap: 0; flex-shrink: 0; font-size: 28px; font-weight: 700; color: var(--ink); }
-header .logo .slash { color: var(--accent); margin-left: 4px; }
-header .content { flex: 1; }
-header .content h1 { font-size: 28px; margin: 0 0 4px; letter-spacing: -0.01em; font-weight: 700; color: var(--ink); }
-header .content p { margin: 0; color: var(--muted); font-size: 14px; }
+header { margin-bottom: 40px; }
+header .logo-section { display: flex; align-items: flex-start; gap: 32px; margin-bottom: 24px; }
+header .logo-graphic { width: 100px; height: 100px; flex-shrink: 0; }
+header .logo-graphic svg { width: 100%; height: 100%; }
+header .logo-text { font-size: 36px; font-weight: 700; color: var(--ink); letter-spacing: -0.01em; margin: 16px 0 0; }
+header .logo-text .slash { color: var(--accent); }
+header h1 { font-size: 32px; margin: 0 0 6px; letter-spacing: -0.01em; font-weight: 700; color: var(--ink); }
+header p { margin: 0; color: var(--muted); font-size: 15px; }
 .offline {
   display: inline-flex; gap: 7px; align-items: center;
   background: var(--ok-bg); color: var(--ok);
@@ -182,11 +184,23 @@ footer p { margin: 0 0 8px; }
 <body>
 <div class="wrap">
   <header>
-    <div class="logo">LevelBlue<span class="slash">/</span></div>
-    <div class="content">
-      <h1>Report QA</h1>
-      <p>Quality assurance for cyber advisory reports</p>
+    <div class="logo-section">
+      <div class="logo-graphic">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 120">
+          <!-- Bright blue bar -->
+          <polygon points="30,20 50,20 70,70 50,70" fill="#0052ff"/>
+          <!-- Cyan bar -->
+          <polygon points="45,35 65,35 85,85 65,85" fill="#00d9ff"/>
+          <!-- Yellow-green bar -->
+          <polygon points="60,50 80,50 95,100 75,100" fill="#ccff00"/>
+        </svg>
+      </div>
+      <div>
+        <div class="logo-text">LevelB<span class="slash">/</span>ue</div>
+      </div>
     </div>
+    <h1>Report QA</h1>
+    <p>Quality assurance for cyber advisory reports and presentations</p>
   </header>
   <div class="offline">🔒 Runs entirely on this computer - nothing is uploaded</div>
 
