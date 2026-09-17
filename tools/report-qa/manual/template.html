@@ -1,0 +1,660 @@
+<title>Report QA Handbook</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Serif:ital,wght@0,400;0,600;1,400&display=swap">
+<style>
+:root {
+  --ground: #f7f8fb;
+  --panel: #ffffff;
+  --sunk: #eef1f7;
+  --ink: #0b1622;
+  --muted: #5c6b7f;
+  --rule: #dfe5ee;
+  --rule-strong: #c5d0e0;
+  --accent: #0052ff;
+  --accent-soft: #e8efff;
+  --blocker: #b3261e;
+  --blocker-soft: #fdecea;
+  --major: #b45309;
+  --major-soft: #fdf3e3;
+  --minor: #0052ff;
+  --minor-soft: #eef4ff;
+  --nit: #5a6c7d;
+  --nit-soft: #eef1f5;
+  --ok: #1a7f52;
+  --ok-soft: #e7f5ee;
+  --sans: "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --serif: "IBM Plex Serif", Georgia, "Times New Roman", serif;
+  --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ground: #0a1420;
+    --panel: #111f30;
+    --sunk: #16283c;
+    --ink: #e6edf6;
+    --muted: #93a6bb;
+    --rule: #22364d;
+    --rule-strong: #2f4761;
+    --accent: #66a6ff;
+    --accent-soft: #14294a;
+    --blocker: #ff9a90;
+    --blocker-soft: #3a1f1d;
+    --major: #f0b866;
+    --major-soft: #36290f;
+    --minor: #66a6ff;
+    --minor-soft: #14294a;
+    --nit: #93a6bb;
+    --nit-soft: #1a2c3f;
+    --ok: #74d7a6;
+    --ok-soft: #14301f;
+  }
+}
+:root[data-theme="dark"] {
+  --ground: #0a1420;
+  --panel: #111f30;
+  --sunk: #16283c;
+  --ink: #e6edf6;
+  --muted: #93a6bb;
+  --rule: #22364d;
+  --rule-strong: #2f4761;
+  --accent: #66a6ff;
+  --accent-soft: #14294a;
+  --blocker: #ff9a90;
+  --blocker-soft: #3a1f1d;
+  --major: #f0b866;
+  --major-soft: #36290f;
+  --minor: #66a6ff;
+  --minor-soft: #14294a;
+  --nit: #93a6bb;
+  --nit-soft: #1a2c3f;
+  --ok: #74d7a6;
+  --ok-soft: #14301f;
+}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--ground);
+  color: var(--ink);
+  font: 400 16px/1.65 var(--serif);
+  -webkit-font-smoothing: antialiased;
+}
+.sheet {
+  max-width: 830px;
+  margin: 0 auto;
+  padding-inline: 20px;
+  padding-block: 40px 64px;
+}
+
+/* --- masthead ----------------------------------------------------------- */
+.brand {
+  font: 600 13px/1 var(--sans);
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 18px;
+}
+h1 {
+  font: 700 clamp(30px, 6vw, 42px)/1.1 var(--sans);
+  letter-spacing: -0.02em;
+  margin: 0 0 10px;
+  text-wrap: balance;
+}
+.standfirst {
+  font-size: clamp(17px, 2.4vw, 19px);
+  color: var(--muted);
+  margin: 0 0 30px;
+  max-width: 62ch;
+  text-wrap: balance;
+}
+
+/* A control block, the way an advisory report opens. */
+.control {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 1px;
+  background: var(--rule);
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  overflow: hidden;
+  margin-bottom: 44px;
+}
+.control div { background: var(--panel); padding: 11px 14px; }
+.control dt {
+  font: 600 10.5px/1 var(--sans);
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 5px;
+}
+.control dd {
+  margin: 0;
+  font: 500 14px/1.3 var(--sans);
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- rhythm -------------------------------------------------------------- */
+section.part { margin-bottom: 46px; }
+h2 {
+  font: 600 13px/1 var(--sans);
+  letter-spacing: .13em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin: 0 0 6px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--rule);
+}
+h2 .n { color: var(--accent); margin-right: 8px; }
+h3 {
+  font: 600 19px/1.3 var(--sans);
+  margin: 26px 0 8px;
+  letter-spacing: -0.01em;
+}
+p { margin: 0 0 14px; max-width: 68ch; }
+p.lead { font-size: 17.5px; }
+a { color: var(--accent); }
+strong { font-weight: 600; }
+em { font-style: italic; }
+code {
+  font: 400 .855em/1.4 var(--mono);
+  background: var(--sunk);
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+
+/* --- the two things that matter most ------------------------------------ */
+.pillars { display: grid; gap: 16px; margin: 30px 0 46px; }
+@media (min-width: 720px) { .pillars { grid-template-columns: 1fr 1fr; } }
+.pillar {
+  background: var(--panel);
+  border: 1px solid var(--rule);
+  border-top: 3px solid var(--accent);
+  border-radius: 8px;
+  padding: 20px 22px 6px;
+}
+.pillar.privacy { border-top-color: var(--ok); }
+.pillar h3 { margin-top: 0; font-size: 18px; }
+.pillar p { font-size: 15px; }
+.pillar .kicker {
+  font: 600 10.5px/1 var(--sans);
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--accent);
+  display: block;
+  margin-bottom: 9px;
+}
+.pillar.privacy .kicker { color: var(--ok); }
+
+/* --- can / cannot -------------------------------------------------------- */
+.split { display: grid; gap: 20px; }
+@media (min-width: 720px) { .split { grid-template-columns: 1fr 1fr; } }
+.ledger { margin: 0; padding: 0; list-style: none; font-family: var(--sans); font-size: 15px; }
+.ledger li {
+  display: grid;
+  grid-template-columns: 18px 1fr;
+  gap: 9px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--rule);
+  line-height: 1.45;
+}
+.ledger li::before { font-weight: 700; }
+.ledger.can li::before { content: "\2713"; color: var(--ok); }
+.ledger.cant li::before { content: "\2715"; color: var(--blocker); }
+
+/* --- steps: a real sequence, so they are numbered ----------------------- */
+ol.steps { margin: 0; padding: 0; list-style: none; counter-reset: step; }
+ol.steps li {
+  counter-increment: step;
+  display: grid;
+  grid-template-columns: 30px 1fr;
+  gap: 14px;
+  padding: 13px 0;
+  border-bottom: 1px solid var(--rule);
+}
+ol.steps li::before {
+  content: counter(step);
+  font: 600 13px/26px var(--mono);
+  text-align: center;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+ol.steps p { margin: 0; font-size: 15px; font-family: var(--sans); }
+ol.steps p + p { margin-top: 4px; color: var(--muted); font-size: 14px; }
+
+/* --- levels -------------------------------------------------------------- */
+.levels { display: grid; gap: 10px; }
+.level {
+  display: grid;
+  grid-template-columns: 96px 1fr;
+  gap: 16px;
+  align-items: start;
+  background: var(--panel);
+  border: 1px solid var(--rule);
+  border-left: 4px solid var(--edge);
+  border-radius: 7px;
+  padding: 14px 16px;
+}
+.level.blocker { --edge: var(--blocker); }
+.level.major { --edge: var(--major); }
+.level.minor { --edge: var(--minor); }
+.level.nit { --edge: var(--nit); }
+.level .name { font: 700 15px/1.3 var(--sans); color: var(--edge); }
+.level .count {
+  font: 500 11.5px/1 var(--mono);
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  display: block;
+  margin-top: 4px;
+}
+.level .gist { font-family: var(--sans); font-weight: 600; font-size: 15px; }
+.level .detail { color: var(--muted); font-size: 14.5px; margin-top: 3px; }
+@media (max-width: 520px) { .level { grid-template-columns: 1fr; gap: 6px; } }
+
+/* --- tables -------------------------------------------------------------- */
+.scroller { overflow-x: auto; border: 1px solid var(--rule); border-radius: 7px; background: var(--panel); }
+table { border-collapse: collapse; width: 100%; font-family: var(--sans); font-size: 14px; }
+th, td { text-align: left; padding: 8px 13px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+thead th {
+  font: 600 10.5px/1 var(--sans);
+  letter-spacing: .09em;
+  text-transform: uppercase;
+  color: var(--muted);
+  background: var(--sunk);
+  white-space: nowrap;
+}
+tbody tr:last-child td { border-bottom: 0; }
+td code { font-size: 12px; color: var(--muted); background: none; padding: 0; white-space: nowrap; }
+
+.sev {
+  display: inline-block;
+  font: 600 10.5px/1 var(--sans);
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  padding: 3px 7px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.sev.blocker { background: var(--blocker-soft); color: var(--blocker); }
+.sev.major { background: var(--major-soft); color: var(--major); }
+.sev.minor { background: var(--minor-soft); color: var(--minor); }
+.sev.nit { background: var(--nit-soft); color: var(--nit); }
+
+/* --- the check list ------------------------------------------------------ */
+.family { margin-bottom: 26px; }
+.family h3 { display: flex; align-items: center; gap: 10px; margin: 0 0 9px; font-size: 16px; }
+.tally {
+  font: 600 11.5px/1 var(--mono);
+  font-variant-numeric: tabular-nums;
+  background: var(--sunk);
+  color: var(--muted);
+  border-radius: 999px;
+  padding: 3px 8px;
+}
+
+/* --- notes --------------------------------------------------------------- */
+.note {
+  background: var(--sunk);
+  border-radius: 7px;
+  padding: 15px 18px 3px;
+  margin: 18px 0;
+  font-size: 15px;
+}
+.note.warn { background: var(--major-soft); }
+.note p:last-child { margin-bottom: 12px; }
+
+footer {
+  margin-top: 56px;
+  padding-top: 20px;
+  border-top: 1px solid var(--rule-strong);
+  font: 400 13px/1.6 var(--sans);
+  color: var(--muted);
+}
+footer p { max-width: none; }
+.stamp { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+
+@media print {
+  body { background: #fff; }
+  .sheet { padding-block: 0; max-width: none; }
+  .pillar, .level, .scroller, .control { break-inside: avoid; }
+}
+</style>
+
+<div class="sheet">
+  <header>
+    <div class="brand">LevelBlue &middot; Cyber Advisory</div>
+    <h1>Report QA</h1>
+    <p class="standfirst">
+      A mechanical check on a report or deck before it goes to a client. It runs entirely on your
+      own computer, finds the faults a rule can find, and hands the rest back to you.
+    </p>
+
+    <dl class="control">
+      <div><dt>Applies to</dt><dd>report-qa.html</dd></div>
+      <div><dt>Checks</dt><dd>__TOTAL__ in __FAMILIES__ families</dd></div>
+      <div><dt>Review stage</dt><dd>First of two</dd></div>
+      <div><dt>Data handling</dt><dd>Stays on device</dd></div>
+      <div><dt>Version</dt><dd class="stamp">__DATE__</dd></div>
+    </dl>
+  </header>
+
+  <div class="pillars">
+    <div class="pillar">
+      <span class="kicker">Read this first</span>
+      <h3>It is stage one, not the review</h3>
+      <p>
+        This tool catches mechanical faults: spelling, spacing, formatting, identifiers, and
+        content that should never ship. It cannot tell you whether your findings are right, whether
+        a severity is justified, or whether your remediation advice is sound.
+      </p>
+      <p>
+        <strong>A clean result is not sign-off.</strong> Every draft still needs a person to read
+        it for argument, accuracy and judgement. The tool clears the noise so that read is spent
+        on the things that actually matter.
+      </p>
+    </div>
+
+    <div class="pillar privacy">
+      <span class="kicker">Read this second</span>
+      <h3>Nothing leaves your computer</h3>
+      <p>
+        There is no upload, no server, no account and no telemetry. The draft you drop in is read
+        into your browser's memory, checked there, and forgotten when you close the tab. It never
+        touches a network.
+      </p>
+      <p>
+        You can prove it: disconnect from the internet, open the file, and check a report. It works
+        exactly the same.
+      </p>
+    </div>
+  </div>
+
+  <section class="part">
+    <h2><span class="n">01</span> How it runs</h2>
+    <p class="lead">
+      The tool is a single file, <code>report-qa.html</code>. Save it somewhere convenient and open
+      it in Edge or Chrome. There is nothing to install and nothing to log into.
+    </p>
+    <p>
+      A web page is usually a request to a server somewhere. This one is not. Everything the tool
+      needs &mdash; the checks, the dictionaries, the code that reads PowerPoint and Word files
+      &mdash; is written inside that one file, and your browser runs it locally the same way it
+      would run any page. When you drop a draft on it, the browser hands the file's contents to
+      code running on your machine. No request is made, so there is nowhere for the draft to go.
+    </p>
+    <p>
+      This is enforced rather than promised: the file is rebuilt by a script that refuses to
+      produce a page containing a network call, an external script or a link to anything outside
+      itself. If someone added one, the build would fail rather than ship.
+    </p>
+    <div class="note">
+      <p>
+        <strong>Keeping it current.</strong> The version and check count are printed at the foot of
+        the tool. To update the team, replace the one file wherever you keep it &mdash; everyone
+        picks up the new checks the next time they open it.
+      </p>
+    </div>
+  </section>
+
+  <section class="part">
+    <h2><span class="n">02</span> What it can and cannot do</h2>
+    <div class="split">
+      <div>
+        <h3>It can</h3>
+        <ul class="ledger can">
+          <li>Find credentials, another client's name, and text that was never meant to ship</li>
+          <li>Catch a previous client's name hiding in the slide master, where reading the deck would not show it</li>
+          <li>Read speaker notes, comments, tracked changes and document properties</li>
+          <li>Check CVSS, CVE, NIST CSF and ISO/IEC references are well formed and current</li>
+          <li>Hold a report to one dialect, one set of terms and one house style</li>
+          <li>Point at the exact words at fault, on the exact slide or line</li>
+          <li>Write its findings into a copy of the deck as PowerPoint comments</li>
+        </ul>
+      </div>
+      <div>
+        <h3>It cannot</h3>
+        <ul class="ledger cant">
+          <li>Tell you whether a finding is correct, or whether you have missed one</li>
+          <li>Judge whether a severity or a risk rating is justified</li>
+          <li>Know whether your remediation advice would actually work</li>
+          <li>Understand the client, the engagement or the politics of the report</li>
+          <li>Check anything in an image, a screenshot or a chart</li>
+          <li>Read a PDF &mdash; and it refuses to try, on purpose</li>
+          <li>Replace a second pair of eyes</li>
+        </ul>
+      </div>
+    </div>
+    <div class="note warn">
+      <p>
+        <strong>On false positives.</strong> A rule that fires on correct prose is worse than a
+        missed nit, because it teaches people to ignore the tool. The checks are written
+        conservatively, but they will still be wrong sometimes. When one is, set it aside
+        (section 06) &mdash; do not change good writing to satisfy a rule.
+      </p>
+    </div>
+  </section>
+
+  <section class="part">
+    <h2><span class="n">03</span> Before your first check</h2>
+    <p>
+      Open <strong>Engagement settings</strong> and fill them in. They describe the engagement
+      rather than the file, they are remembered on your computer, and they apply to every draft
+      until you change them. Three checks cannot run without them, so an empty field quietly
+      narrows the whole pass.
+    </p>
+    <div class="scroller">
+      <table>
+        <thead><tr><th>Setting</th><th>What it does</th><th>If you leave it blank</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><strong>English</strong></td>
+            <td>Fixes the report to British or American spelling.</td>
+            <td>The dialect is guessed from the draft, which is unreliable on a short deck.</td>
+          </tr>
+          <tr>
+            <td><strong>This client's name</strong></td>
+            <td>Checks the report actually names them.</td>
+            <td>Nothing notices a template field nobody filled in.</td>
+          </tr>
+          <tr>
+            <td><strong>Other clients' names</strong></td>
+            <td>Catches a previous client surviving in a copied deck, including in the slide masters.</td>
+            <td>Template leakage goes unreported &mdash; the single most damaging thing this tool finds.</td>
+          </tr>
+          <tr>
+            <td><strong>Required marking</strong></td>
+            <td>Checks your classification marking is present and consistent.</td>
+            <td>The marking is not checked at all.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="part">
+    <h2><span class="n">04</span> Running a check</h2>
+    <ol class="steps">
+      <li>
+        <div>
+          <p>Drop the draft onto the page, or click to choose it.</p>
+          <p>PowerPoint, Word, Markdown or an HTML page. Nothing is uploaded.</p>
+        </div>
+      </li>
+      <li>
+        <div>
+          <p>Read the verdict.</p>
+          <p>One line at the top: whether anything in the draft must not reach a client.</p>
+        </div>
+      </li>
+      <li>
+        <div>
+          <p>Work the blockers and majors, which open by default.</p>
+          <p>Minors and nits start collapsed so the list stays one screen.</p>
+        </div>
+      </li>
+      <li>
+        <div>
+          <p>Set aside anything that does not apply.</p>
+          <p>The counts, the verdict and every export follow your decisions.</p>
+        </div>
+      </li>
+      <li>
+        <div>
+          <p>Hand the findings back, then read the draft yourself.</p>
+          <p>This is the step the tool cannot do for you.</p>
+        </div>
+      </li>
+    </ol>
+  </section>
+
+  <section class="part">
+    <h2><span class="n">05</span> Reading the findings</h2>
+    <p>
+      Every finding quotes the draft's own words with the run at fault highlighted, so you can
+      match it against the slide in front of you. Whitespace faults are highlighted too &mdash;
+      a highlighted blank is the only way a double space is visible at all.
+    </p>
+
+    <h3>The four levels</h3>
+    <div class="levels">
+      <div class="level blocker">
+        <div><span class="name">Blocker</span><span class="count">__BLOCKERS__ checks</span></div>
+        <div>
+          <div class="gist">Must not reach a client at all.</div>
+          <div class="detail">A credential, another client's name, an unresolved comment, a tracked
+            change, an internal remark in the speaker notes. Fix before the draft leaves the building.</div>
+        </div>
+      </div>
+      <div class="level major">
+        <div><span class="name">Major</span><span class="count">__MAJORS__ checks</span></div>
+        <div>
+          <div class="gist">Wrong, or reads as wrong to the client.</div>
+          <div class="detail">A missing section, a cross-reference that goes nowhere, a CVSS score
+            that contradicts its own label, an acronym never expanded.</div>
+        </div>
+      </div>
+      <div class="level minor">
+        <div><span class="name">Minor</span><span class="count">__MINORS__ checks</span></div>
+        <div>
+          <div class="gist">The draft disagrees with itself.</div>
+          <div class="detail">Spelling, capitalisation, dashes, spacing. Each one is small; together
+            they are what makes a report look unchecked.</div>
+        </div>
+      </div>
+      <div class="level nit">
+        <div><span class="name">Nit</span><span class="count">__NITS__ checks</span></div>
+        <div>
+          <div class="gist">A preference rather than a fault.</div>
+          <div class="detail">Wordiness, hedging, passive voice. Fix if you have the time, ignore it
+            if you do not.</div>
+        </div>
+      </div>
+    </div>
+
+    <h3>Finding your way around</h3>
+    <p>
+      Findings are gathered under the check that raised them. A check that fired eight times is one
+      row carrying a count and a preview of the flagged words, which is often enough to act on
+      without opening it &mdash; open it for the eight places.
+    </p>
+    <p>
+      <strong>Show</strong> filters to one level; <strong>Blocker</strong> on its own is the
+      go/no-go view, and clicking it again clears the filter. <strong>Expand all</strong> opens
+      everything. Printing opens every group first, so nothing vanishes from a PDF.
+    </p>
+  </section>
+
+  <section class="part">
+    <h2><span class="n">06</span> Setting findings aside</h2>
+    <p>
+      No rule set is right about everything, so you have the last word.
+      <strong>Ignore</strong> on a finding stops that flagged text being reported by that check.
+      <strong>Ignore check</strong> sets the whole check aside for this draft. Both are judgements
+      about this report, not edits to it.
+    </p>
+    <p>
+      Nothing you set aside is simply gone. It collects in an <strong>Ignored</strong> section at
+      the foot of the list with a <strong>Restore</strong> on each, the running total sits under the
+      verdict, and every copied format states how many were left out. A QA pass whose exclusions are
+      invisible is one nobody can check.
+    </p>
+    <p>
+      Your decisions last as long as the page is open, and survive re-checking the same draft after
+      a round of edits. They are deliberately not saved to disk: doing so would write text from a
+      client deliverable into browser storage, and the promise this tool makes is that the draft
+      stays on your machine.
+    </p>
+  </section>
+
+  <section class="part">
+    <h2><span class="n">07</span> Handing findings back</h2>
+    <p>
+      <strong>Copy</strong> puts the findings on your clipboard in the shape the next person needs.
+      All four quote the flagged text, because <em>&ldquo;line 42 has an American spelling&rdquo;</em>
+      sends the author hunting and <code>Found: "color"</code> does not.
+    </p>
+    <div class="scroller">
+      <table>
+        <thead><tr><th>Button</th><th>Gives you</th></tr></thead>
+        <tbody>
+          <tr><td><strong>For comments</strong></td><td>One block per finding, to paste into the comment on that slide or paragraph.</td></tr>
+          <tr><td><strong>Summary</strong></td><td>One line per finding, blockers first, to attach to the mail back to the author.</td></tr>
+          <tr><td><strong>Blocker list</strong></td><td>Only what stops the draft being issued.</td></tr>
+          <tr><td><strong>Full report</strong></td><td>The complete report in Markdown, for a review thread.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>Writing comments straight into a deck</h3>
+    <p>
+      For a PowerPoint file, <strong>Download deck with comments</strong> saves a copy carrying one
+      real PowerPoint comment per finding, on the slide it came from. The consultant opens it, works
+      through the comment pane and resolves each one &mdash; no transcribing by hand.
+    </p>
+    <p>
+      It writes <em>a copy</em>. The file you dropped in is read and never written to. Comments
+      already in the deck are kept, along with whoever wrote them, and anything you set aside is
+      left out. Word files are not supported for this yet: Word anchors comments to exact runs of
+      text rather than to a page, which is a harder problem.
+    </p>
+  </section>
+
+  <section class="part">
+    <h2><span class="n">08</span> What it reads</h2>
+    <div class="scroller">
+      <table>
+        <thead><tr><th>Format</th><th>Support</th></tr></thead>
+        <tbody>
+          <tr><td><code>.pptx</code></td><td>Slides, titles, bullets, tables, speaker notes, comments, and the text in slide layouts and masters. Findings are reported by slide number.</td></tr>
+          <tr><td><code>.docx</code></td><td>Body text, plus tracked changes, comments, highlighting, headers, footers and document properties.</td></tr>
+          <tr><td><code>.md</code>, <code>.txt</code></td><td>Fully supported.</td></tr>
+          <tr><td><code>.html</code></td><td>Converted to text and checked.</td></tr>
+          <tr><td><code>.pdf</code></td><td><strong>Refused on purpose.</strong> Pulling text back out of a PDF garbles spacing and line breaks, so a check on it would report faults that are not in your document and miss ones that are. Check the file you made the PDF from.</td></tr>
+          <tr><td><code>.doc</code>, <code>.ppt</code></td><td>Refused. Save as the modern format first.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="part">
+    <h2><span class="n">09</span> Every check</h2>
+    <p>
+      All __TOTAL__ checks, grouped into the __FAMILIES__ families the tool names under each finding.
+      The rule name in the last column is what identifies a check if you ever need to raise one with
+      the person who maintains the tool.
+    </p>
+    __CHECK_TABLES__
+  </section>
+
+  <footer>
+    <p>
+      <strong>Report QA</strong> is the mechanical half of a two-stage review. It is deliberately
+      narrow: it reports only what a rule can be sure of, so that the judgement a report actually
+      needs stays with the person doing the review.
+    </p>
+    <p class="stamp">__TOTAL__ checks &middot; version __DATE__ &middot; build __COMMIT__</p>
+  </footer>
+</div>

@@ -12,6 +12,7 @@
     "qa:test": "node --test tools/report-qa/test.mjs",
     "qa:rules": "node tools/report-qa/cli.mjs --list-rules",
     "qa:build": "node tools/report-qa/build-standalone.mjs",
+    "qa:manual": "node tools/report-qa/build-manual.mjs",
     "deploy": "gh-pages -d dist"
   },
   "dependencies": {

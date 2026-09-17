@@ -25,6 +25,20 @@ The build fails rather than emitting a page that contains a `fetch`, an external
 script or stylesheet, or a WebSocket - the offline guarantee is enforced, not
 just intended.
 
+## The handbook
+
+`report-qa-handbook.html` is the team-facing manual - what the tool is and is
+not, how it runs without a network, how to work the findings, and every check
+grouped by family. It is generated, so the check list cannot drift out of step
+with the rules:
+
+```bash
+npm run qa:manual                         # writes report-qa-handbook.html
+```
+
+Distribute it beside `report-qa.html`: it is a single self-contained file too,
+and opens offline the same way.
+
 ## What the levels mean
 
 Every finding carries one of four levels, and the page explains them behind
