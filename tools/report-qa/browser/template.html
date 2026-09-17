@@ -59,14 +59,11 @@ body {
   padding-inline: 20px;
 }
 .wrap { max-width: 860px; margin: 0 auto; }
-header { margin-bottom: 40px; }
-header .logo-section { display: flex; align-items: flex-start; gap: 32px; margin-bottom: 24px; }
-header .logo-graphic { width: 100px; height: 100px; flex-shrink: 0; }
-header .logo-graphic svg { width: 100%; height: 100%; }
-header .logo-text { font-size: 36px; font-weight: 700; color: var(--ink); letter-spacing: -0.01em; margin: 16px 0 0; }
-header .logo-text .slash { color: var(--accent); }
-header h1 { font-size: 32px; margin: 0 0 6px; letter-spacing: -0.01em; font-weight: 700; color: var(--ink); }
-header p { margin: 0; color: var(--muted); font-size: 15px; }
+header { margin-bottom: 36px; }
+header .logo { width: 180px; margin-bottom: 20px; }
+header .logo svg { width: 100%; height: auto; display: block; }
+header h1 { font-size: 28px; margin: 0 0 6px; letter-spacing: -0.01em; font-weight: 700; color: var(--ink); }
+header p { margin: 0; color: var(--muted); font-size: 14px; }
 .offline {
   display: inline-flex; gap: 7px; align-items: center;
   background: var(--ok-bg); color: var(--ok);
@@ -184,20 +181,22 @@ footer p { margin: 0 0 8px; }
 <body>
 <div class="wrap">
   <header>
-    <div class="logo-section">
-      <div class="logo-graphic">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 120">
+    <div class="logo">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 280 160">
+        <!-- Geometric bars -->
+        <g transform="translate(100, 10)">
           <!-- Bright blue bar -->
-          <polygon points="30,20 50,20 70,70 50,70" fill="#0052ff"/>
+          <polygon points="0,30 25,30 35,65 10,65" fill="#0052ff"/>
           <!-- Cyan bar -->
-          <polygon points="45,35 65,35 85,85 65,85" fill="#00d9ff"/>
+          <polygon points="20,15 45,15 60,65 35,65" fill="#00d9ff"/>
           <!-- Yellow-green bar -->
-          <polygon points="60,50 80,50 95,100 75,100" fill="#ccff00"/>
-        </svg>
-      </div>
-      <div>
-        <div class="logo-text">LevelB<span class="slash">/</span>ue</div>
-      </div>
+          <polygon points="40,0 65,0 80,65 55,65" fill="#ccff00"/>
+        </g>
+        <!-- Text: LevelBlue with slash in blue -->
+        <text x="10" y="130" font-size="42" font-weight="700" fill="#0a1929" font-family="system-ui, -apple-system, sans-serif">Level</text>
+        <text x="165" y="130" font-size="42" font-weight="700" fill="#0052ff" font-family="system-ui, -apple-system, sans-serif">/</text>
+        <text x="185" y="130" font-size="42" font-weight="700" fill="#0a1929" font-family="system-ui, -apple-system, sans-serif">ue</text>
+      </svg>
     </div>
     <h1>Report QA</h1>
     <p>Quality assurance for cyber advisory reports and presentations</p>
