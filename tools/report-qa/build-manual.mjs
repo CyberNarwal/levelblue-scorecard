@@ -105,12 +105,34 @@ function build() {
     .replace(/__DATE__/g, date)
     .replace(/__COMMIT__/g, commit);
 
+  assertSelfContained(html);
+
   const out = join(root, 'report-qa-handbook.html');
   writeFileSync(out, html);
   console.log(`Built ${out}`);
   console.log(`  ${ALL_RULES.length} checks in ${families} families `
     + `(${counts.blocker} blocker, ${counts.major} major, ${counts.minor} minor, ${counts.nit} nit)`);
   console.log(`  version ${date} (${commit}), ${Math.round(html.length / 1024)} kB`);
+}
+
+/**
+ * The handbook's own subject is a tool that touches no network, so the handbook
+ * cannot quietly fetch a webfont, a script or an image when someone opens it.
+ * A font link is the easy way for that to creep back in, so the build refuses
+ * to emit a page carrying one rather than trusting anyone to remember.
+ */
+function assertSelfContained(html) {
+  const offences = [
+    [/<link\b[^>]*\bhref=["']https?:/i, 'a link to an external stylesheet or font'],
+    [/<script\b[^>]*\bsrc=["']https?:/i, 'an external script'],
+    [/<img\b[^>]*\bsrc=["']https?:/i, 'an externally hosted image'],
+    [/@import\s+url\(["']?https?:/i, 'a CSS @import over the network'],
+    [/\bfetch\s*\(|XMLHttpRequest|new\s+WebSocket/, 'a network call'],
+  ];
+  const found = offences.filter(([pattern]) => pattern.test(html)).map(([, what]) => what);
+  if (found.length) {
+    throw new Error(`The handbook must be self-contained, but it carries ${found.join(', ')}.`);
+  }
 }
 
 build();

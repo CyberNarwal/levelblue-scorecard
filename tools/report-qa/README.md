@@ -37,7 +37,10 @@ npm run qa:manual                         # writes report-qa-handbook.html
 ```
 
 Distribute it beside `report-qa.html`: it is a single self-contained file too,
-and opens offline the same way.
+and opens offline the same way. It is held to the tool's own standard - the
+build refuses to emit a handbook carrying a webfont link, an external script or
+a network call, because a document whose subject is a tool that touches no
+network cannot itself phone out when someone opens it.
 
 ## What the levels mean
 

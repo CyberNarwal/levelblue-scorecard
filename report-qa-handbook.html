@@ -1,7 +1,4 @@
 <title>Report QA Handbook</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Serif:ital,wght@0,400;0,600;1,400&display=swap">
 <style>
 :root {
   --ground: #f7f8fb;
@@ -23,9 +20,11 @@
   --nit-soft: #eef1f5;
   --ok: #1a7f52;
   --ok-soft: #e7f5ee;
-  --sans: "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  --serif: "IBM Plex Serif", Georgia, "Times New Roman", serif;
-  --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  /* Faces the machine already has. A handbook whose subject is a tool that
+     touches no network cannot itself fetch a webfont on open. */
+  --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --serif: Georgia, "Iowan Old Style", "Palatino Linotype", "Times New Roman", serif;
+  --mono: ui-monospace, SFMono-Regular, "Cascadia Mono", Menlo, Consolas, "Liberation Mono", monospace;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
@@ -77,7 +76,7 @@ body {
   margin: 0;
   background: var(--ground);
   color: var(--ink);
-  font: 400 16px/1.65 var(--serif);
+  font: 400 16.5px/1.62 var(--serif);
   -webkit-font-smoothing: antialiased;
 }
 .sheet {
@@ -112,15 +111,21 @@ h1 {
 /* A control block, the way an advisory report opens. */
 .control {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: 1px;
-  background: var(--rule);
+  grid-template-columns: repeat(auto-fit, minmax(125px, 1fr));
+  background: var(--panel);
   border: 1px solid var(--rule);
   border-radius: 8px;
   overflow: hidden;
   margin-bottom: 44px;
 }
-.control div { background: var(--panel); padding: 11px 14px; }
+/* Cells carry their own rules rather than letting a background bleed through
+   gaps: with six fields the row rarely divides evenly, and a bled gap turns
+   the leftover space into a grey block. */
+.control div {
+  padding: 11px 14px;
+  border-right: 1px solid var(--rule);
+  border-bottom: 1px solid var(--rule);
+}
 .control dt {
   font: 600 10.5px/1 var(--sans);
   letter-spacing: .1em;
@@ -1369,6 +1374,6 @@ footer p { max-width: none; }
       needs stays with the person doing the review.
     </p>
     <p>Written by <strong>Rajan Narwal</strong>, Manager, Cyber Advisory.</p>
-    <p class="stamp">105 checks &middot; version 2026-09-17 &middot; build 105be04</p>
+    <p class="stamp">105 checks &middot; version 2026-09-17 &middot; build 613f634</p>
   </footer>
 </div>
