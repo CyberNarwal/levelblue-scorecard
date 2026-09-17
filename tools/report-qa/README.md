@@ -44,6 +44,28 @@ The list is built to be read top-down in one screen rather than scrolled:
 - Printing opens everything first, so a collapsed group cannot silently vanish
   from a PDF.
 
+## Ignoring what does not apply
+
+No rule set is right about everything, so the reviewer has the last word.
+**Ignore** on a finding stops that flagged text being reported by that check;
+**Ignore check** sets the whole check aside for this draft. Both are judgements
+about this report, not edits to it.
+
+Dismissed findings are never simply gone. They collect in an **Ignored** section
+at the foot of the list with the count and a **Restore** for each, the running
+total sits on the line under the verdict, and the copied formats state how many
+were left out - a QA pass whose exclusions are invisible is one nobody can check.
+Every count, the verdict and all four exports move together, so what you copy is
+what you see.
+
+The decisions live in the page for as long as it is open, and survive
+re-checking the same draft after a round of edits because they are keyed to the
+flagged words rather than to a line number. They are deliberately not written to
+storage: the keys would carry text out of a client deliverable, and the promise
+this tool makes is that the draft stays on the machine. For an exclusion that
+should outlive the tab, put `<!-- qa-disable rule/id -->` in the draft (see
+below) or turn the rule off in `report-qa.config.json`.
+
 ## Handing findings back
 
 **Copy** puts the findings on the clipboard in the shape the next person needs:

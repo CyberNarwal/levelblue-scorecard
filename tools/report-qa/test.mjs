@@ -22,7 +22,7 @@ import { applyFixes } from './src/fix.mjs';
 import { loadDocument } from './src/load.mjs';
 import { suffixDialect } from './src/data/dialect.mjs';
 import { splitSentences, countWords, matchCase, excerptAround, excerptPartsAround } from './src/text.mjs';
-import { formatBlockersOnly, formatComments, formatSummaryDocument } from './src/report.mjs';
+import { formatBlockersOnly, formatComments, formatMarkdown, formatSummaryDocument } from './src/report.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const NOW = new Date('2026-03-15T12:00:00Z');
@@ -642,6 +642,23 @@ test('the summary puts what blocks the deliverable above what does not', () => {
   );
   assert.match(text, /"TBC"/, 'findings quote the draft');
   assert.match(text, /Do not issue this draft/);
+});
+
+test('a hand-off says how many findings the reviewer set aside', () => {
+  const [result, meta] = exportFixture();
+  const withDismissals = { ...meta, dismissed: 3 };
+
+  for (const format of [formatSummaryDocument, formatBlockersOnly, formatMarkdown]) {
+    assert.match(
+      format(result, withDismissals),
+      /3 further findings judged not to apply and left out\./,
+      `${format.name} must declare what was left out`,
+    );
+    assert.ok(
+      !/judged not to apply/.test(format(result, meta)),
+      `${format.name} must stay silent when nothing was dismissed`,
+    );
+  }
 });
 
 test('the blocker view answers only whether the draft can go out', () => {

@@ -233,6 +233,27 @@ mark {
 /* Pushed right so the replacements line up as a column; a long one that wraps
    onto its own line stays on that column rather than jumping to the margin. */
 .fix { flex: 0 1 auto; margin-left: auto; font-size: 13px; font-weight: 600; color: var(--ok); text-align: right; }
+/* --- ignoring ------------------------------------------------------------ */
+/* Faint at rest rather than hidden: a control nobody can see is a control
+   nobody uses, and this one has to be found without reading any documentation. */
+.act {
+  flex: none; font: inherit; font-size: 11.5px; padding: 2px 8px;
+  border: 1px solid var(--line); border-radius: 999px;
+  background: var(--bg); color: var(--muted); cursor: pointer;
+  opacity: .4; transition: opacity .12s, color .12s, border-color .12s;
+}
+.row:hover .act, .rule-head:hover .act, .sev-head:hover .act,
+.act:focus-visible, .act:hover { opacity: 1; }
+.act:hover { color: var(--accent); border-color: var(--accent); }
+/* All of them line up on the right, clear of the text they act on. */
+.rule-head > .act, .sev-head > .act { margin-left: auto; }
+.sev.ignored { opacity: .75; }
+.sev.ignored .sev-head { font-weight: 600; }
+.sev.ignored .rule-title { font-weight: 500; }
+.sev.ignored .act { opacity: 1; }
+@media (hover: none) {
+  .act { opacity: 1; }
+}
 .note { margin: 4px 0 0 75px; font-size: 12px; color: var(--muted); }
 .rule { margin: 2px 0 0 75px; font: 10.5px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; color: var(--muted); opacity: .6; }
 @media (max-width: 560px) {

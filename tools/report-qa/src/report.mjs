@@ -123,6 +123,12 @@ export function formatMarkdown(result, meta) {
     return out.join('\n');
   }
 
+  const dismissed = dismissedLine(meta);
+  if (dismissed) {
+    out.push(dismissed);
+    out.push('');
+  }
+
   if (stats.bySeverity.blocker) {
     out.push('> **Do not issue this draft.** The blockers below include content that must not reach a client.');
     out.push('');
@@ -196,6 +202,16 @@ function fixOf(finding) {
   return /^\s*$/.test(finding.suggestion) ? `"${finding.suggestion}"` : finding.suggestion;
 }
 
+/**
+ * Findings the reviewer set aside are left out of these formats, so the count
+ * is stated rather than left for the reader to notice is missing.
+ */
+function dismissedLine(meta) {
+  if (!meta.dismissed) return null;
+  return `${meta.dismissed} further finding${meta.dismissed === 1 ? '' : 's'} `
+    + 'judged not to apply and left out.';
+}
+
 const ASK = {
   blocker: 'ACTION REQUIRED',
   major: 'CHANGE REQUIRED',
@@ -246,8 +262,11 @@ export function formatSummaryDocument(result, meta) {
   out.push(`Checked ${meta.now.toISOString().slice(0, 10)} against ${describeDialect(stats)} conventions.`);
   out.push('');
 
+  const dismissed = dismissedLine(meta);
+
   if (!findings.length) {
     out.push('No mechanical findings. Read it for argument and accuracy before issuing.');
+    if (dismissed) out.push(dismissed);
     return out.join('\n');
   }
 
@@ -255,6 +274,7 @@ export function formatSummaryDocument(result, meta) {
     .filter((s) => stats.bySeverity[s])
     .map((s) => `${stats.bySeverity[s]} ${LABEL[s].toLowerCase()}`);
   out.push(`${stats.total} finding${stats.total === 1 ? '' : 's'}: ${tally.join(', ')}.`);
+  if (dismissed) out.push(dismissed);
   if (stats.bySeverity.blocker) {
     out.push('Do not issue this draft until the first section is clear.');
   }
@@ -291,6 +311,7 @@ export function formatBlockersOnly(result, meta) {
   const rest = others
     ? `${others} lesser finding${others === 1 ? '' : 's'} to review.`
     : 'Nothing else outstanding.';
+  const dismissed = dismissedLine(meta);
 
   if (!blockers.length) {
     return [
@@ -298,6 +319,7 @@ export function formatBlockersOnly(result, meta) {
       '',
       'Nothing in this draft is of the kind that must not reach a client.',
       rest,
+      ...(dismissed ? [dismissed] : []),
     ].join('\n');
   }
 
@@ -317,5 +339,6 @@ export function formatBlockersOnly(result, meta) {
   }
 
   out.push(rest);
+  if (dismissed) out.push(dismissed);
   return out.join('\n');
 }
