@@ -186,7 +186,15 @@ code {
   padding: 20px 22px 6px;
 }
 .pillar.privacy { border-top-color: var(--ok); }
-.pillar h3 { margin-top: 0; font-size: 18px; }
+.pillar-title {
+  margin: 0 0 8px;
+  font: 600 18px/1.3 var(--sans);
+  letter-spacing: -0.01em;
+  text-transform: none;
+  color: var(--ink);
+  border-bottom: 0;
+  padding-bottom: 0;
+}
 .pillar p { font-size: 15px; }
 .pillar .kicker {
   font: 600 10.5px/1 var(--sans);
@@ -357,22 +365,22 @@ footer p { max-width: none; }
   <div class="pillars">
     <div class="pillar">
       <span class="kicker">Read this first</span>
-      <h3>It is stage one, not the review</h3>
+      <h2 class="pillar-title">It is stage one, not the review</h3>
       <p>
         This tool catches mechanical faults: spelling, spacing, formatting, identifiers, and
         content that should never ship. It cannot tell you whether your findings are right, whether
         a severity is justified, or whether your remediation advice is sound.
       </p>
       <p>
-        <strong>A clean result is not sign-off.</strong> Every draft still needs a person to read
-        it for argument, accuracy and judgement. The tool clears the noise so that read is spent
-        on the things that actually matter.
+        <strong>A clean result is not sign-off.</strong> Every draft still needs someone to read
+        it for argument, accuracy and judgement. Clearing the mechanical faults first is what lets
+        that reading go on the things a rule cannot see.
       </p>
     </div>
 
     <div class="pillar privacy">
       <span class="kicker">Read this second</span>
-      <h3>Nothing leaves your computer</h3>
+      <h2 class="pillar-title">Nothing leaves your computer</h3>
       <p>
         There is no upload, no server, no account and no telemetry. The draft you drop in is read
         into your browser's memory, checked there, and forgotten when you close the tab. It never
@@ -394,9 +402,9 @@ footer p { max-width: none; }
     <p>
       A web page is usually a request to a server somewhere. This one is not. Everything the tool
       needs &mdash; the checks, the dictionaries, the code that reads PowerPoint and Word files
-      &mdash; is written inside that one file, and your browser runs it locally the same way it
-      would run any page. When you drop a draft on it, the browser hands the file's contents to
-      code running on your machine. No request is made, so there is nowhere for the draft to go.
+      &mdash; is written inside that one file. Your browser runs it locally, the same way it would
+      run any page. When you drop a draft on it, the browser hands the file's contents to code
+      running on your machine. No request is made, so there is nowhere for the draft to go.
     </p>
     <p>
       This is enforced rather than promised: the file is rebuilt by a script that refuses to
@@ -421,7 +429,8 @@ footer p { max-width: none; }
           <li>Find credentials, another client's name, and text that was never meant to ship</li>
           <li>Catch a previous client's name hiding in the slide master, where reading the deck would not show it</li>
           <li>Read speaker notes, comments, tracked changes and document properties</li>
-          <li>Check CVSS, CVE, NIST CSF and ISO/IEC references are well formed and current</li>
+          <li>Check Common Vulnerability Scoring System (CVSS), Common Vulnerabilities and
+            Exposures (CVE), NIST CSF and ISO/IEC references are well formed and current</li>
           <li>Hold a report to one dialect, one set of terms and one house style</li>
           <li>Point at the exact words at fault, on the exact slide or line</li>
           <li>Write its findings into a copy of the deck as PowerPoint comments</li>
@@ -606,7 +615,7 @@ footer p { max-width: none; }
     <h2><span class="n">07</span> Handing findings back</h2>
     <p>
       <strong>Copy</strong> puts the findings on your clipboard in the shape the next person needs.
-      All four quote the flagged text, because <em>&ldquo;line 42 has an American spelling&rdquo;</em>
+      All four quote the flagged text, because <em>"line 42 has an American spelling"</em>
       sends the author hunting and <code>Found: "color"</code> does not.
     </p>
     <div class="scroller">
@@ -1374,6 +1383,6 @@ footer p { max-width: none; }
       needs stays with the person doing the review.
     </p>
     <p>Written by <strong>Rajan Narwal</strong>, Manager, Cyber Advisory.</p>
-    <p class="stamp">105 checks &middot; version 2026-09-17 &middot; build 613f634</p>
+    <p class="stamp">105 checks &middot; version 2026-09-17 &middot; build 482259c</p>
   </footer>
 </div>

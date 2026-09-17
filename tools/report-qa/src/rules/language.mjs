@@ -260,11 +260,14 @@ export const rules = [
     severity: 'nit',
     check(doc) {
       const pattern = new RegExp(`\\b(${EMPTY_INTENSIFIERS.map(escapeWords).join('|')})\\s+(\\w+)`, 'gi');
-      return [...doc.scan(pattern, { types: SCOPE })].map(({ match, start, end }) => ({
-        start,
-        end,
-        message: `"${match[0]}" - "${match[2]}" is stronger without the intensifier.`,
-      }));
+      return [...doc.scan(pattern, { types: SCOPE })]
+        // "rather than" is a comparison, not an intensified "than".
+        .filter(({ match }) => !/^rather$/i.test(match[1]) || !/^than$/i.test(match[2]))
+        .map(({ match, start, end }) => ({
+          start,
+          end,
+          message: `"${match[0]}" - "${match[2]}" is stronger without the intensifier.`,
+        }));
     },
   },
 

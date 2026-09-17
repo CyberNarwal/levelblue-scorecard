@@ -155,13 +155,20 @@ function htmlToText(html) {
   text = text.replace(/<br\s*\/?>/gi, '\n');
   text = text.replace(/<[^>]+>/g, '');
   const named = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ' };
-  return text.replace(/&(#x?[0-9a-fA-F]+|[a-zA-Z]+);/g, (whole, body) => {
+  const decoded = text.replace(/&(#x?[0-9a-fA-F]+|[a-zA-Z]+);/g, (whole, body) => {
     if (body[0] === '#') {
       const code = body[1] === 'x' || body[1] === 'X' ? parseInt(body.slice(2), 16) : parseInt(body.slice(1), 10);
       return Number.isFinite(code) ? String.fromCodePoint(code) : whole;
     }
     return named[body] ?? whole;
   });
+  // A browser collapses runs of spaces and ignores indentation, so text pulled
+  // out of HTML must too, or every indented line in the source is reported as a
+  // double space and a stray blank line.
+  return decoded
+    .replace(/[ \t]+/g, ' ')
+    .replace(/^[ \t]+|[ \t]+$/gm, '')
+    .replace(/\n{3,}/g, '\n\n');
 }
 
 let lastResult = null;

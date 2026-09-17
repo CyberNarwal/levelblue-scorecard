@@ -60,7 +60,7 @@ export function loadDocument(path) {
  * Minimal HTML to text: enough to QA an exported report, not a browser.
  * Block elements become paragraphs; headings keep their level as Markdown.
  */
-function htmlToText(html) {
+export function htmlToText(html) {
   let text = html
     .replace(/<!--[\s\S]*?-->/g, '')
     .replace(/<(script|style)[\s\S]*?<\/\1>/gi, '');
@@ -70,7 +70,14 @@ function htmlToText(html) {
   text = text.replace(/<\/(p|div|tr|table|ul|ol|section|article|blockquote)>/gi, '\n\n');
   text = text.replace(/<br\s*\/?>/gi, '\n');
   text = text.replace(/<[^>]+>/g, '');
-  return decodeEntities(text).replace(/\n{3,}/g, '\n\n');
+  // A browser collapses runs of spaces and ignores indentation, so text pulled
+  // out of HTML must too. Without this, every indented line in the source is
+  // reported as a double space and a stray blank line - hundreds of findings
+  // about the markup rather than the writing.
+  return decodeEntities(text)
+    .replace(/[ \t]+/g, ' ')
+    .replace(/^[ \t]+|[ \t]+$/gm, '')
+    .replace(/\n{3,}/g, '\n\n');
 }
 
 function strip(value) {

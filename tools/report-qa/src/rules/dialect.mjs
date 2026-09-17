@@ -89,8 +89,23 @@ export const rules = [
       const hits = ctx.dialectEvidence ?? collectDialectEvidence(doc);
       const target = ctx.dialect;
       if (!target) return [];
+      const lower = doc.text.toLowerCase();
+
+      /**
+       * A low-confidence pair is one where both spellings are ordinary words in
+       * their own right - "draft" and "draught", "check" and "cheque",
+       * "practice" and "practise". Reporting one of those on sight tells an
+       * author their correct word is wrong, and an advisory report is full of
+       * drafts and checks. They are only worth raising when the draft uses both
+       * forms, which is a real inconsistency rather than a guess about meaning.
+       */
+      const worthReporting = (hit) => {
+        if (hit.pair?.confidence !== 'low') return true;
+        return new RegExp(`\\b${hit.counterpart.toLowerCase()}\\b`).test(lower);
+      };
+
       return hits
-        .filter((hit) => hit.dialect !== target)
+        .filter((hit) => hit.dialect !== target && worthReporting(hit))
         .map((hit) => ({
           start: hit.start,
           end: hit.end,

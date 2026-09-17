@@ -100,8 +100,16 @@ export const rules = [
         });
       }
 
-      // Number and date ranges take an en dash, not a hyphen.
+      // A written-out date is not a range, and an advisory report is full of
+      // them - every ISO date would otherwise be reported twice, once for
+      // year-month and once for month-day.
+      const dates = [...doc.text.matchAll(/\b\d{4}-\d{1,2}-\d{1,2}\b|\b\d{1,2}-\d{1,2}-\d{4}\b/g)]
+        .map((m) => [m.index, m.index + m[0].length]);
+      const insideDate = (from, to) => dates.some(([s, e]) => from >= s && to <= e);
+
+      // Number ranges take an en dash, not a hyphen.
       for (const { match, start, end } of doc.scan(/(\d)\s?-\s?(\d)/g, { types: PROSE_AND_HEADINGS })) {
+        if (insideDate(start, end)) continue;
         findings.push({
           start,
           end,

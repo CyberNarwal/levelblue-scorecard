@@ -21,7 +21,7 @@ import { readZip, readPart, readRelationships } from './src/extract/ooxml.mjs';
 import { annotatePptx } from './src/annotate/pptx.mjs';
 import { inflateRaw } from './src/extract/inflate.mjs';
 import { applyFixes } from './src/fix.mjs';
-import { loadDocument } from './src/load.mjs';
+import { htmlToText, loadDocument } from './src/load.mjs';
 import { suffixDialect } from './src/data/dialect.mjs';
 import { splitSentences, countWords, matchCase, excerptAround, excerptPartsAround } from './src/text.mjs';
 import { formatBlockersOnly, formatComments, formatMarkdown, formatSummaryDocument } from './src/report.mjs';
@@ -132,6 +132,46 @@ test('minority spellings are reported against the majority dialect', () => {
   assert.ok(findings.length >= 2);
   assert.ok(findings.every((f) => /American spelling/.test(f.message)));
   assert.equal(result.stats.dialect, 'en-GB');
+});
+
+test('a word that is ordinary in both dialects is not reported on sight', () => {
+  // "draft", "check" and "practice" are correct British words. Reporting them
+  // tells an author their own language is wrong, and an advisory report is full
+  // of them - the fastest way to get the whole tool switched off.
+  const result = check(
+    'The organisation reviewed the draft and analysed the check results.\n\n'
+    + 'Its licence and its defence programme were recognised in the summary.\n',
+  );
+  assert.deepEqual(findingsFor(result, 'dialect/mixed-spelling'), []);
+});
+
+test('a draft using both forms of such a word is still reported', () => {
+  const result = check(
+    'The organisation recognised the draught programme.\n\n'
+    + 'A later draft of the defence summary was analysed and authorised.\n',
+  );
+  const words = findingsFor(result, 'dialect/mixed-spelling').map((f) => f.message);
+  assert.ok(
+    words.some((m) => /draught|draft/.test(m)),
+    'using "draught" and "draft" in one report is a real inconsistency',
+  );
+});
+
+test('"rather than" is a comparison, not an intensifier', () => {
+  const result = check('Escalate the finding rather than closing it, and record the decision.');
+  assert.deepEqual(findingsFor(result, 'language/empty-intensifier'), []);
+  const real = check('The control is rather weak and the exposure is very significant.');
+  assert.ok(findingsFor(real, 'language/empty-intensifier').length >= 1, 'a real intensifier still fires');
+});
+
+test('a date is not a numeric range', () => {
+  const result = check('The assessment ran on 2026-09-17 and the retest on 17-10-2026 as agreed.');
+  assert.deepEqual(
+    findingsFor(result, 'punctuation/dash-style'), [],
+    'an ISO date must not be read as a range wanting an en dash',
+  );
+  const range = check('Between 10-20 hosts were affected across the estate during the window.');
+  assert.ok(findingsFor(range, 'punctuation/dash-style').length >= 1, 'a real range still fires');
 });
 
 test('a consistently American report produces no dialect findings', () => {
@@ -610,6 +650,25 @@ test('spelling and security rules still apply to slide text', () => {
   const hit = rulesHit(checkDeck({ dialect: 'en-GB' }));
   assert.ok(hit.has('dialect/mixed-spelling'), 'American spellings on a slide are still reported');
   assert.ok(hit.has('terminology/canonical-name'), 'terminology rules still apply');
+});
+
+test('indentation in an HTML source is markup, not a spacing fault', () => {
+  const html = [
+    '<html><body>',
+    '  <div>',
+    '    <p>The organisation reviewed the control set.</p>',
+    '',
+    '',
+    '    <p>A second paragraph follows the first one here.</p>',
+    '  </div>',
+    '</body></html>',
+  ].join('\n');
+  const doc = parseMarkdown(htmlToText(html), { source: 'page.html', format: 'html' });
+  const result = analyse(doc, { config: structuredClone(DEFAULT_CONFIG), now: NOW });
+  const hit = rulesHit(result);
+  assert.ok(!hit.has('whitespace/double-space'), 'indentation must not read as a double space');
+  assert.ok(!hit.has('whitespace/excess-blank-lines'), 'blank source lines must not read as vertical space');
+  assert.match(doc.text, /organisation reviewed the control set/);
 });
 
 test('legacy .ppt is refused with a useful message', () => {
