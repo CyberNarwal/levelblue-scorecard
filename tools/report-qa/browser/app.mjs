@@ -227,24 +227,27 @@ function renderFindings(result, doc) {
       }
       item.append(head);
 
-      if (finding.excerpt) {
-        const excerptBox = text('div', 'excerpt-box');
-        excerptBox.append(text('p', 'excerpt-label', 'Issue in document:'));
-        const pre = text('pre', 'excerpt', finding.excerpt);
-        excerptBox.append(pre);
-        item.append(excerptBox);
-      }
+      const details = text('div', 'finding-details');
 
-      if (finding.suggestion) {
-        const fixBox = text('div', 'fix-box');
-        fixBox.append(text('p', 'fix-label', 'How to fix:'));
-        fixBox.append(text('p', 'fix-text', finding.suggestion));
-        item.append(fixBox);
+      if (finding.excerpt || finding.suggestion) {
+        const context = text('div', 'finding-context');
+        if (finding.excerpt) {
+          context.append(text('span', 'excerpt-inline', `"${finding.excerpt}"`));
+        }
+        if (finding.suggestion) {
+          if (finding.excerpt) {
+            context.append(text('span', 'arrow', ' → '));
+          }
+          context.append(text('span', 'suggestion-inline', finding.suggestion));
+        }
+        details.append(context);
       }
 
       if (finding.note) {
-        item.append(text('p', 'note', finding.note));
+        details.append(text('p', 'note', finding.note));
       }
+
+      item.append(details);
 
       const footer = text('p', 'rule');
       footer.textContent = finding.rule;
