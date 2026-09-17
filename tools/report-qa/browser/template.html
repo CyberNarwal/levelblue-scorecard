@@ -54,6 +54,9 @@
   }
 }
 * { box-sizing: border-box; }
+/* A display rule on a class beats the browser's own [hidden] styling, which
+   silently left hidden panels on screen. */
+[hidden] { display: none !important; }
 body {
   margin: 0;
   background: var(--bg);
@@ -174,6 +177,9 @@ input[type=file] { display: none; }
 }
 .actions button:hover, .ghost:hover { border-color: var(--accent); color: var(--accent); }
 .ghost { margin-left: auto; border-color: transparent; color: var(--muted); }
+.actions button.primary { border-color: var(--accent); color: var(--accent); font-weight: 600; }
+.actions button.primary:hover { background: var(--minor-bg); }
+.bar-note { font-size: 12px; color: var(--muted); }
 .legend { flex: 1 1 100%; font-size: 12.5px; }
 .legend > summary {
   display: inline-block; cursor: pointer; color: var(--accent);
@@ -401,6 +407,17 @@ footer p { margin: 0 0 8px; }
         <button type="button" id="copy-report" title="The full markdown report, for a review thread">Full report</button>
       </div>
       <button type="button" id="expand" class="ghost">Expand all</button>
+    </div>
+
+    <div class="bar" id="file-bar" hidden>
+      <span class="bar-label">File</span>
+      <div class="actions">
+        <button type="button" id="download-pptx" class="primary"
+          title="Save a copy of the deck with every finding written in as a PowerPoint comment">
+          Download deck with comments
+        </button>
+      </div>
+      <span class="bar-note">Writes a copy. Your original file is never changed.</span>
     </div>
 
     <div id="findings"></div>

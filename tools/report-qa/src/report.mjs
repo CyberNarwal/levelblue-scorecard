@@ -220,6 +220,27 @@ const ASK = {
 };
 
 /**
+ * One finding as the body of a comment, whether that comment is being pasted
+ * from the clipboard or written into the file itself. Both routes come through
+ * here so the wording cannot drift apart between them.
+ *
+ * `withLocation` is dropped when the comment is already attached to the slide
+ * it refers to and repeating it would only take up room.
+ */
+export function findingComment(finding, { withLocation = true } = {}) {
+  const quote = flagged(finding);
+  const lines = [];
+  const head = `${ASK[finding.severity]} - ${finding.title || finding.rule}`;
+  lines.push(withLocation ? `${locationOf(finding, true)} | ${head}` : head);
+  if (quote) lines.push(`Found: "${quote}"`);
+  lines.push(`Issue: ${finding.message}`);
+  const fix = fixOf(finding);
+  if (fix) lines.push(`Fix: ${fix}`);
+  if (finding.note) lines.push(`Note: ${finding.note}`);
+  return lines.join('\n');
+}
+
+/**
  * One comment per finding, to paste into the comment bubble on the slide or
  * paragraph it belongs to. The flagged words lead, because the author is
  * reading this beside their own text and needs to match it up.
@@ -227,19 +248,7 @@ const ASK = {
 export function formatComments(result, meta) {
   const { findings } = result;
   if (!findings.length) return 'No findings.';
-
-  const lines = [];
-  for (const finding of findings) {
-    const quote = flagged(finding);
-    lines.push(`${locationOf(finding, true)} | ${ASK[finding.severity]}`);
-    if (quote) lines.push(`Found: "${quote}"`);
-    lines.push(`Issue: ${finding.message}`);
-    const fix = fixOf(finding);
-    if (fix) lines.push(`Fix: ${fix}`);
-    if (finding.note) lines.push(`Note: ${finding.note}`);
-    lines.push('');
-  }
-  return lines.join('\n').trimEnd();
+  return findings.map((finding) => findingComment(finding)).join('\n\n');
 }
 
 const SECTION = {

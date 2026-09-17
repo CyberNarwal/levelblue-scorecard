@@ -110,6 +110,35 @@ below) or turn the rule off in `report-qa.config.json`.
 All four quote the flagged text, because "line 42 has an American spelling" sends
 the author looking and `Found: "color"` does not.
 
+## Writing comments into the deck
+
+For a `.pptx`, **Download deck with comments** saves a copy carrying one real
+PowerPoint comment per finding, on the slide it came from. The consultant opens
+it, works through the comment pane and resolves each one - no transcribing from
+a QA report into a deck by hand.
+
+This works because PresentationML anchors a comment to a slide and a position
+rather than to a run of text, and the checker already knows the slide. Word is
+the harder case: its comments have to be spliced into the exact runs inside
+`document.xml`, and the extractor does not currently keep the positions that
+would need.
+
+What it does to the file:
+
+- **It writes a copy.** `Deck (QA comments).pptx`. The file you dropped in is
+  read and never written to. This is the only part of the tool that produces a
+  file at all, and it does not touch the original.
+- **The slides are copied across byte for byte**, still compressed, so nothing
+  is re-encoded behind the author's back. A test asserts this.
+- **Comments already in the deck are kept**, and so is their author. Running it
+  twice adds the second pass rather than replacing the first.
+- **Ignored findings are left out**, the same as the copied formats.
+
+A malformed package makes PowerPoint offer to "repair" a client deliverable, so
+the tests check more than the comments: every relationship target resolves,
+every part is declared in `[Content_Types].xml`, and the deck still reads back
+with its slides intact.
+
 ## The command line
 
 ```bash

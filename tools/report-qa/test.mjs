@@ -17,6 +17,8 @@ import { parseMarkdown } from './src/document.mjs';
 import { ALL_RULES, analyse } from './src/engine.mjs';
 import { extractDocx } from './src/extract/docx.mjs';
 import { extractPptx } from './src/extract/pptx.mjs';
+import { readZip, readPart, readRelationships } from './src/extract/ooxml.mjs';
+import { annotatePptx } from './src/annotate/pptx.mjs';
 import { inflateRaw } from './src/extract/inflate.mjs';
 import { applyFixes } from './src/fix.mjs';
 import { loadDocument } from './src/load.mjs';
@@ -629,7 +631,11 @@ test('the comment format quotes the draft\'s own words, not just the rule', () =
   const [result, meta] = exportFixture();
   const text = formatComments(result, meta);
   assert.match(text, /Found: "TBC"/, 'the flagged text is quoted so the author can find it');
-  assert.match(text, /^Line \d+ \| ACTION REQUIRED$/m, 'each comment names a location and an ask');
+  assert.match(
+    text,
+    /^Line \d+ \| ACTION REQUIRED - Unfinished placeholder text$/m,
+    'each comment names a location, an ask and what the check was',
+  );
   assert.match(text, /Fix: /, 'the fix travels with the comment');
 });
 
@@ -671,6 +677,124 @@ test('the blocker view answers only whether the draft can go out', () => {
   const clean = check('# Review\n\nThe colour of the chart is correct.\n');
   const clear = formatBlockersOnly(clean, meta);
   assert.match(clear, /^NO BLOCKERS/m);
+});
+
+// ------------------------------------------------------- writing comments back
+
+/** A package produced by PowerPoint's own writer, not a hand-built minimum. */
+const realDeck = () => new Uint8Array(readFileSync(join(here, 'samples', 'powerpoint-package.pptx')));
+
+/** Every relationship resolves and every part is declared. A package that fails
+ *  either of these is one PowerPoint offers to "repair", on a client file. */
+function assertPackageIsSound(bytes) {
+  const parts = readZip(bytes);
+  const types = readPart(parts, '[Content_Types].xml');
+  assert.ok(types, 'the package must declare its content types');
+
+  const defaults = new Set([...types.matchAll(/<Default\b[^>]*Extension="([^"]+)"/gi)].map((m) => m[1].toLowerCase()));
+  for (const name of parts.keys()) {
+    if (name === '[Content_Types].xml') continue;
+    const extension = name.slice(name.lastIndexOf('.') + 1).toLowerCase();
+    assert.ok(
+      types.includes(`PartName="/${name}"`) || defaults.has(extension),
+      `${name} has no content type, so the package will not open`,
+    );
+  }
+  for (const [name] of parts) {
+    if (!name.endsWith('.rels')) continue;
+    const base = name.replace(/(^|\/)_rels\/[^/]+$/, '');
+    for (const target of readRelationships(parts, name, base).values()) {
+      if (/^https?:/.test(target)) continue;
+      assert.ok(parts.has(target), `${name} points at ${target}, which is not in the package`);
+    }
+  }
+  return parts;
+}
+
+test('findings are written into a copy of the deck as PowerPoint comments', () => {
+  const original = realDeck();
+  const before = original.slice();
+  const findings = [
+    { slide: 1, severity: 'blocker', rule: 'a/b', title: 'Placeholder left in', message: 'Scope is TBC.', excerptParts: { match: 'TBC' } },
+    { slide: 2, severity: 'major', rule: 'c/d', title: 'American spelling', message: '"color" is American.', suggestion: 'colour', excerptParts: { match: 'color' } },
+  ];
+  const out = annotatePptx(original, findings, { author: 'Report QA', now: NOW });
+
+  assert.deepEqual(original, before, 'the deck handed in must not be modified');
+  const parts = assertPackageIsSound(out);
+
+  const back = extractPptx(out);
+  assert.equal(back.meta.slideCount, 3, 'the slides survive untouched');
+  assert.equal(back.meta.comments.length, 2);
+  assert.match(back.meta.comments[0].text, /Scope is TBC/);
+  assert.match(back.meta.comments[1].text, /Fix: colour/);
+  assert.match(readPart(parts, 'ppt/commentAuthors.xml'), /name="Report QA"/);
+});
+
+test('the slide parts themselves are copied across byte for byte', () => {
+  const original = realDeck();
+  const out = annotatePptx(original, [{ slide: 2, severity: 'nit', rule: 'a/b', title: 'T', message: 'M' }], { now: NOW });
+  const from = readZip(original);
+  const to = readZip(out);
+  for (const [name, bytes] of from) {
+    if (name === '[Content_Types].xml' || name.endsWith('.rels')) continue;
+    assert.deepEqual(to.get(name), bytes, `${name} was rewritten when it should have been copied`);
+  }
+});
+
+test('a second pass adds to the comments already in the deck', () => {
+  const once = annotatePptx(realDeck(), [
+    { slide: 1, severity: 'major', rule: 'a/b', title: 'First', message: 'First pass.' },
+  ], { now: NOW });
+  const twice = annotatePptx(once, [
+    { slide: 1, severity: 'major', rule: 'c/d', title: 'Second', message: 'Second pass.' },
+  ], { now: NOW });
+
+  assertPackageIsSound(twice);
+  const comments = extractPptx(twice).meta.comments;
+  assert.equal(comments.length, 2, 'an existing comment must not be overwritten');
+  assert.ok(comments.some((c) => /First pass/.test(c.text)));
+  assert.ok(comments.some((c) => /Second pass/.test(c.text)));
+});
+
+test('another reviewer keeps their own name in the author list', () => {
+  const mine = annotatePptx(realDeck(), [{ slide: 1, severity: 'nit', rule: 'a/b', title: 'T', message: 'M' }], { author: 'Report QA', now: NOW });
+  const theirs = annotatePptx(mine, [{ slide: 1, severity: 'nit', rule: 'c/d', title: 'T', message: 'M' }], { author: 'A. N. Other', now: NOW });
+  const authors = readPart(assertPackageIsSound(theirs), 'ppt/commentAuthors.xml');
+  assert.match(authors, /name="Report QA"/);
+  assert.match(authors, /name="A. N. Other"/);
+});
+
+test('text that would break the XML is escaped rather than shipped raw', () => {
+  const out = annotatePptx(realDeck(), [{
+    slide: 1,
+    severity: 'blocker',
+    rule: 'a/b',
+    title: 'Ampersands & <angles>',
+    message: `a & b < c > d "e" ${String.fromCharCode(7)} f`,
+    excerptParts: { match: '<script>alert("x")</script>' },
+  }], { author: 'QA & Co', now: NOW });
+
+  assertPackageIsSound(out);
+  const text = extractPptx(out).meta.comments[0].text;
+  assert.match(text, /a & b < c > d "e"/, 'the characters come back as themselves');
+  assert.match(text, /<script>alert\("x"\)<\/script>/);
+  assert.ok(!/\u0007/.test(text), 'a control character must not survive into the XML');
+});
+
+test('a finding about the whole file lands on the first slide', () => {
+  const out = annotatePptx(realDeck(), [
+    { documentLevel: true, severity: 'major', rule: 'a/b', title: 'Whole file', message: 'No classification marking.' },
+  ], { now: NOW });
+  assertPackageIsSound(out);
+  const comments = extractPptx(out).meta.comments;
+  assert.equal(comments.length, 1);
+  assert.match(comments[0].text, /No classification marking/);
+  assert.match(comments[0].text, /Document \|/, 'it still says the finding is about the file, not the slide');
+});
+
+test('writing is refused rather than producing an empty annotated deck', () => {
+  assert.throws(() => annotatePptx(realDeck(), [], { now: NOW }), /no findings left/i);
 });
 
 // ------------------------------------------------------------------- inflate
