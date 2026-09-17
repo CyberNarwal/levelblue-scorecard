@@ -270,6 +270,34 @@ test('a repeated sentence is flagged as a copy-paste artefact', () => {
   assert.ok(rulesHit(result).has('structure/duplicate-paragraph'));
 });
 
+test('LevelBlue house style: "ongoing" is preferred, "on-going" is flagged', () => {
+  const wrong = check('The on-going assessment revealed several risks.');
+  assert.ok(rulesHit(wrong).has('terminology/canonical-name'), '"on-going" is flagged');
+  assert.ok(findingsFor(wrong, 'terminology/canonical-name')[0].suggestion === 'ongoing');
+  const correct = check('The ongoing assessment revealed several risks.');
+  assert.ok(!rulesHit(correct).has('terminology/canonical-name'));
+});
+
+test('LevelBlue company name: capitalization is one word', () => {
+  const wrong = check('Level Blue conducted a security assessment.');
+  assert.ok(rulesHit(wrong).has('terminology/canonical-name'), '"Level Blue" (two words) is flagged');
+  const correct = check('LevelBlue conducted a security assessment.');
+  assert.ok(!rulesHit(correct).has('terminology/canonical-name'));
+});
+
+test('LevelBlue logo and revision number suggestions appear on documents', () => {
+  const docResult = check('# Report\n\nSome content here.');
+  assert.ok(rulesHit(docResult).has('structure/levelblue-logo-suggestion'));
+  assert.ok(rulesHit(docResult).has('structure/revision-number'));
+});
+
+test('revision number suggestion is skipped if revision number is present', () => {
+  const withRevision = check('# Report\n\nRevision 1.0\n\nContent here.');
+  assert.ok(!rulesHit(withRevision).has('structure/revision-number'), 'revision number is detected');
+  const withoutRevision = check('# Report\n\nNo revision here.\n\nContent here.');
+  assert.ok(rulesHit(withoutRevision).has('structure/revision-number'));
+});
+
 // ----------------------------------------------------------- confidentiality
 
 test('secrets are blockers and are masked in the output', () => {

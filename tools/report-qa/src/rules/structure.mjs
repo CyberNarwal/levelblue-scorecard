@@ -394,6 +394,48 @@ export const rules = [
       return findings;
     },
   },
+
+  {
+    id: 'structure/levelblue-logo-suggestion',
+    title: 'Recommend confirming latest LevelBlue logo',
+    category: 'Release readiness',
+    severity: 'nit',
+    check(doc, ctx) {
+      if (doc.format === 'pptx') {
+        // PPTX already has slide-specific logo rules
+        return [];
+      }
+      return [{
+        start: 0,
+        end: Math.min(1, doc.text.length),
+        message: 'Confirm the latest LevelBlue logo is included on the title/cover page and visible on every page.',
+        note: 'Use the current LevelBlue branding; verify during QA that the logo meets the brand guidelines.',
+        documentLevel: true,
+      }];
+    },
+  },
+
+  {
+    id: 'structure/revision-number',
+    title: 'Recommend including a revision number',
+    category: 'Release readiness',
+    severity: 'nit',
+    check(doc, ctx) {
+      if (doc.format === 'pptx') {
+        // Revision numbers are typically in document metadata, not slides
+        return [];
+      }
+      const hasRevision = /\b(?:revision|rev|v)\s*[0-9]+(?:\.[0-9]+)?\b/i.test(doc.text);
+      if (hasRevision) return [];
+      return [{
+        start: 0,
+        end: Math.min(1, doc.text.length),
+        message: 'The document does not indicate a revision number.',
+        note: 'Include a revision number on the title/cover page (e.g. Revision 1.0, v1).',
+        documentLevel: true,
+      }];
+    },
+  },
 ];
 
 /** Classify a heading as Title Case or Sentence case, or null when ambiguous. */

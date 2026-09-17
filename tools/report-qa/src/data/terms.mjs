@@ -53,6 +53,8 @@ export const CANONICAL_TERMS = [
   { wrong: /\bwifi\b|\bWiFi\b|\bWIFI\b|\bWi\s+Fi\b|\bwi-fi\b/, right: 'Wi-Fi' },
   { wrong: /\bweb\s+site(?:s)?\b/i, right: 'website' },
   { wrong: /\bon-?premise\b(?!s)/i, right: 'on-premises', note: '"On-premise" means "based on a proposition"; the infrastructure term is "on-premises".' },
+  { wrong: /\bon-going\b/i, right: 'ongoing', note: 'LevelBlue house style: "ongoing" is a noun and adjective; "on-going" is non-standard.' },
+  { wrong: /\bLevel\s+Blue\b/, right: 'LevelBlue', note: 'Company name is one word: LevelBlue.' },
   { wrong: /\bmulti\s+factor\s+authentication\b|\bmultifactor\s+authentication\b/i, right: 'multi-factor authentication' },
   { wrong: /\bzero\s+day\s+(?=vulnerabilit|exploit|attack|threat)/i, right: 'zero-day ', note: 'Hyphenate when used attributively.' },
   { wrong: /\bman\s+in\s+the\s+middle\b/i, right: 'adversary-in-the-middle', note: 'Hyphenate, and prefer the neutral form used by MITRE ATT&CK and NCSC.' },
