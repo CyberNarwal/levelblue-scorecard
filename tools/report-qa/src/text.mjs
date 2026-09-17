@@ -172,10 +172,62 @@ export function matchCase(original, replacement) {
 
 /** A short, single-line excerpt centred on an offset, for the finding output. */
 export function excerptAround(text, start, end, radius = 40) {
-  const from = Math.max(0, start - radius);
-  const to = Math.min(text.length, end + radius);
-  let snippet = text.slice(from, to).replace(/\s+/g, ' ').trim();
-  if (from > 0) snippet = '...' + snippet;
-  if (to < text.length) snippet += '...';
-  return snippet;
+  const { before, match, after } = excerptPartsAround(text, start, end, radius);
+  // A flagged span can run across a line break; the flat form is one line.
+  return `${before}${match}${after}`.replace(/\s*\n\s*/g, ' ');
+}
+
+/** A flagged span longer than this is cut, so one long sentence cannot fill the list. */
+const MAX_MATCH = 160;
+/** How far the window may move to avoid cutting a word in half. */
+const SNAP = 15;
+
+/** Move the window's left edge right, off the middle of a word. */
+function snapStart(text, index, limit) {
+  const stop = Math.min(index + SNAP, limit);
+  for (let i = index; i < stop; i += 1) {
+    if (/\s/.test(text[i])) return i + 1;
+  }
+  return index;
+}
+
+/** Move the window's right edge left, off the middle of a word. */
+function snapEnd(text, index, limit) {
+  const stop = Math.max(index - SNAP, limit);
+  for (let i = index; i > stop; i -= 1) {
+    if (/\s/.test(text[i - 1])) return i - 1;
+  }
+  return index;
+}
+
+/**
+ * The same excerpt as `excerptAround`, split at the flagged span so a reader can
+ * be shown the exact text the rule objected to rather than a window it sits
+ * somewhere inside. `match` is the flagged text verbatim; `before` and `after`
+ * are the surrounding context that makes it locatable in the draft.
+ */
+export function excerptPartsAround(text, start, end, radius = 40) {
+  const clamped = Math.max(0, Math.min(start, text.length));
+  const clampedEnd = Math.max(clamped, Math.min(end, text.length));
+
+  // The window starts and ends on a word boundary where it can, so the context
+  // reads as words rather than as the tail of one.
+  const rawFrom = Math.max(0, clamped - radius);
+  const rawTo = Math.min(text.length, clampedEnd + radius);
+  const from = rawFrom > 0 ? snapStart(text, rawFrom, clamped) : 0;
+  const to = rawTo < text.length ? snapEnd(text, rawTo, clampedEnd) : text.length;
+
+  // Context is collapsed to keep the row to one line, but the flagged span is
+  // kept verbatim: for a double space or a stray tab the whitespace IS the
+  // finding, and collapsing it would hide the very thing being reported.
+  const before = text.slice(from, clamped).replace(/\s+/g, ' ').replace(/^ /, '');
+  const after = text.slice(clampedEnd, to).replace(/\s+/g, ' ').replace(/ $/, '');
+  let match = text.slice(clamped, clampedEnd);
+  if (match.length > MAX_MATCH) match = `${match.slice(0, MAX_MATCH)}…`;
+
+  return {
+    before: from > 0 ? `...${before}` : before,
+    match,
+    after: to < text.length ? `${after}...` : after,
+  };
 }

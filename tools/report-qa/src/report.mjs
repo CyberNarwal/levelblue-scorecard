@@ -47,6 +47,7 @@ export function formatJson(result, meta) {
       suggestion: f.suggestion,
       note: f.note,
       excerpt: f.excerpt,
+      excerptParts: f.excerptParts,
       occurrences: f.occurrences,
       aggregate: f.aggregate,
       fixable: f.fixable,
@@ -181,117 +182,102 @@ function describeDialect(stats) {
 }
 
 /**
- * Comment export format: copy-pasteable text for adding to document/slide comments.
- * Format: "Slide/Line X: [Issue] - [Action required/Optional]"
+ * The exact run of text the rule objected to, which is what an author needs in
+ * order to find it in their own draft. Document-level findings have no span.
+ */
+function flagged(finding) {
+  const match = finding.excerptParts?.match?.replace(/\s+/g, ' ').trim();
+  return match || null;
+}
+
+/** A replacement that is only whitespace has to be quoted or it reads as nothing. */
+function fixOf(finding) {
+  if (!finding.suggestion) return null;
+  return /^\s*$/.test(finding.suggestion) ? `"${finding.suggestion}"` : finding.suggestion;
+}
+
+const ASK = {
+  blocker: 'ACTION REQUIRED',
+  major: 'CHANGE REQUIRED',
+  minor: 'Please fix',
+  nit: 'Optional',
+};
+
+/**
+ * One comment per finding, to paste into the comment bubble on the slide or
+ * paragraph it belongs to. The flagged words lead, because the author is
+ * reading this beside their own text and needs to match it up.
  */
 export function formatComments(result, meta) {
   const { findings } = result;
-  if (!findings.length) return '(No findings to report)';
+  if (!findings.length) return 'No findings.';
 
   const lines = [];
   for (const finding of findings) {
-    const location = locationOf(finding, true);
-    const severity = finding.severity === 'blocker' ? 'ACTION REQUIRED'
-      : finding.severity === 'major' ? 'CHANGE REQUIRED'
-        : finding.severity === 'minor' ? 'Please fix'
-          : 'Optional improvement';
-
-    lines.push(`${location}: ${finding.message}`);
-    lines.push(`Status: ${severity}`);
-    if (finding.suggestion) lines.push(`Action: ${finding.suggestion}`);
+    const quote = flagged(finding);
+    lines.push(`${locationOf(finding, true)} | ${ASK[finding.severity]}`);
+    if (quote) lines.push(`Found: "${quote}"`);
+    lines.push(`Issue: ${finding.message}`);
+    const fix = fixOf(finding);
+    if (fix) lines.push(`Fix: ${fix}`);
     if (finding.note) lines.push(`Note: ${finding.note}`);
     lines.push('');
   }
-  return lines.join('\n');
+  return lines.join('\n').trimEnd();
 }
 
+const SECTION = {
+  blocker: 'MUST FIX BEFORE ISSUE',
+  major: 'WRONG, OR READS AS WRONG',
+  minor: 'INCONSISTENT',
+  nit: 'OPTIONAL',
+};
+
 /**
- * Summary document: clean, structured report with blockers first.
- * Suitable for emailing to consultant with findings grouped by criticality.
+ * A summary to attach to the mail back to the author: one line per finding,
+ * quoting their own words, ordered so the things that stop the deliverable
+ * going out are read first.
  */
 export function formatSummaryDocument(result, meta) {
   const { stats, findings } = result;
   const out = [];
 
-  out.push(`QA Summary: ${meta.source}`);
-  out.push('='.repeat(60));
-  out.push('');
-  out.push(`Checked: ${meta.now.toISOString().slice(0, 10)}`);
-  out.push(`Dialect: ${describeDialect(stats)}`);
-  out.push('');
-
-  out.push('OVERVIEW');
-  out.push('-'.repeat(60));
-  out.push(`Total findings: ${stats.total}`);
-  if (stats.bySeverity.blocker) out.push(`  • Blockers (must fix): ${stats.bySeverity.blocker}`);
-  if (stats.bySeverity.major) out.push(`  • Major issues (change required): ${stats.bySeverity.major}`);
-  if (stats.bySeverity.minor) out.push(`  • Minor issues (inconsistent): ${stats.bySeverity.minor}`);
-  if (stats.bySeverity.nit) out.push(`  • Nits (optional): ${stats.bySeverity.nit}`);
+  out.push(`QA summary: ${meta.source}`);
+  out.push(`Checked ${meta.now.toISOString().slice(0, 10)} against ${describeDialect(stats)} conventions.`);
   out.push('');
 
   if (!findings.length) {
-    out.push('No findings. This document is mechanically sound.');
+    out.push('No mechanical findings. Read it for argument and accuracy before issuing.');
     return out.join('\n');
   }
 
-  // Blockers first - these must be fixed
-  const blockerGroup = findings.filter((f) => f.severity === 'blocker');
-  if (blockerGroup.length) {
-    out.push('CRITICAL: DO NOT SEND - Fix these first');
-    out.push('='.repeat(60));
-    for (const finding of blockerGroup) {
-      const location = locationOf(finding, true);
-      out.push(`• ${location}`);
-      out.push(`  Issue: ${finding.message}`);
-      if (finding.suggestion) out.push(`  Fix: ${finding.suggestion}`);
-      if (finding.note) out.push(`  Note: ${finding.note}`);
-      out.push('');
+  const tally = SEVERITIES
+    .filter((s) => stats.bySeverity[s])
+    .map((s) => `${stats.bySeverity[s]} ${LABEL[s].toLowerCase()}`);
+  out.push(`${stats.total} finding${stats.total === 1 ? '' : 's'}: ${tally.join(', ')}.`);
+  if (stats.bySeverity.blocker) {
+    out.push('Do not issue this draft until the first section is clear.');
+  }
+  out.push('');
+
+  for (const severity of SEVERITIES) {
+    const group = findings.filter((f) => f.severity === severity);
+    if (!group.length) continue;
+
+    out.push(`${SECTION[severity]} (${group.length})`);
+    out.push('-'.repeat(SECTION[severity].length + 6));
+    for (const finding of group) {
+      const quote = flagged(finding);
+      const fix = fixOf(finding);
+      out.push(`${locationOf(finding, true)} - ${finding.message}`);
+      if (quote) out.push(`    "${quote}"${fix ? `  ->  ${fix}` : ''}`);
+      else if (fix) out.push(`    ->  ${fix}`);
+      if (finding.note) out.push(`    ${finding.note}`);
     }
+    out.push('');
   }
 
-  // Major issues
-  const majorGroup = findings.filter((f) => f.severity === 'major');
-  if (majorGroup.length) {
-    out.push('MAJOR ISSUES: Needs correction');
-    out.push('='.repeat(60));
-    for (const finding of majorGroup) {
-      const location = locationOf(finding, true);
-      out.push(`• ${location}`);
-      out.push(`  Issue: ${finding.message}`);
-      if (finding.suggestion) out.push(`  Fix: ${finding.suggestion}`);
-      if (finding.note) out.push(`  Note: ${finding.note}`);
-      out.push('');
-    }
-  }
-
-  // Minor issues
-  const minorGroup = findings.filter((f) => f.severity === 'minor');
-  if (minorGroup.length) {
-    out.push('MINOR ISSUES: Consistency and polish');
-    out.push('='.repeat(60));
-    for (const finding of minorGroup) {
-      const location = locationOf(finding, true);
-      out.push(`• ${location}`);
-      out.push(`  Issue: ${finding.message}`);
-      if (finding.suggestion) out.push(`  Fix: ${finding.suggestion}`);
-      out.push('');
-    }
-  }
-
-  // Nits
-  const nitGroup = findings.filter((f) => f.severity === 'nit');
-  if (nitGroup.length) {
-    out.push('OPTIONAL: Nice-to-haves');
-    out.push('='.repeat(60));
-    for (const finding of nitGroup) {
-      const location = locationOf(finding, true);
-      out.push(`• ${location}: ${finding.message}`);
-      if (finding.suggestion) out.push(`  Suggestion: ${finding.suggestion}`);
-      out.push('');
-    }
-  }
-
-  return out.join('\n');
+  return out.join('\n').trimEnd();
 }
 
 /**
@@ -301,30 +287,35 @@ export function formatSummaryDocument(result, meta) {
 export function formatBlockersOnly(result, meta) {
   const { stats, findings } = result;
   const blockers = findings.filter((f) => f.severity === 'blocker');
+  const others = stats.total - blockers.length;
+  const rest = others
+    ? `${others} lesser finding${others === 1 ? '' : 's'} to review.`
+    : 'Nothing else outstanding.';
 
   if (!blockers.length) {
-    return `✓ CLEAR TO SEND\n\nNo blockers found. This document may be issued to the client.\n\n${stats.total} minor${stats.total === 1 ? '' : 's'} to review if you have time.`;
+    return [
+      `NO BLOCKERS: ${meta.source}`,
+      '',
+      'Nothing in this draft is of the kind that must not reach a client.',
+      rest,
+    ].join('\n');
   }
 
   const out = [];
-  out.push('✗ DO NOT SEND');
+  out.push(`DO NOT ISSUE: ${meta.source}`);
   out.push('');
-  out.push(`${blockers.length} blocker${blockers.length === 1 ? '' : 's'} found. These must be fixed before sending to client:`);
+  out.push(`${blockers.length} blocker${blockers.length === 1 ? '' : 's'} must be cleared first.`);
   out.push('');
 
   for (const finding of blockers) {
-    const location = locationOf(finding, true);
-    out.push(`▸ ${location}`);
-    out.push(`  ${finding.message}`);
-    if (finding.suggestion) out.push(`  → ${finding.suggestion}`);
+    const quote = flagged(finding);
+    out.push(`${locationOf(finding, true)} - ${finding.message}`);
+    if (quote) out.push(`    "${quote}"`);
+    const fix = fixOf(finding);
+    if (fix) out.push(`    ->  ${fix}`);
     out.push('');
   }
 
-  const others = stats.total - blockers.length;
-  if (others) {
-    out.push(`---`);
-    out.push(`Also ${others} non-critical issue${others === 1 ? '' : 's'} to review.`);
-  }
-
+  out.push(rest);
   return out.join('\n');
 }

@@ -169,6 +169,59 @@ function text(tag, className, content) {
   return node;
 }
 
+/** Where the reader should look in their own draft. */
+function locationLabel(finding) {
+  if (finding.documentLevel) return 'File';
+  if (finding.slide) return `Slide ${finding.slide}${finding.region === 'notes' ? ' notes' : ''}`;
+  return `Line ${finding.line}`;
+}
+
+/**
+ * One finding, as two lines: the draft's own words with the flagged text
+ * highlighted, then the explanation underneath.
+ *
+ * The quote leads because the first question a reviewer asks is "what, exactly?"
+ * - a rule name and a category answer that far more slowly than seeing the
+ * offending words sitting in their own sentence.
+ */
+function renderFinding(finding) {
+  const item = text('article', 'finding');
+  const row = text('div', 'row');
+  row.append(text('span', 'where', locationLabel(finding)));
+
+  const parts = finding.excerptParts;
+  if (parts && parts.match) {
+    const quote = text('span', 'quote');
+    if (parts.before) quote.append(text('span', 'ctx', parts.before));
+    quote.append(text('mark', null, parts.match));
+    if (parts.after) quote.append(text('span', 'ctx', parts.after));
+    row.append(quote);
+  } else {
+    row.append(text('span', 'quote headline', finding.message));
+  }
+
+  if (finding.occurrences > 1) {
+    row.append(text('span', 'times', `×${finding.occurrences}`));
+  }
+  if (finding.suggestion) {
+    // A replacement that is only whitespace has to be quoted or the row shows
+    // an arrow pointing at nothing.
+    const fix = /^\s*$/.test(finding.suggestion) ? `"${finding.suggestion}"` : finding.suggestion;
+    row.append(text('span', 'fix', `→ ${fix}`));
+  }
+  item.append(row);
+
+  // The message is the explanation once the quote has already shown the fault,
+  // so it is not repeated when there was no quote to explain.
+  const why = text('p', 'why');
+  if (parts && parts.match) why.append(text('span', 'why-msg', finding.message));
+  if (finding.note) why.append(text('span', 'why-note', finding.note));
+  why.append(text('span', 'rule', finding.rule));
+  item.append(why);
+
+  return item;
+}
+
 function renderFindings(result, doc) {
   const { stats, findings } = result;
   const verdict = verdictFor(stats);
@@ -214,45 +267,7 @@ function renderFindings(result, doc) {
     section.append(text('p', 'group-blurb', SEVERITY_BLURB[severity]));
 
     for (const finding of group) {
-      const item = text('article', 'finding');
-      const where = finding.documentLevel ? 'Whole file'
-        : finding.slide ? `Slide ${finding.slide}${finding.region === 'notes' ? ' notes' : ''}`
-          : `Line ${finding.line}`;
-
-      const head = text('div', 'finding-head');
-      head.append(text('span', 'where', where));
-      head.append(text('span', 'msg', finding.message));
-      if (finding.occurrences > 1) {
-        head.append(text('span', 'occurrences', `(${finding.occurrences}x)`));
-      }
-      item.append(head);
-
-      const details = text('div', 'finding-details');
-
-      if (finding.excerpt || finding.suggestion) {
-        const context = text('div', 'finding-context');
-        if (finding.excerpt) {
-          context.append(text('span', 'excerpt-inline', `"${finding.excerpt}"`));
-        }
-        if (finding.suggestion) {
-          if (finding.excerpt) {
-            context.append(text('span', 'arrow', ' → '));
-          }
-          context.append(text('span', 'suggestion-inline', finding.suggestion));
-        }
-        details.append(context);
-      }
-
-      if (finding.note) {
-        details.append(text('p', 'note', finding.note));
-      }
-
-      item.append(details);
-
-      const footer = text('p', 'rule');
-      footer.textContent = finding.rule;
-      item.append(footer);
-      section.append(item);
+      section.append(renderFinding(finding));
     }
     list.append(section);
   }

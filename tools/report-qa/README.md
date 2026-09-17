@@ -25,6 +25,25 @@ The build fails rather than emitting a page that contains a `fetch`, an external
 script or stylesheet, or a WebSocket - the offline guarantee is enforced, not
 just intended.
 
+Every finding quotes the draft's own words with the flagged run highlighted, so
+a reviewer can match it against the slide in front of them without hunting for
+the rule's meaning. Whitespace faults are highlighted too, which is the only way
+a double space or a stray tab is visible at all.
+
+## Handing findings back
+
+Four buttons copy the findings in the shape the next person needs:
+
+| Button | For |
+|---|---|
+| Blockers only | The go/no-go call - what stops the draft being issued, and nothing else |
+| Copy for comments | One block per finding, to paste into the comment on that slide or paragraph |
+| Summary document | One line per finding, blockers first, to attach to the mail back to the author |
+| Copy report | The full markdown report, for a review thread |
+
+All four quote the flagged text, because "line 42 has an American spelling" sends
+the author looking and `Found: "color"` does not.
+
 ## The command line
 
 ```bash

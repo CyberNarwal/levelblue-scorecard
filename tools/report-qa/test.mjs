@@ -21,7 +21,8 @@ import { inflateRaw } from './src/extract/inflate.mjs';
 import { applyFixes } from './src/fix.mjs';
 import { loadDocument } from './src/load.mjs';
 import { suffixDialect } from './src/data/dialect.mjs';
-import { splitSentences, countWords, matchCase } from './src/text.mjs';
+import { splitSentences, countWords, matchCase, excerptAround, excerptPartsAround } from './src/text.mjs';
+import { formatBlockersOnly, formatComments, formatSummaryDocument } from './src/report.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const NOW = new Date('2026-03-15T12:00:00Z');
@@ -59,6 +60,36 @@ test('matchCase preserves the original capitalisation pattern', () => {
   assert.equal(matchCase('Organisation', 'organization'), 'Organization');
   assert.equal(matchCase('ORGANISATION', 'organization'), 'ORGANIZATION');
   assert.equal(matchCase('organisation', 'organization'), 'organization');
+});
+
+test('a split excerpt quotes the flagged span exactly and keeps its context', () => {
+  const source = 'The team reviewed the color of the dashboard before sign-off.';
+  const start = source.indexOf('color');
+  const parts = excerptPartsAround(source, start, start + 5);
+  assert.equal(parts.match, 'color');
+  assert.match(parts.before, /reviewed the $/);
+  assert.match(parts.after, /^ of the dashboard/);
+});
+
+test('a split excerpt reassembles to the same window as the flat excerpt', () => {
+  const source = `Intro. ${'padding '.repeat(20)}a whitelist was used here. ${'tail '.repeat(20)}End.`;
+  const start = source.indexOf('whitelist');
+  const parts = excerptPartsAround(source, start, start + 9);
+  assert.equal(parts.before + parts.match + parts.after, excerptAround(source, start, start + 9));
+});
+
+test('a split excerpt marks whitespace faults, which are invisible otherwise', () => {
+  const source = 'A sentence ending.  Two spaces before this one.';
+  const start = source.indexOf('.  ') + 1;
+  const parts = excerptPartsAround(source, start, start + 2);
+  assert.equal(parts.match, '  ', 'the flagged run of spaces is preserved, not collapsed away');
+});
+
+test('a very long flagged span is cut rather than filling the list', () => {
+  const sentence = `${'word '.repeat(80)}end.`;
+  const parts = excerptPartsAround(sentence, 0, sentence.length);
+  assert.ok(parts.match.length < 200, 'the quote stays short enough to scan');
+  assert.match(parts.match, /…$/, 'the cut is marked');
 });
 
 // ------------------------------------------------------------ document model
@@ -581,6 +612,48 @@ test('spelling and security rules still apply to slide text', () => {
 
 test('legacy .ppt is refused with a useful message', () => {
   assert.throws(() => loadDocument('deck.ppt'), /Save as \.pptx/);
+});
+
+// ------------------------------------------------------------- hand-off output
+
+/** A draft with one of each severity, for the formats handed back to an author. */
+function exportFixture() {
+  const result = check(
+    '# Review\n\nScope is TBC. The color of the whitelist needs work.\n',
+    { dialect: 'en-GB' },
+  );
+  return [result, { source: 'draft.md', format: 'markdown', now: NOW }];
+}
+
+test('the comment format quotes the draft\'s own words, not just the rule', () => {
+  const [result, meta] = exportFixture();
+  const text = formatComments(result, meta);
+  assert.match(text, /Found: "TBC"/, 'the flagged text is quoted so the author can find it');
+  assert.match(text, /^Line \d+ \| ACTION REQUIRED$/m, 'each comment names a location and an ask');
+  assert.match(text, /Fix: /, 'the fix travels with the comment');
+});
+
+test('the summary puts what blocks the deliverable above what does not', () => {
+  const [result, meta] = exportFixture();
+  const text = formatSummaryDocument(result, meta);
+  assert.ok(
+    text.indexOf('MUST FIX BEFORE ISSUE') < text.indexOf('WRONG, OR READS AS WRONG'),
+    'blockers are read first',
+  );
+  assert.match(text, /"TBC"/, 'findings quote the draft');
+  assert.match(text, /Do not issue this draft/);
+});
+
+test('the blocker view answers only whether the draft can go out', () => {
+  const [result, meta] = exportFixture();
+  const stopping = formatBlockersOnly(result, meta);
+  assert.match(stopping, /^DO NOT ISSUE: draft\.md$/m);
+  assert.match(stopping, /"TBC"/);
+  assert.ok(!stopping.includes('color'), 'lesser findings are left out of the go/no-go call');
+
+  const clean = check('# Review\n\nThe colour of the chart is correct.\n');
+  const clear = formatBlockersOnly(clean, meta);
+  assert.match(clear, /^NO BLOCKERS/m);
 });
 
 // ------------------------------------------------------------------- inflate

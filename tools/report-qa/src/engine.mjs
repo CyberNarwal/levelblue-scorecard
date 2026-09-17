@@ -18,7 +18,7 @@ import { rules as slideRules } from './rules/slides.mjs';
 import { rules as structureRules } from './rules/structure.mjs';
 import { rules as terminologyRules } from './rules/terminology.mjs';
 import { rules as whitespaceRules } from './rules/whitespace.mjs';
-import { countWords, excerptAround } from './text.mjs';
+import { countWords, excerptAround, excerptPartsAround } from './text.mjs';
 
 export const ALL_RULES = [
   ...confidentialityRules,
@@ -98,6 +98,9 @@ export function analyse(doc, { config, now = new Date() } = {}) {
   const maskedText = maskSensitiveSpans(doc.text, findings);
   for (const finding of findings) {
     finding.excerpt = finding.documentLevel ? null : excerptAround(maskedText, finding.start, finding.end);
+    finding.excerptParts = finding.documentLevel
+      ? null
+      : excerptPartsAround(maskedText, finding.start, finding.end);
   }
 
   const deduped = dedupe(findings);
