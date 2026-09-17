@@ -218,22 +218,36 @@ function renderFindings(result, doc) {
       const where = finding.documentLevel ? 'Whole file'
         : finding.slide ? `Slide ${finding.slide}${finding.region === 'notes' ? ' notes' : ''}`
           : `Line ${finding.line}`;
+
       const head = text('div', 'finding-head');
       head.append(text('span', 'where', where));
       head.append(text('span', 'msg', finding.message));
+      if (finding.occurrences > 1) {
+        head.append(text('span', 'occurrences', `(${finding.occurrences}x)`));
+      }
       item.append(head);
 
       if (finding.excerpt) {
-        item.append(text('pre', 'excerpt', finding.excerpt));
+        const excerptBox = text('div', 'excerpt-box');
+        excerptBox.append(text('p', 'excerpt-label', 'Issue in document:'));
+        const pre = text('pre', 'excerpt', finding.excerpt);
+        excerptBox.append(pre);
+        item.append(excerptBox);
       }
+
       if (finding.suggestion) {
-        item.append(text('p', 'suggestion', `Suggested: ${finding.suggestion}`));
+        const fixBox = text('div', 'fix-box');
+        fixBox.append(text('p', 'fix-label', 'How to fix:'));
+        fixBox.append(text('p', 'fix-text', finding.suggestion));
+        item.append(fixBox);
       }
+
       if (finding.note) {
         item.append(text('p', 'note', finding.note));
       }
+
       const footer = text('p', 'rule');
-      footer.textContent = finding.rule + (finding.occurrences > 1 ? ` - ${finding.occurrences} occurrences` : '');
+      footer.textContent = finding.rule;
       item.append(footer);
       section.append(item);
     }
