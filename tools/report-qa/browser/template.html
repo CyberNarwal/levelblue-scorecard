@@ -8,41 +8,43 @@
 <style>
 :root {
   color-scheme: light dark;
-  --bg: #f9f7fc;
+  --bg: #ffffff;
   --panel: #ffffff;
-  --ink: #16181d;
-  --muted: #5d6472;
-  --line: #e8e2f0;
-  --accent: #863bff;
-  --accent-light: #47bfff;
+  --ink: #0a1929;
+  --muted: #5a6c7d;
+  --line: #e0e7f1;
+  --accent: #0052ff;
+  --accent-light: #00d9ff;
+  --accent-lime: #ccff00;
   --blocker: #b3261e;
   --blocker-bg: #fdecea;
   --major: #b45309;
   --major-bg: #fdf3e3;
-  --minor: #863bff;
-  --minor-bg: #f3ebff;
-  --nit: #7e14ff;
-  --nit-bg: #ede6ff;
+  --minor: #0052ff;
+  --minor-bg: #f0f7ff;
+  --nit: #5a6c7d;
+  --nit-bg: #f5f7fa;
   --ok: #1a7f52;
   --ok-bg: #e7f5ee;
 }
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #0f0f13;
-    --panel: #1a1620;
-    --ink: #e8eaee;
-    --muted: #9aa2b1;
-    --line: #2d232f;
-    --accent: #a855ff;
-    --accent-light: #63d8ff;
+    --bg: #0a1929;
+    --panel: #112240;
+    --ink: #e8eef7;
+    --muted: #8fa3b8;
+    --line: #1f3a5f;
+    --accent: #4da3ff;
+    --accent-light: #4dd9ff;
+    --accent-lime: #ccff00;
     --blocker: #ff8a80;
     --blocker-bg: #3a1f1d;
     --major: #f0b866;
     --major-bg: #362a17;
-    --minor: #a855ff;
-    --minor-bg: #2a1f3d;
-    --nit: #9d4dd6;
-    --nit-bg: #22152d;
+    --minor: #4da3ff;
+    --minor-bg: #0f2847;
+    --nit: #8fa3b8;
+    --nit-bg: #1a2a3a;
     --ok: #6ddba4;
     --ok-bg: #17301f;
   }
@@ -57,8 +59,9 @@ body {
   padding-inline: 20px;
 }
 .wrap { max-width: 860px; margin: 0 auto; }
-header h1 { font-size: 26px; margin: 0 0 6px; letter-spacing: -0.02em; font-weight: 700; background: linear-gradient(135deg, var(--accent) 0%, var(--accent-light) 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
-header p { margin: 0 0 20px; color: var(--muted); font-size: 14px; }
+header h1 { font-size: 28px; margin: 0 0 8px; letter-spacing: -0.01em; font-weight: 700; color: var(--ink); }
+header h1 .slash { color: var(--accent); font-weight: 700; }
+header p { margin: 0 0 20px; color: var(--muted); font-size: 15px; }
 .offline {
   display: inline-flex; gap: 7px; align-items: center;
   background: var(--ok-bg); color: var(--ok);
@@ -73,10 +76,10 @@ header p { margin: 0 0 20px; color: var(--muted); font-size: 14px; }
   text-align: center;
   cursor: pointer;
   transition: border-color .2s, background .2s, box-shadow .2s;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  box-shadow: 0 1px 3px rgba(10, 25, 41, 0.08);
 }
-.dropzone:hover, .dropzone:focus-visible { border-color: var(--accent); outline: none; box-shadow: 0 2px 8px rgba(134, 59, 255, 0.12); }
-.dropzone.dragging { border-color: var(--accent); background: var(--nit-bg); box-shadow: 0 4px 12px rgba(134, 59, 255, 0.16); }
+.dropzone:hover, .dropzone:focus-visible { border-color: var(--accent); outline: none; box-shadow: 0 4px 12px rgba(0, 82, 255, 0.15); }
+.dropzone.dragging { border-color: var(--accent-light); background: var(--minor-bg); box-shadow: 0 4px 12px rgba(0, 217, 255, 0.16); }
 .dropzone strong { display: block; font-size: 16px; margin-bottom: 5px; }
 .dropzone span { color: var(--muted); font-size: 13.5px; }
 input[type=file] { display: none; }
@@ -89,7 +92,7 @@ input[type=file] { display: none; }
 .settings-toggle:hover { color: var(--accent-light); }
 .settings {
   background: var(--panel); border: 1px solid var(--line); border-radius: 11px;
-  padding: 18px 20px; margin-top: 8px; background: linear-gradient(135deg, rgba(134, 59, 255, 0.02), rgba(71, 191, 255, 0.02));
+  padding: 18px 20px; margin-top: 8px;
 }
 .settings label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 4px; }
 .settings .field { margin-bottom: 14px; }
@@ -97,10 +100,10 @@ input[type=file] { display: none; }
 .settings input, .settings select {
   width: 100%; padding: 9px 11px; font: inherit; font-size: 14px;
   border: 1.5px solid var(--line); border-radius: 8px;
-  background: var(--bg); color: var(--ink); transition: border-color .15s;
+  background: var(--bg); color: var(--ink); transition: border-color .15s, box-shadow .15s;
 }
 .settings input:focus, .settings select:focus {
-  outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(134, 59, 255, 0.08);
+  outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(0, 82, 255, 0.1);
 }
 .settings .hint { color: var(--muted); font-size: 12.5px; margin: 5px 0 0; }
 .error {
@@ -134,7 +137,7 @@ input[type=file] { display: none; }
   border: 1.5px solid var(--line); background: var(--panel); color: var(--ink);
   border-radius: 8px; cursor: pointer; transition: all .15s;
 }
-.actions button:hover { border-color: var(--accent); color: var(--accent); background: rgba(134, 59, 255, 0.04); }
+.actions button:hover { border-color: var(--accent); color: var(--accent); background: rgba(0, 82, 255, 0.04); }
 .group { margin-top: 26px; }
 .group h2 { font-size: 15px; margin: 0 0 2px; display: flex; align-items: center; gap: 8px; }
 .dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; flex: none; }
@@ -148,7 +151,7 @@ input[type=file] { display: none; }
   border-radius: 9px; padding: 14px 16px; margin-bottom: 10px;
   transition: all .15s;
 }
-.finding:hover { border-color: var(--accent); box-shadow: 0 1px 4px rgba(134, 59, 255, 0.08); }
+.finding:hover { border-color: var(--accent); box-shadow: 0 2px 6px rgba(0, 82, 255, 0.1); }
 .finding-head { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
 .where {
   font-variant-numeric: tabular-nums; font-size: 12.5px; font-weight: 600;
@@ -176,7 +179,7 @@ footer p { margin: 0 0 8px; }
 <body>
 <div class="wrap">
   <header>
-    <h1>LevelBlue Report QA</h1>
+    <h1>LevelBlue<span class="slash">/</span> Report QA</h1>
     <p>Quality assurance for cyber advisory reports and presentations</p>
     <div class="offline">🔒 Runs entirely on this computer - nothing is uploaded</div>
   </header>
