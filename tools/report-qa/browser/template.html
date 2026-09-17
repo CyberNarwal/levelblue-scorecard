@@ -59,9 +59,8 @@ body {
   padding-inline: 20px;
 }
 .wrap { max-width: 860px; margin: 0 auto; }
-header { margin-bottom: 36px; }
-header .logo { width: 180px; margin-bottom: 20px; }
-header .logo svg { width: 100%; height: auto; display: block; }
+header { margin-bottom: 32px; }
+header .brand { font-size: 24px; font-weight: 700; color: var(--accent); margin-bottom: 12px; letter-spacing: -0.01em; }
 header h1 { font-size: 28px; margin: 0 0 6px; letter-spacing: -0.01em; font-weight: 700; color: var(--ink); }
 header p { margin: 0; color: var(--muted); font-size: 14px; }
 .offline {
@@ -181,23 +180,7 @@ footer p { margin: 0 0 8px; }
 <body>
 <div class="wrap">
   <header>
-    <div class="logo">
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 280 160">
-        <!-- Geometric bars -->
-        <g transform="translate(100, 10)">
-          <!-- Bright blue bar -->
-          <polygon points="0,30 25,30 35,65 10,65" fill="#0052ff"/>
-          <!-- Cyan bar -->
-          <polygon points="20,15 45,15 60,65 35,65" fill="#00d9ff"/>
-          <!-- Yellow-green bar -->
-          <polygon points="40,0 65,0 80,65 55,65" fill="#ccff00"/>
-        </g>
-        <!-- Text: LevelBlue with slash in blue -->
-        <text x="10" y="130" font-size="42" font-weight="700" fill="#0a1929" font-family="system-ui, -apple-system, sans-serif">Level</text>
-        <text x="165" y="130" font-size="42" font-weight="700" fill="#0052ff" font-family="system-ui, -apple-system, sans-serif">/</text>
-        <text x="185" y="130" font-size="42" font-weight="700" fill="#0a1929" font-family="system-ui, -apple-system, sans-serif">ue</text>
-      </svg>
-    </div>
+    <div class="brand">LevelBlue</div>
     <h1>Report QA</h1>
     <p>Quality assurance for cyber advisory reports and presentations</p>
   </header>
