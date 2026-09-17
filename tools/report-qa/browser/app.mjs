@@ -13,7 +13,7 @@ import { documentFromParagraphs, parseMarkdown } from '../src/document.mjs';
 import { analyse } from '../src/engine.mjs';
 import { extractDocx } from '../src/extract/docx.mjs';
 import { extractPptx } from '../src/extract/pptx.mjs';
-import { formatMarkdown } from '../src/report.mjs';
+import { formatMarkdown, formatComments, formatSummaryDocument, formatBlockersOnly } from '../src/report.mjs';
 
 /** House defaults baked in at build time from report-qa.config.json. */
 const BUILT_IN_CONFIG = typeof __HOUSE_CONFIG__ === 'undefined' ? {} : __HOUSE_CONFIG__;
@@ -290,6 +290,63 @@ function copyReport() {
   }
 }
 
+function exportComments() {
+  if (!lastResult) return;
+  const text = formatComments(lastResult.result, {
+    source: lastResult.doc.source,
+    format: lastResult.doc.format,
+    now: new Date(),
+  });
+  const button = el('export-comments');
+  const done = (label) => {
+    button.textContent = label;
+    setTimeout(() => { button.textContent = 'Copy for comments'; }, 1800);
+  };
+  if (navigator.clipboard?.writeText) {
+    navigator.clipboard.writeText(text).then(() => done('Copied'), () => fallbackCopy(text, done));
+  } else {
+    fallbackCopy(text, done);
+  }
+}
+
+function exportSummary() {
+  if (!lastResult) return;
+  const text = formatSummaryDocument(lastResult.result, {
+    source: lastResult.doc.source,
+    format: lastResult.doc.format,
+    now: new Date(),
+  });
+  const button = el('export-summary');
+  const done = (label) => {
+    button.textContent = label;
+    setTimeout(() => { button.textContent = 'Copy summary'; }, 1800);
+  };
+  if (navigator.clipboard?.writeText) {
+    navigator.clipboard.writeText(text).then(() => done('Copied'), () => fallbackCopy(text, done));
+  } else {
+    fallbackCopy(text, done);
+  }
+}
+
+function exportBlockersOnly() {
+  if (!lastResult) return;
+  const text = formatBlockersOnly(lastResult.result, {
+    source: lastResult.doc.source,
+    format: lastResult.doc.format,
+    now: new Date(),
+  });
+  const button = el('export-blockers');
+  const done = (label) => {
+    button.textContent = label;
+    setTimeout(() => { button.textContent = 'Copy blockers'; }, 1800);
+  };
+  if (navigator.clipboard?.writeText) {
+    navigator.clipboard.writeText(text).then(() => done('Copied'), () => fallbackCopy(text, done));
+  } else {
+    fallbackCopy(text, done);
+  }
+}
+
 /** Clipboard API is unavailable on some file:// origins; fall back to a selection. */
 function fallbackCopy(value, done) {
   const area = document.createElement('textarea');
@@ -349,6 +406,9 @@ function init() {
   window.addEventListener('drop', (event) => event.preventDefault());
 
   el('copy').addEventListener('click', copyReport);
+  el('export-comments').addEventListener('click', exportComments);
+  el('export-summary').addEventListener('click', exportSummary);
+  el('export-blockers').addEventListener('click', exportBlockersOnly);
   el('settings-toggle').addEventListener('click', () => {
     const panel = el('settings');
     panel.hidden = !panel.hidden;

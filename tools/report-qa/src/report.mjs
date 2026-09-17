@@ -179,3 +179,152 @@ function describeDialect(stats) {
   const { british, american } = stats.dialectEvidence;
   return `${name} (${british} British / ${american} American spellings)`;
 }
+
+/**
+ * Comment export format: copy-pasteable text for adding to document/slide comments.
+ * Format: "Slide/Line X: [Issue] - [Action required/Optional]"
+ */
+export function formatComments(result, meta) {
+  const { findings } = result;
+  if (!findings.length) return '(No findings to report)';
+
+  const lines = [];
+  for (const finding of findings) {
+    const location = locationOf(finding, true);
+    const severity = finding.severity === 'blocker' ? 'ACTION REQUIRED'
+      : finding.severity === 'major' ? 'CHANGE REQUIRED'
+        : finding.severity === 'minor' ? 'Please fix'
+          : 'Optional improvement';
+
+    lines.push(`${location}: ${finding.message}`);
+    lines.push(`Status: ${severity}`);
+    if (finding.suggestion) lines.push(`Action: ${finding.suggestion}`);
+    if (finding.note) lines.push(`Note: ${finding.note}`);
+    lines.push('');
+  }
+  return lines.join('\n');
+}
+
+/**
+ * Summary document: clean, structured report with blockers first.
+ * Suitable for emailing to consultant with findings grouped by criticality.
+ */
+export function formatSummaryDocument(result, meta) {
+  const { stats, findings } = result;
+  const out = [];
+
+  out.push(`QA Summary: ${meta.source}`);
+  out.push('='.repeat(60));
+  out.push('');
+  out.push(`Checked: ${meta.now.toISOString().slice(0, 10)}`);
+  out.push(`Dialect: ${describeDialect(stats)}`);
+  out.push('');
+
+  out.push('OVERVIEW');
+  out.push('-'.repeat(60));
+  out.push(`Total findings: ${stats.total}`);
+  if (stats.bySeverity.blocker) out.push(`  • Blockers (must fix): ${stats.bySeverity.blocker}`);
+  if (stats.bySeverity.major) out.push(`  • Major issues (change required): ${stats.bySeverity.major}`);
+  if (stats.bySeverity.minor) out.push(`  • Minor issues (inconsistent): ${stats.bySeverity.minor}`);
+  if (stats.bySeverity.nit) out.push(`  • Nits (optional): ${stats.bySeverity.nit}`);
+  out.push('');
+
+  if (!findings.length) {
+    out.push('No findings. This document is mechanically sound.');
+    return out.join('\n');
+  }
+
+  // Blockers first - these must be fixed
+  const blockerGroup = findings.filter((f) => f.severity === 'blocker');
+  if (blockerGroup.length) {
+    out.push('CRITICAL: DO NOT SEND - Fix these first');
+    out.push('='.repeat(60));
+    for (const finding of blockerGroup) {
+      const location = locationOf(finding, true);
+      out.push(`• ${location}`);
+      out.push(`  Issue: ${finding.message}`);
+      if (finding.suggestion) out.push(`  Fix: ${finding.suggestion}`);
+      if (finding.note) out.push(`  Note: ${finding.note}`);
+      out.push('');
+    }
+  }
+
+  // Major issues
+  const majorGroup = findings.filter((f) => f.severity === 'major');
+  if (majorGroup.length) {
+    out.push('MAJOR ISSUES: Needs correction');
+    out.push('='.repeat(60));
+    for (const finding of majorGroup) {
+      const location = locationOf(finding, true);
+      out.push(`• ${location}`);
+      out.push(`  Issue: ${finding.message}`);
+      if (finding.suggestion) out.push(`  Fix: ${finding.suggestion}`);
+      if (finding.note) out.push(`  Note: ${finding.note}`);
+      out.push('');
+    }
+  }
+
+  // Minor issues
+  const minorGroup = findings.filter((f) => f.severity === 'minor');
+  if (minorGroup.length) {
+    out.push('MINOR ISSUES: Consistency and polish');
+    out.push('='.repeat(60));
+    for (const finding of minorGroup) {
+      const location = locationOf(finding, true);
+      out.push(`• ${location}`);
+      out.push(`  Issue: ${finding.message}`);
+      if (finding.suggestion) out.push(`  Fix: ${finding.suggestion}`);
+      out.push('');
+    }
+  }
+
+  // Nits
+  const nitGroup = findings.filter((f) => f.severity === 'nit');
+  if (nitGroup.length) {
+    out.push('OPTIONAL: Nice-to-haves');
+    out.push('='.repeat(60));
+    for (const finding of nitGroup) {
+      const location = locationOf(finding, true);
+      out.push(`• ${location}: ${finding.message}`);
+      if (finding.suggestion) out.push(`  Suggestion: ${finding.suggestion}`);
+      out.push('');
+    }
+  }
+
+  return out.join('\n');
+}
+
+/**
+ * Blocker-only filter: shows only critical findings that must not reach client.
+ * Used for quick decision: can we send this, or not?
+ */
+export function formatBlockersOnly(result, meta) {
+  const { stats, findings } = result;
+  const blockers = findings.filter((f) => f.severity === 'blocker');
+
+  if (!blockers.length) {
+    return `✓ CLEAR TO SEND\n\nNo blockers found. This document may be issued to the client.\n\n${stats.total} minor${stats.total === 1 ? '' : 's'} to review if you have time.`;
+  }
+
+  const out = [];
+  out.push('✗ DO NOT SEND');
+  out.push('');
+  out.push(`${blockers.length} blocker${blockers.length === 1 ? '' : 's'} found. These must be fixed before sending to client:`);
+  out.push('');
+
+  for (const finding of blockers) {
+    const location = locationOf(finding, true);
+    out.push(`▸ ${location}`);
+    out.push(`  ${finding.message}`);
+    if (finding.suggestion) out.push(`  → ${finding.suggestion}`);
+    out.push('');
+  }
+
+  const others = stats.total - blockers.length;
+  if (others) {
+    out.push(`---`);
+    out.push(`Also ${others} non-critical issue${others === 1 ? '' : 's'} to review.`);
+  }
+
+  return out.join('\n');
+}

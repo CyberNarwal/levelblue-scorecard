@@ -132,7 +132,10 @@ input[type=file] { display: none; }
 .chip.major { background: var(--major-bg); color: var(--major); }
 .chip.minor { background: var(--minor-bg); color: var(--minor); }
 .chip.nit { background: var(--nit-bg); color: var(--nit); }
-.actions { margin: 16px 0 6px; }
+.actions {
+  display: flex; flex-wrap: wrap; gap: 8px;
+  margin: 16px 0 6px;
+}
 .actions button {
   font: inherit; font-size: 13.5px; font-weight: 500; padding: 8px 16px;
   border: 1.5px solid var(--line); background: var(--panel); color: var(--ink);
@@ -228,7 +231,12 @@ footer p { margin: 0 0 8px; }
     <div class="verdict" id="verdict"></div>
     <p class="meta" id="meta"></p>
     <div class="counts" id="counts"></div>
-    <div class="actions"><button id="copy">Copy report</button></div>
+    <div class="actions">
+      <button id="export-blockers" title="Quick check: can we send this? Shows only blockers.">Blockers only</button>
+      <button id="export-comments" title="Copy findings in comment format (location: issue, action: fix)">Copy for comments</button>
+      <button id="export-summary" title="Structured summary with blockers first, for emailing to consultant">Summary document</button>
+      <button id="copy" title="Markdown QA report for pasting into review tools">Copy report</button>
+    </div>
     <div id="findings"></div>
   </div>
 
