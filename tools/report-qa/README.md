@@ -25,6 +25,36 @@ The build fails rather than emitting a page that contains a `fetch`, an external
 script or stylesheet, or a WebSocket - the offline guarantee is enforced, not
 just intended.
 
+## What the levels mean
+
+Every finding carries one of four levels, and the page explains them behind
+"What do these mean?" next to the filter:
+
+| Level | Means |
+|---|---|
+| Blocker | Must not reach a client at all: a credential, another client's name, an unresolved comment, a tracked change. Fix before the draft leaves the building. |
+| Major | Wrong, or reads as wrong to the client: a missing section, a cross-reference that goes nowhere, a CVSS score that contradicts its own label. |
+| Minor | The draft disagrees with itself on spelling, capitalisation, dashes or spacing. Each one is small; together they are what makes a report look unchecked. |
+| Nit | A preference rather than a fault - wordiness, hedging, passive voice. Fix if you have the time. |
+
+Separately, each check belongs to a family - Confidentiality, Release readiness,
+Structure, Terminology, Dialect, Slides, Security accuracy and so on - named
+under the group it raised.
+
+## Engagement settings
+
+Four values describing the engagement rather than the file, remembered in the
+browser and applied to every draft until changed. The page opens them on a first
+visit and states on the button what they are currently doing, because three
+checks cannot run without them and an empty field silently narrows the QA pass:
+
+| Setting | Without it |
+|---|---|
+| English | The dialect is inferred from the draft, which is unreliable on a short deck |
+| This client's name | Nothing notices that the report never names the client - the sign of a template field nobody filled in |
+| Other clients' names | Nothing notices a previous client's name surviving in a copied deck, including in the slide masters where reading the slides will not show it |
+| Required marking | The classification marking is not checked |
+
 ## Reading the findings
 
 Every finding quotes the draft's own words with the flagged run highlighted, so
@@ -100,22 +130,16 @@ npm run qa:test                           # run the test suite
 | `.pdf` | **Refused on purpose.** Text extraction from PDF is unreliable enough that QA on the result is worse than no QA. Check the source document |
 | `.doc`, `.ppt` | Refused. Save as the modern format first |
 
-## Severities
+## Exit codes
 
-| | Meaning |
-|---|---|
-| `blocker` | Must not reach a client. Secrets, another client's name, placeholder text, contradictory statistics, a CVSS score that disagrees with its severity label, unresolved comments or tracked changes |
-| `major` | Wrong, or reads as wrong. Dialect inconsistency, malformed identifiers, missing space after punctuation, unresolved cross-references |
-| `minor` | Inconsistent. Serial commas, dash style, heading case, unit spacing |
-| `nit` | Preference. Wordiness, hedging, trailing whitespace |
-
+Levels are described under [What the levels mean](#what-the-levels-mean).
 `--fail-on` (default `major`) sets the exit code, so this drops into a
 pre-commit hook or CI unchanged. Exit 0 clean, 1 findings at or above the
 threshold, 2 could not run.
 
 ## What it checks
 
-103 rules in ten families. `npm run qa:rules` prints the current list.
+105 rules in eighteen families. `npm run qa:rules` prints the current list.
 
 - **Spacing** - double spaces, trailing whitespace, stacked blank lines (and
   stacked empty paragraphs in Word), invisible characters pasted in from Word or

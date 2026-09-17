@@ -97,12 +97,25 @@ header p { margin: 0; color: var(--muted); font-size: 14px; }
 .dropzone span { color: var(--muted); font-size: 13.5px; }
 input[type=file] { display: none; }
 .status { text-align: center; color: var(--muted); font-size: 13.5px; min-height: 20px; margin-top: 10px; }
+/* A bare link here was missed by everyone, and the checks that depend on these
+   values then quietly never ran. It reads as an invitation instead. */
 .settings-toggle {
-  background: none; border: 0; color: var(--accent); cursor: pointer;
-  font: inherit; font-size: 13.5px; font-weight: 600; padding: 8px 0; margin-top: 6px;
-  transition: color .15s;
+  display: block; width: 100%; text-align: left; cursor: pointer;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+  color: var(--ink); font: inherit; padding: 11px 14px; margin-top: 12px;
+  transition: border-color .15s;
 }
-.settings-toggle:hover { color: var(--accent-light); }
+.settings-toggle:hover, .settings-toggle:focus-visible { border-color: var(--accent); outline: none; }
+.st-main { display: flex; align-items: center; gap: 9px; }
+.st-name { font-size: 13.5px; font-weight: 600; color: var(--accent); }
+.st-state {
+  font-size: 11px; font-weight: 700; border-radius: 999px; padding: 2px 8px;
+  background: var(--major-bg); color: var(--major); text-transform: uppercase; letter-spacing: .04em;
+}
+.st-state.set { background: var(--ok-bg); color: var(--ok); text-transform: none; letter-spacing: 0; font-weight: 600; }
+.st-why { display: block; margin-top: 3px; font-size: 12.5px; color: var(--muted); }
+.has-result .st-why { display: none; }
+.settings-intro { margin: 0 0 14px; font-size: 12.5px; color: var(--muted); }
 .settings {
   background: var(--panel); border: 1px solid var(--line); border-radius: 11px;
   padding: 18px 20px; margin-top: 8px;
@@ -161,6 +174,29 @@ input[type=file] { display: none; }
 }
 .actions button:hover, .ghost:hover { border-color: var(--accent); color: var(--accent); }
 .ghost { margin-left: auto; border-color: transparent; color: var(--muted); }
+.legend { flex: 1 1 100%; font-size: 12.5px; }
+.legend > summary {
+  display: inline-block; cursor: pointer; color: var(--accent);
+  padding: 2px 0; list-style: none;
+}
+.legend > summary::-webkit-details-marker { display: none; }
+.legend > summary::before { content: '? '; font-weight: 700; }
+.legend dl {
+  display: grid; grid-template-columns: max-content 1fr; gap: 5px 12px;
+  margin: 8px 0 0; padding: 12px 14px;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+}
+.legend dt { font-weight: 700; }
+.legend dt.blocker { color: var(--blocker); }
+.legend dt.major { color: var(--major); }
+.legend dt.minor { color: var(--minor); }
+.legend dt.nit { color: var(--nit); }
+.legend dd { margin: 0; color: var(--muted); }
+.legend > p { margin: 8px 0 0; color: var(--muted); }
+@media (max-width: 560px) {
+  .legend dl { grid-template-columns: 1fr; gap: 2px; }
+  .legend dd { margin-bottom: 7px; }
+}
 
 /* --- severity sections --------------------------------------------------- */
 .sev { margin-top: 18px; }
@@ -255,7 +291,9 @@ mark {
   .act { opacity: 1; }
 }
 .note { margin: 4px 0 0 75px; font-size: 12px; color: var(--muted); }
-.rule { margin: 2px 0 0 75px; font: 10.5px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; color: var(--muted); opacity: .6; }
+.rule { margin: 2px 0 0 75px; font-size: 10.5px; color: var(--muted); opacity: .75; }
+.rule .rule-id { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; opacity: .8; }
+.rule-family { font-weight: 600; letter-spacing: .03em; text-transform: uppercase; }
 @media (max-width: 560px) {
   .where { min-width: 0; text-align: left; }
   .note, .rule { margin-left: 0; }
@@ -289,9 +327,16 @@ footer p { margin: 0 0 8px; }
   <p class="status" id="status"></p>
 
   <button class="settings-toggle" id="settings-toggle" aria-expanded="false" aria-controls="settings">
-    Engagement settings
+    <span class="st-main">
+      <span class="st-name">Engagement settings</span>
+      <span class="st-state" id="settings-state">Not set</span>
+    </span>
+    <span class="st-why" id="settings-why">Tell the tool who this report is for and it can catch a name
+      left behind from the template it was copied from. Worth 30 seconds before the first check.</span>
   </button>
   <div class="settings" id="settings" hidden>
+    <p class="settings-intro">These describe the engagement, not the file. They are remembered on this
+      computer and apply to every draft you check until you change them.</p>
     <div class="field">
       <label for="dialect">English</label>
       <select id="dialect">
@@ -326,6 +371,25 @@ footer p { margin: 0 0 8px; }
     <div class="bar">
       <span class="bar-label">Show</span>
       <div class="counts" id="counts"></div>
+      <details class="legend">
+        <summary>What do these mean?</summary>
+        <dl>
+          <dt class="blocker">Blocker</dt>
+          <dd>Must not reach a client at all: a credential, another client's name,
+            an unresolved comment, a tracked change. Fix before the draft leaves the building.</dd>
+          <dt class="major">Major</dt>
+          <dd>Wrong, or reads as wrong to the client: a missing section, a cross-reference
+            that goes nowhere, a CVSS score that contradicts its own label.</dd>
+          <dt class="minor">Minor</dt>
+          <dd>The draft disagrees with itself on spelling, capitalisation, dashes or spacing.
+            Each one is small; together they are what makes a report look unchecked.</dd>
+          <dt class="nit">Nit</dt>
+          <dd>A preference rather than a fault - wordiness, hedging, passive voice.
+            Fix if you have the time, ignore it if you do not.</dd>
+        </dl>
+        <p>Each finding also names the family of check it came from - Confidentiality,
+          Structure, Terminology and so on - under the group it belongs to.</p>
+      </details>
     </div>
 
     <div class="bar">
