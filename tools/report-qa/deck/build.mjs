@@ -5,6 +5,7 @@
  * handbook's do: a deck that disagrees with the tool undermines the tool.
  */
 
+import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -103,6 +104,36 @@ function pill(slide, label, colour, bg, x, y, w = 1.15) {
     x, y, w, h: 0.32,
     fontFace: BODY, fontSize: 10.5, bold: true, color: colour, charSpacing: 0.6,
     align: 'center', valign: 'middle', isTextBox: true, margin: 0,
+  });
+}
+
+const shotMeta = Object.fromEntries(
+  JSON.parse(readFileSync(join(here, 'shots', 'sizes.json'), 'utf8')).map((m) => [m.name, m]),
+);
+
+/**
+ * Place a screenshot of the real tool, sized from its own pixel dimensions so
+ * the interface is never stretched into something the team would not recognise.
+ * Returns the height used, so the caller can lay out beneath it.
+ */
+function picture(slide, name, x, y, w) {
+  const meta = shotMeta[name];
+  if (!meta) throw new Error(`no screenshot captured for "${name}" - run capture.mjs`);
+  const data = readFileSync(join(here, 'shots', `${name}.png`)).toString('base64');
+  const h = (w * meta.h) / meta.w;
+  slide.addShape(pres.ShapeType.roundRect, {
+    x: x - 0.06, y: y - 0.06, w: w + 0.12, h: h + 0.12,
+    fill: { color: WHITE }, line: { color: RULE, width: 1 }, rectRadius: 0.06,
+  });
+  slide.addImage({ data: `image/png;base64,${data}`, x, y, w, h });
+  return h;
+}
+
+function caption(slide, text, x, y, w) {
+  slide.addText(text, {
+    x, y, w, h: 0.26,
+    fontFace: BODY, fontSize: 11, color: '8A9AAC', italic: true,
+    isTextBox: true, margin: 0, valign: 'middle',
   });
 }
 
@@ -268,15 +299,18 @@ function card(slide, x, y, w, h, fill = WHITE) {
     x = M;
     row.forEach((cell, i) => {
       s.addText(cell, {
-        x, y, w: colW[i] - 0.3, h: 1.0,
+        x, y, w: colW[i] - 0.3, h: 0.74,
         fontFace: BODY, fontSize: 13.5,
         bold: i === 0, color: i === 0 ? INK : MUTED,
         isTextBox: true, margin: 0, lineSpacingMultiple: 1.14,
       });
       x += colW[i];
     });
-    y += 1.12;
+    y += 0.80;
   }
+
+  const h4 = picture(s, 'settings', M, 5.88, 8.6);
+  caption(s, 'The button carries its own state.', M + 8.95, 5.88 + h4 / 2 - 0.13, 3.1);
   s.addNotes('Real example: filling these in on our sample deck took it from 27 findings to 29, and the two it added were a missing classification marking and a previous client name sitting in the slide master – invisible to anyone reading the slides.');
 }
 
@@ -306,15 +340,18 @@ function card(slide, x, y, w, h, fill = WHITE) {
       align: 'center', valign: 'middle', isTextBox: true, margin: 0,
     });
     s.addText(head, {
-      x: M + 0.78, y: y - 0.04, w: 5.5, h: 0.32,
+      x: M + 0.78, y: y - 0.04, w: 5.3, h: 0.32,
       fontFace: HEAD, fontSize: 18, bold: true, color: INK, isTextBox: true, margin: 0, valign: 'middle',
     });
     s.addText(sub, {
-      x: M + 0.78, y: y + 0.31, w: CW - 0.78, h: 0.32,
+      x: M + 0.78, y: y + 0.31, w: 5.9, h: 0.32,
       fontFace: BODY, fontSize: 13.5, color: MUTED, isTextBox: true, margin: 0, valign: 'middle',
     });
     y += 0.94;
   });
+
+  const h5 = picture(s, 'verdict', M + 7.1, 2.15, 4.99);
+  caption(s, 'Step 2, on a real deck.', M + 7.1, 2.15 + h5 + 0.16, 4.99);
   s.addNotes('Step five is the point of the whole thing. The tool exists to clear the mechanical noise so that read is spent on argument and accuracy.');
 }
 
@@ -361,31 +398,8 @@ function card(slide, x, y, w, h, fill = WHITE) {
   const s = pres.addSlide({ masterName: 'CONTENT' });
   title(s, 'Every finding quotes your own words', 'So you can match it against the slide in front of you, instead of decoding a rule name.');
 
-  card(s, M, 1.9, CW, 2.05, PANEL);
-  s.addText('Slide 2', {
-    x: M + 0.36, y: 2.2, w: 0.85, h: 0.3,
-    fontFace: BODY, fontSize: 12, bold: true, color: MUTED, align: 'right', isTextBox: true, margin: 0, valign: 'middle',
-  });
-  s.addText([
-    { text: '…escalation paths are undocumented. The ', options: { color: MUTED } },
-    { text: 'organization', options: { highlight: MARK, color: MARK_INK, bold: true } },
-    { text: ' should prioritise…', options: { color: MUTED } },
-  ], {
-    x: M + 1.4, y: 2.2, w: 7.6, h: 0.32,
-    fontFace: 'Courier New', fontSize: 12, isTextBox: true, margin: 0, valign: 'middle',
-  });
-  s.addText('→  organisation', {
-    x: M + 9.2, y: 2.2, w: 2.5, h: 0.32,
-    fontFace: BODY, fontSize: 13.5, bold: true, color: GREEN, isTextBox: true, margin: 0, valign: 'middle',
-  });
-  s.addText('"organization" is American spelling; this report is British.', {
-    x: M + 1.4, y: 2.62, w: 9, h: 0.3,
-    fontFace: BODY, fontSize: 12.5, color: MUTED, isTextBox: true, margin: 0, valign: 'middle',
-  });
-  s.addText('DIALECT · dialect/mixed-spelling', {
-    x: M + 1.4, y: 2.94, w: 9, h: 0.28,
-    fontFace: BODY, fontSize: 10.5, color: '93A3B5', isTextBox: true, margin: 0, valign: 'middle',
-  });
+  const shotH = picture(s, 'finding', M, 1.9, CW);
+  caption(s, 'The tool, on our sample deck.', M, 1.9 + shotH + 0.16, CW);
 
   const notes = [
     ['The exact words', 'Highlighted inside their own sentence – not a line number to go hunting with.'],
@@ -396,7 +410,7 @@ function card(slide, x, y, w, h, fill = WHITE) {
   const colW = (CW - 0.4) / 2;
   notes.forEach(([head, text], i) => {
     const x = M + (i % 2) * (colW + 0.4);
-    const y = 4.3 + Math.floor(i / 2) * 1.2;
+    const y = 4.45 + Math.floor(i / 2) * 1.2;
     s.addText(head, {
       x, y, w: colW, h: 0.3,
       fontFace: HEAD, fontSize: 15.5, bold: true, color: INK, isTextBox: true, margin: 0,
@@ -434,28 +448,9 @@ function card(slide, x, y, w, h, fill = WHITE) {
     });
   });
 
-  card(s, M, 4.75, CW, 1.5, PANEL);
-  s.addText('Internal remarks in the speaker notes', {
-    x: M + 0.42, y: 5.05, w: 5.2, h: 0.34,
-    fontFace: BODY, fontSize: 15, bold: true, color: INK, isTextBox: true, margin: 0, valign: 'middle',
-  });
-  pill(s, '4', MUTED, 'E4EAF2', M + 5.72, 5.07, 0.42);
-  s.addText([
-    { text: "Don't mention", options: { highlight: MARK, color: MARK_INK } },
-    { text: ',  ', options: { color: MUTED } },
-    { text: 'day rate', options: { highlight: MARK, color: MARK_INK } },
-    { text: ',  ', options: { color: MUTED } },
-    { text: 'push them for more', options: { highlight: MARK, color: MARK_INK } },
-    { text: ',  ', options: { color: MUTED } },
-    { text: 'guesstimate', options: { highlight: MARK, color: MARK_INK } },
-  ], {
-    x: M + 6.35, y: 5.05, w: 5.4, h: 0.34,
-    fontFace: BODY, fontSize: 12.5, isTextBox: true, margin: 0, valign: 'middle',
-  });
-  s.addText('One collapsed row, four places. You can judge that without opening it.', {
-    x: M + 0.42, y: 5.5, w: CW - 0.84, h: 0.3,
-    fontFace: BODY, fontSize: 12.5, color: MUTED, italic: true, isTextBox: true, margin: 0, valign: 'middle',
-  });
+  const h8 = picture(s, 'grouped', M, 4.95, CW);
+  caption(s, 'One row, six places. Often enough to judge without opening it.', M, 4.95 + h8 + 0.18, CW);
+
   s.addNotes('The preview on a collapsed group is the useful part – the flagged words themselves, so you can often decide without expanding.');
 }
 
@@ -501,9 +496,11 @@ function card(slide, x, y, w, h, fill = WHITE) {
     text: t,
     options: { bullet: true, breakLine: i !== facts.length - 1 },
   })), {
-    x: M + 0.1, y: 4.3, w: CW - 0.2, h: 1.9,
-    fontFace: BODY, fontSize: 14, color: MUTED, isTextBox: true, margin: 0, paraSpaceAfter: 7,
+    x: M + 0.1, y: 4.28, w: CW - 0.2, h: 1.27,
+    fontFace: BODY, fontSize: 13.5, color: MUTED, isTextBox: true, margin: 0, paraSpaceAfter: 5,
   });
+
+  picture(s, 'ignored', M + 0.34, 5.66, 11.4);
   s.addNotes('The point is that exclusions are visible. A QA pass whose exclusions are invisible is one nobody can audit – including us, six months later.');
 }
 
@@ -534,15 +531,16 @@ function card(slide, x, y, w, h, fill = WHITE) {
     });
   });
 
-  card(s, M, 5.05, CW, 1.35, PANEL);
+  const h10 = picture(s, 'handoff', M + 0.74, 4.90, 10.6);
+  card(s, M, 4.90 + h10 + 0.2, CW, 0.7, PANEL);
   s.addText([
     { text: 'All four quote the flagged text. ', options: { bold: true, color: INK } },
     { text: '"Line 42 has an American spelling" sends the author hunting. ', options: { color: MUTED } },
     { text: 'Found: "color"', options: { highlight: MARK, color: MARK_INK } },
     { text: ' does not.', options: { color: MUTED } },
   ], {
-    x: M + 0.36, y: 5.05, w: CW - 0.72, h: 1.35,
-    fontFace: BODY, fontSize: 14.5, isTextBox: true, margin: 0, valign: 'middle', lineSpacingMultiple: 1.2,
+    x: M + 0.36, y: 4.90 + h10 + 0.2, w: CW - 0.72, h: 0.7,
+    fontFace: BODY, fontSize: 13.5, isTextBox: true, margin: 0, valign: 'middle',
   });
   s.addNotes('Anything you set aside is excluded from all four, and each one states how many were left out.');
 }

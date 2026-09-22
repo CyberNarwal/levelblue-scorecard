@@ -165,6 +165,13 @@ team. Like the handbook it is generated, so its check counts cannot drift:
 npm run qa:deck                           # writes the .pptx in the project root
 ```
 
+Six of its slides carry screenshots of the tool itself rather than drawings of
+it, captured by driving the real page with Playwright. `npm run qa:deck`
+rebuilds the tool, retakes every screenshot from it, and then builds the deck,
+so a slide cannot show an interface that no longer exists. The draft used is the
+repo's own fixture - a fictional "Northwind Trading" - so no client text is ever
+baked into a deck that gets passed around.
+
 It is built to be checked by the thing it describes. Running the tool on it took
 it from 98 findings to 71; what is left is intentional - the speaker notes, the
 deliberate "organization" and "color" examples, and one slide that quotes

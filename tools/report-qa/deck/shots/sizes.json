@@ -1,0 +1,32 @@
+[
+  {
+    "name": "settings",
+    "w": 880,
+    "h": 87
+  },
+  {
+    "name": "verdict",
+    "w": 880,
+    "h": 193
+  },
+  {
+    "name": "finding",
+    "w": 872,
+    "h": 131
+  },
+  {
+    "name": "grouped",
+    "w": 872,
+    "h": 52
+  },
+  {
+    "name": "handoff",
+    "w": 880,
+    "h": 96
+  },
+  {
+    "name": "ignored",
+    "w": 872,
+    "h": 89
+  }
+]

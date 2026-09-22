@@ -13,7 +13,7 @@
     "qa:rules": "node tools/report-qa/cli.mjs --list-rules",
     "qa:build": "node tools/report-qa/build-standalone.mjs",
     "qa:manual": "node tools/report-qa/build-manual.mjs",
-    "qa:deck": "node tools/report-qa/deck/build.mjs",
+    "qa:deck": "npm run qa:build && node tools/report-qa/deck/capture.mjs && node tools/report-qa/deck/build.mjs",
     "deploy": "gh-pages -d dist"
   },
   "dependencies": {
