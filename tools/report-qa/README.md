@@ -156,6 +156,27 @@ the tests check more than the comments: every relationship target resolves,
 every part is declared in `[Content_Types].xml`, and the deck still reads back
 with its slides intact.
 
+## Where the framework data comes from
+
+The canonical names, current versions and control-identifier shapes are taken
+from each framework's own publisher - NIST, ISO, PCI SSC, CIS, NCSC, EUR-Lex -
+and each rule's note says which one, so a disputed finding can be checked
+against the source.
+
+They are deliberately **not** taken from the Secure Controls Framework or any
+other third-party compilation. The SCF is the best single map of the landscape
+and is worth reading to decide which frameworks to cover, but it is published
+under CC BY-ND 4.0: the SCF Council states the licence forbids distributing
+derivative content, and says so explicitly for content produced from it by AI.
+Reshaping their catalogue into rule data and shipping it inside `report-qa.html`
+would need a commercial Licensed Content Provider agreement. Taking the scope
+from it and the facts from the publishers avoids that, and sidesteps the UK/EU
+database right that can attach to a compilation even where the entries
+themselves are free.
+
+If a version in `RETIRED_VERSIONS` goes stale, correct it against the
+publisher rather than a secondary source, and update the note with it.
+
 ## The command line
 
 ```bash

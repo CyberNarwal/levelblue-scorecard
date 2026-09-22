@@ -355,10 +355,10 @@ footer p { max-width: none; }
     <dl class="control">
       <div><dt>Author</dt><dd>Rajan Narwal<span class="sub">Cyber Advisory &middot; Manager</span></dd></div>
       <div><dt>Applies to</dt><dd>report-qa.html</dd></div>
-      <div><dt>Checks</dt><dd>105 in 18 families</dd></div>
+      <div><dt>Checks</dt><dd>107 in 18 families</dd></div>
       <div><dt>Review stage</dt><dd>First of two</dd></div>
       <div><dt>Data handling</dt><dd>Stays on device</dd></div>
-      <div><dt>Version</dt><dd class="stamp">2026-09-17</dd></div>
+      <div><dt>Version</dt><dd class="stamp">2026-09-22</dd></div>
     </dl>
   </header>
 
@@ -551,7 +551,7 @@ footer p { max-width: none; }
         </div>
       </div>
       <div class="level major">
-        <div><span class="name">Major</span><span class="count">28 checks</span></div>
+        <div><span class="name">Major</span><span class="count">30 checks</span></div>
         <div>
           <div class="gist">Wrong, or reads as wrong to the client.</div>
           <div class="detail">A missing section, a cross-reference that goes nowhere, a CVSS score
@@ -664,7 +664,7 @@ footer p { max-width: none; }
   <section class="part">
     <h2><span class="n">09</span> Every check</h2>
     <p>
-      All 105 checks, grouped into the 18 families the tool names under each finding.
+      All 107 checks, grouped into the 18 families the tool names under each finding.
       The rule name in the last column is what identifies a check if you ever need to raise one with
       the person who maintains the tool.
     </p>
@@ -860,6 +860,56 @@ footer p { max-width: none; }
           </div>
         </section>
         <section class="family">
+          <h3>Security accuracy <span class="tally">8</span></h3>
+          <div class="scroller">
+            <table>
+              <thead><tr><th>Level</th><th>What it looks for</th><th>Rule</th></tr></thead>
+              <tbody>
+            <tr>
+              <td><span class="sev major">Major</span></td>
+              <td>Malformed CVE identifier</td>
+              <td><code>cyber/cve-format</code></td>
+            </tr>
+            <tr>
+              <td><span class="sev blocker">Blocker</span></td>
+              <td>CVSS score problem</td>
+              <td><code>cyber/cvss-score</code></td>
+            </tr>
+            <tr>
+              <td><span class="sev minor">Minor</span></td>
+              <td>Malformed MITRE ATT&amp;CK technique ID</td>
+              <td><code>cyber/attack-technique</code></td>
+            </tr>
+            <tr>
+              <td><span class="sev major">Major</span></td>
+              <td>Invalid NIST CSF 2.0 identifier</td>
+              <td><code>cyber/csf-identifier</code></td>
+            </tr>
+            <tr>
+              <td><span class="sev minor">Minor</span></td>
+              <td>ISO/IEC 27001 control reference looks out of date</td>
+              <td><code>cyber/iso-control-version</code></td>
+            </tr>
+            <tr>
+              <td><span class="sev major">Major</span></td>
+              <td>Severity label is not on the report scale</td>
+              <td><code>cyber/severity-scale</code></td>
+            </tr>
+            <tr>
+              <td><span class="sev major">Major</span></td>
+              <td>Framework version is retired or superseded</td>
+              <td><code>cyber/framework-version</code></td>
+            </tr>
+            <tr>
+              <td><span class="sev major">Major</span></td>
+              <td>Control identifier is not on the framework it cites</td>
+              <td><code>cyber/control-identifier</code></td>
+            </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+        <section class="family">
           <h3>Release readiness <span class="tally">7</span></h3>
           <div class="scroller">
             <table>
@@ -984,46 +1034,6 @@ footer p { max-width: none; }
               <td><span class="sev nit">Nit</span></td>
               <td>Two slides share a title</td>
               <td><code>slides/duplicate-title</code></td>
-            </tr>
-              </tbody>
-            </table>
-          </div>
-        </section>
-        <section class="family">
-          <h3>Security accuracy <span class="tally">6</span></h3>
-          <div class="scroller">
-            <table>
-              <thead><tr><th>Level</th><th>What it looks for</th><th>Rule</th></tr></thead>
-              <tbody>
-            <tr>
-              <td><span class="sev major">Major</span></td>
-              <td>Malformed CVE identifier</td>
-              <td><code>cyber/cve-format</code></td>
-            </tr>
-            <tr>
-              <td><span class="sev blocker">Blocker</span></td>
-              <td>CVSS score problem</td>
-              <td><code>cyber/cvss-score</code></td>
-            </tr>
-            <tr>
-              <td><span class="sev minor">Minor</span></td>
-              <td>Malformed MITRE ATT&amp;CK technique ID</td>
-              <td><code>cyber/attack-technique</code></td>
-            </tr>
-            <tr>
-              <td><span class="sev major">Major</span></td>
-              <td>Invalid NIST CSF 2.0 identifier</td>
-              <td><code>cyber/csf-identifier</code></td>
-            </tr>
-            <tr>
-              <td><span class="sev minor">Minor</span></td>
-              <td>ISO/IEC 27001 control reference looks out of date</td>
-              <td><code>cyber/iso-control-version</code></td>
-            </tr>
-            <tr>
-              <td><span class="sev major">Major</span></td>
-              <td>Severity label is not on the report scale</td>
-              <td><code>cyber/severity-scale</code></td>
             </tr>
               </tbody>
             </table>
@@ -1383,6 +1393,6 @@ footer p { max-width: none; }
       needs stays with the person doing the review.
     </p>
     <p>Written by <strong>Rajan Narwal</strong>, Manager, Cyber Advisory.</p>
-    <p class="stamp">105 checks &middot; version 2026-09-17 &middot; build b22c8b9</p>
+    <p class="stamp">107 checks &middot; version 2026-09-22 &middot; build e76abf9</p>
   </footer>
 </div>

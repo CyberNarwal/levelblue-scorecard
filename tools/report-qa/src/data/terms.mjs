@@ -30,6 +30,17 @@ export const CANONICAL_TERMS = [
   { wrong: /\bcyber\s?essentials(?:\s+plus)?\b(?<!Cyber Essentials)(?<!Cyber Essentials Plus)/, right: 'Cyber Essentials / Cyber Essentials Plus' },
   { wrong: /\bGDPR\s+regulation\b/i, right: 'GDPR', note: 'Redundant - the R already stands for Regulation.' },
   { wrong: /\bNIS\s?2\s+directive\s+regulation\b/i, right: 'NIS2 Directive' },
+  { wrong: /\bNIS\s2\b|\bNIS-2\b|\bNIS\s+II\b/, right: 'NIS2', note: 'The directive is styled NIS2 by the European Commission, with no space or hyphen.' },
+  { wrong: /\bDigital\s+Operational\s+Resilience\s+Act\s+\(DORA\)\s+regulation\b/i, right: 'DORA', note: 'Redundant - DORA is already a regulation (EU 2022/2554).' },
+  { wrong: /\bDora\b(?<!DORA)/, right: 'DORA', note: 'An acronym, so all capitals: Digital Operational Resilience Act.' },
+  { wrong: /\bNCSC\s+Cyber\s+Assessment\s+Framework\b/, right: 'NCSC CAF', note: 'Spell it out on first use, then use NCSC CAF. Current version is v3.2.' },
+  { wrong: /\bCAF\s+framework\b/i, right: 'CAF', note: 'Redundant - the F already stands for Framework.' },
+  { wrong: /\bNIST\s+800[-\s]?53\b|\bSP\s?800[-\s]?53\b(?<!SP 800-53)/, right: 'NIST SP 800-53', note: 'The formal citation is NIST SP 800-53 (currently Revision 5).' },
+  { wrong: /\bNIST\s+800[-\s]?171\b|\bSP\s?800[-\s]?171\b(?<!SP 800-171)/, right: 'NIST SP 800-171' },
+  { wrong: /\bSOC2\b|\bSOC\s+Type\s+2\b/i, right: 'SOC 2', note: 'SOC 2 Type I and Type II describe the report, not the standard.' },
+  { wrong: /\bCMMC\s+2\.0\s+model\b/i, right: 'CMMC 2.0' },
+  { wrong: /\bUK\s+GDPR\s+regulation\b/i, right: 'UK GDPR' },
+  { wrong: /\bCyber\s+Essentials\s+certification\s+scheme\b/i, right: 'Cyber Essentials' },
   { wrong: /\bSOC\s?2\b(?<!SOC 2)/, right: 'SOC 2' },
   { wrong: /\bMITRE\s+ATT&?CK\b(?<!MITRE ATT&CK)|\bMitre\s+Att&?ck\b|\bmitre\s+att&?ck\b/, right: 'MITRE ATT&CK' },
 
@@ -128,6 +139,44 @@ export const ACRONYM_EXPANSIONS = {
   SBOM: 'software bill of materials',
 };
 
+/**
+ * Framework versions that have been withdrawn or superseded. Citing a retired
+ * version in a client report is the kind of thing that gets the whole
+ * assessment questioned, and the dates move, so each entry says which
+ * publisher to check against rather than being taken on trust.
+ *
+ * Sourced from the publishers themselves - PCI SSC, NIST, CIS, ISO, NCSC -
+ * not from any third-party compilation.
+ */
+export const RETIRED_VERSIONS = [
+  {
+    pattern: /\bPCI\s?DSS\s+v?3(?:\.\d)*\b/gi,
+    current: 'PCI DSS v4.0.1',
+    note: 'PCI DSS v3.2.1 was retired on 31 March 2024. v4.0.1 is the only active version (PCI SSC).',
+  },
+  {
+    pattern: /\bPCI\s?DSS\s+v?4\.0(?!\.1)\b/gi,
+    current: 'PCI DSS v4.0.1',
+    note: 'v4.0.1 superseded v4.0 in June 2024 (PCI SSC).',
+    severity: 'nit',
+  },
+  {
+    pattern: /\bNIST\s+CSF\s+v?1(?:\.\d)?\b|\bCybersecurity\s+Framework\s+v?1\.1\b/gi,
+    current: 'NIST CSF 2.0',
+    note: 'CSF 2.0 replaced 1.1 in February 2024 and added the GOVERN function (NIST).',
+  },
+  {
+    pattern: /\bCIS\s+Controls\s+v?[1-7](?:\.\d)?\b/gi,
+    current: 'CIS Controls v8.1',
+    note: 'v8.1 is current (CIS). Versions up to v7.1 are retired.',
+  },
+  {
+    pattern: /\bCAF\s+v?[12](?:\.\d)?\b/gi,
+    current: 'NCSC CAF v3.2',
+    note: 'v3.2 is current (NCSC).',
+  },
+];
+
 /** Identifier formats seen in vulnerability and threat reporting. */
 export const IDENTIFIERS = {
   cve: /\bCVE[-‐-― ]?(\d{4})[-‐-― ]?(\d{4,7})\b/gi,
@@ -137,7 +186,19 @@ export const IDENTIFIERS = {
   csfFunction: /\b(GOVERN|IDENTIFY|PROTECT|DETECT|RESPOND|RECOVER)\b/g,
   isoControl: /\bA\.(\d{1,2})\.(\d{1,2})(?:\.(\d{1,2}))?\b/g,
   cisControl: /\bCIS\s+Control\s+(\d{1,2})(?:\.(\d{1,2}))?\b/gi,
+  pciRequirement: /\bPCI\s?DSS\s+(?:requirement\s+)?(\d{1,2})\.(\d{1,2})(?:\.(\d{1,2}))?\b/gi,
+  nist53Control: /\b(AC|AT|AU|CA|CM|CP|IA|IR|MA|MP|PE|PL|PM|PS|PT|RA|SA|SC|SI|SR)-(\d{1,2})(?:\((\d{1,2})\))?\b/g,
+  soc2Criterion: /\b(CC|A|C|PI|P)(\d)\.(\d{1,2})\b/g,
 };
+
+/** PCI DSS v4.0.1 has twelve requirements; CIS Controls v8.1 has eighteen. */
+export const PCI_REQUIREMENT_COUNT = 12;
+export const CIS_CONTROL_COUNT = 18;
+/** NIST SP 800-53 Rev 5 families, for validating a control identifier. */
+export const NIST_53_FAMILIES = new Set([
+  'AC', 'AT', 'AU', 'CA', 'CM', 'CP', 'IA', 'IR', 'MA', 'MP',
+  'PE', 'PL', 'PM', 'PS', 'PT', 'RA', 'SA', 'SC', 'SI', 'SR',
+]);
 
 /** NIST CSF 2.0 functions, for validating subcategory prefixes. */
 export const CSF_FUNCTIONS = {

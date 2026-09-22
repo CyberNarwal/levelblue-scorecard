@@ -164,6 +164,55 @@ test('"rather than" is a comparison, not an intensifier', () => {
   assert.ok(findingsFor(real, 'language/empty-intensifier').length >= 1, 'a real intensifier still fires');
 });
 
+test('a retired framework version is reported against the current one', () => {
+  const result = check(
+    'The assessment covered PCI DSS v3.2.1 and NIST CSF 1.1 across the estate.\n\n'
+    + 'CIS Controls v7.1 formed the baseline and CAF v2.0 covered the public work.\n',
+  );
+  const messages = findingsFor(result, 'cyber/framework-version').map((f) => f.message);
+  assert.equal(messages.length, 4);
+  assert.ok(messages.some((m) => /PCI DSS v4\.0\.1 supersedes/.test(m)));
+  assert.ok(messages.some((m) => /NIST CSF 2\.0 supersedes/.test(m)));
+  assert.ok(messages.some((m) => /CIS Controls v8\.1 supersedes/.test(m)));
+  assert.ok(messages.some((m) => /NCSC CAF v3\.2 supersedes/.test(m)));
+});
+
+test('a control identifier outside its framework is reported', () => {
+  const result = check(
+    'The gap maps to PCI DSS requirement 14.2 and to CIS Control 22 in the baseline.\n\n'
+    + 'Control AC-0 was cited as the access control for the in-scope systems.\n',
+  );
+  const messages = findingsFor(result, 'cyber/control-identifier').map((f) => f.message);
+  assert.equal(messages.length, 3);
+  assert.ok(messages.some((m) => /v4\.0\.1 has 12/.test(m)));
+  assert.ok(messages.some((m) => /v8\.1 has 18/.test(m)));
+  assert.ok(messages.some((m) => /numbering starts at 1/.test(m)));
+});
+
+test('a correctly cited framework reference is silent', () => {
+  // The rule that matters most here is the one that does not fire. An advisory
+  // report cites frameworks on every other page, so a false positive in this
+  // family would be visible constantly.
+  const result = check(
+    'The assessment covered PCI DSS v4.0.1, NIST CSF 2.0 and CIS Controls v8.1.\n\n'
+    + 'NCSC CAF v3.2 applied to the public-sector systems, alongside NIS2 and DORA.\n\n'
+    + 'Findings map to PCI DSS requirement 12.3, CIS Control 18, and controls AC-2,\n'
+    + 'SC-7 and IR-4. SOC 2 Type II reporting and ISO/IEC 27001:2022 were in scope.\n',
+  );
+  const hit = rulesHit(result);
+  assert.ok(!hit.has('cyber/framework-version'), 'a current version must not be reported');
+  assert.ok(!hit.has('cyber/control-identifier'), 'a valid identifier must not be reported');
+  assert.deepEqual(findingsFor(result, 'terminology/canonical-name'), [], 'canonical names must pass');
+});
+
+test('the new framework names are corrected to house style', () => {
+  const result = check('The client is in scope for NIS 2 and Dora, assessed under SOC2 rules.');
+  const fixes = findingsFor(result, 'terminology/canonical-name').map((f) => f.suggestion);
+  for (const expected of ['NIS2', 'DORA', 'SOC 2']) {
+    assert.ok(fixes.includes(expected), `expected a correction to "${expected}"`);
+  }
+});
+
 test('a date is not a numeric range', () => {
   const result = check('The assessment ran on 2026-09-17 and the retest on 17-10-2026 as agreed.');
   assert.deepEqual(

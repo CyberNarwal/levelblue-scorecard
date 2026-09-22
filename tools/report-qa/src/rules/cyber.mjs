@@ -7,7 +7,16 @@
  * is not on the scale the report defines.
  */
 
-import { CSF_FUNCTIONS, cvssBandFor, IDENTIFIERS, PRIVATE_IP } from '../data/terms.mjs';
+import {
+  CIS_CONTROL_COUNT,
+  CSF_FUNCTIONS,
+  cvssBandFor,
+  IDENTIFIERS,
+  NIST_53_FAMILIES,
+  PCI_REQUIREMENT_COUNT,
+  PRIVATE_IP,
+  RETIRED_VERSIONS,
+} from '../data/terms.mjs';
 
 const SCOPE = ['paragraph', 'listItem', 'heading', 'caption', 'tableRow'];
 
@@ -340,6 +349,79 @@ export const rules = [
           confidence: 'medium',
         });
       }
+      return findings;
+    },
+  },
+
+  {
+    id: 'cyber/framework-version',
+    title: 'Framework version is retired or superseded',
+    category: 'Security accuracy',
+    severity: 'major',
+    check(doc) {
+      const findings = [];
+      for (const entry of RETIRED_VERSIONS) {
+        for (const { match, start, end } of doc.scan(entry.pattern, { types: SCOPE, skipOpaque: false })) {
+          findings.push({
+            start,
+            end,
+            message: `"${match[0].trim()}" is not the current version. ${entry.current} supersedes it.`,
+            suggestion: entry.current,
+            note: `${entry.note} Assessing against a retired version is sometimes deliberate - say so in the report if it is.`,
+            severity: entry.severity,
+            confidence: 'medium',
+          });
+        }
+      }
+      return findings;
+    },
+  },
+
+  {
+    id: 'cyber/control-identifier',
+    title: 'Control identifier is not on the framework it cites',
+    category: 'Security accuracy',
+    severity: 'major',
+    check(doc) {
+      const findings = [];
+
+      // PCI DSS v4.0.1 has twelve requirements. A thirteenth is a typo, or a
+      // reference to something that is not PCI DSS.
+      for (const { match, start, end } of doc.scan(IDENTIFIERS.pciRequirement, { types: SCOPE, skipOpaque: false })) {
+        const requirement = Number(match[1]);
+        if (requirement >= 1 && requirement <= PCI_REQUIREMENT_COUNT) continue;
+        findings.push({
+          start,
+          end,
+          message: `"${match[0].trim()}" cites PCI DSS requirement ${requirement}; v4.0.1 has ${PCI_REQUIREMENT_COUNT}.`,
+          note: 'Requirement numbers run 1 to 12 (PCI SSC).',
+        });
+      }
+
+      // CIS Controls v8.1 has eighteen; v8 consolidated the previous twenty.
+      for (const { match, start, end } of doc.scan(IDENTIFIERS.cisControl, { types: SCOPE, skipOpaque: false })) {
+        const control = Number(match[1]);
+        if (control >= 1 && control <= CIS_CONTROL_COUNT) continue;
+        findings.push({
+          start,
+          end,
+          message: `"${match[0].trim()}" cites CIS Control ${control}; v8.1 has ${CIS_CONTROL_COUNT}.`,
+          note: 'v8 consolidated the previous 20 controls into 18 (CIS).',
+        });
+      }
+
+      // The pattern only matches real 800-53 families, so what is left to catch
+      // is the near-miss a reader would skim past: a control numbered zero.
+      for (const { match, start, end } of doc.scan(IDENTIFIERS.nist53Control, { types: SCOPE, skipOpaque: false })) {
+        if (!NIST_53_FAMILIES.has(match[1]) || Number(match[2]) > 0) continue;
+        findings.push({
+          start,
+          end,
+          message: `"${match[0]}" is not a NIST SP 800-53 control; numbering starts at 1.`,
+          note: 'Control identifiers are family-number, such as AC-2 (NIST SP 800-53 Rev 5).',
+        });
+      }
+
       return findings;
     },
   },
