@@ -156,6 +156,26 @@ the tests check more than the comments: every relationship target resolves,
 every part is declared in `[Content_Types].xml`, and the deck still reads back
 with its slides intact.
 
+## The walkthrough deck
+
+`Report QA - team walkthrough.pptx` is the deck for introducing the tool to the
+team. Like the handbook it is generated, so its check counts cannot drift:
+
+```bash
+npm run qa:deck                           # writes the .pptx in the project root
+```
+
+It is built to be checked by the thing it describes. Running the tool on it took
+it from 98 findings to 71; what is left is intentional - the speaker notes, the
+deliberate "organization" and "color" examples, and one slide that quotes
+"day rate" to show what the speaker-notes check catches. That quote means the
+deck reports a blocker against itself, which is correct: the deck is internal
+and never goes to a client.
+
+`deck/check-geometry.py` stands in for the usual render-and-look pass, which
+needs LibreOffice. It reports shapes off the slide, shapes inside the 0.5"
+margin, overlapping text boxes, and text estimated to overflow its box.
+
 ## Where the framework data comes from
 
 The canonical names, current versions and control-identifier shapes are taken
