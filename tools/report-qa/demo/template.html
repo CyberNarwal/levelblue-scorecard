@@ -103,35 +103,32 @@ h2 {
 .beat h3 { font-size: 18.5px; font-weight: 700; margin: 0; flex: 1 1 200px; letter-spacing: -0.01em; }
 .mins { font: 600 12px/1 var(--mono); color: var(--muted); }
 
-.line { display: grid; grid-template-columns: 52px 1fr; gap: 12px; margin-bottom: 11px; }
-.line:last-child { margin-bottom: 0; }
-.tag {
-  font: 700 10.5px/1.6 var(--sans); letter-spacing: .1em; text-transform: uppercase;
-  padding-top: 3px;
+/* One column, read top to bottom. Bold is something you do, the serif is
+   something you say. Nothing to decode while you are talking. */
+.script { font: 400 17.5px/1.62 var(--read); }
+.script p { margin: 0 0 15px; }
+.script p:last-child { margin-bottom: 0; }
+.script .act {
+  font: 600 16px/1.5 var(--sans); color: var(--do);
+  margin: 0 0 15px; padding-left: 20px; text-indent: -20px;
 }
-.do .tag { color: var(--do); }
-.say .tag { color: var(--muted); }
-.see .tag { color: var(--see); }
-.watch .tag { color: var(--warn); }
-.why .tag { color: var(--dim); }
-
-.do .body { font-size: 15px; }
-.say .body { font: 400 17px/1.55 var(--read); color: var(--ink); }
-.see .body {
-  font-size: 14.5px; color: var(--see);
-  background: var(--see-soft); border-radius: 8px; padding: 9px 12px;
+.script .act::before { content: "\25B8"; margin-right: 8px; }
+.script .act code, .script .act b { color: var(--ink); font-weight: 700; }
+.script .act code { font: 600 14px/1.4 var(--mono); }
+.script em { color: var(--do); font-style: italic; }
+.script b { font-weight: 600; }
+.aside {
+  margin: 15px 0 0; padding: 9px 12px; border-radius: 8px;
+  font: 400 14px/1.5 var(--sans); color: var(--muted);
+  background: var(--ground); border: 1px solid var(--line);
 }
-.watch .body {
-  font-size: 14px; color: var(--warn);
-  background: var(--warn-soft); border-radius: 8px; padding: 9px 12px;
+.aside b { color: var(--ink); font-weight: 600; }
+.aside.trouble { color: var(--warn); border-color: #4a2a26; }
+.aside.trouble b { color: var(--warn); }
+.pause {
+  margin: 15px 0 0; font: 600 13px/1.5 var(--sans);
+  color: var(--do); letter-spacing: .02em;
 }
-/* The reasoning behind a line, to draw on if there is time or if asked. Set
-   quieter than the line itself so the eye finds what to say first. */
-.why .body {
-  font-size: 14px; line-height: 1.5; color: var(--muted);
-  border-left: 2px solid var(--line); padding-left: 12px;
-}
-.why .body b { color: var(--ink); font-weight: 600; }
 kbd {
   font: 600 12px/1 var(--mono); background: var(--panel-2); border: 1px solid var(--line);
   border-radius: 5px; padding: 3px 6px; color: var(--ink);
@@ -140,7 +137,6 @@ code, .lit {
   font: 500 13.5px/1.45 var(--mono); background: var(--ground);
   border: 1px solid var(--line); border-radius: 5px; padding: 1px 6px; color: var(--ink);
 }
-.say .body em { color: var(--do); font-style: italic; }
 .num { font-variant-numeric: tabular-nums; font-weight: 700; }
 
 /* --- questions ----------------------------------------------------------- */
@@ -156,8 +152,7 @@ code, .lit {
 
 footer { margin-top: 36px; padding-top: 18px; border-top: 1px solid var(--line); color: var(--dim); font-size: 13px; }
 @media (max-width: 460px) {
-  .line { grid-template-columns: 1fr; gap: 4px; }
-  .tag { padding-top: 0; }
+  .script { font-size: 17px; }
 }
 </style>
 

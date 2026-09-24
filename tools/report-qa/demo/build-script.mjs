@@ -54,6 +54,35 @@ if (!leak) throw new Error('the demo depends on the slide-master leak; it did no
 const n = (value) => `<span class="num">${value}</span>`;
 const lit = (value) => `<span class="lit">${escape(value)}</span>`;
 
+const bySeverity = { blocker: 0, major: 0, minor: 0, nit: 0 };
+for (const rule of ALL_RULES) bySeverity[rule.severity] += 1;
+const familyCount = new Set(ALL_RULES.map((r) => r.category)).size;
+const securityChecks = ALL_RULES.filter((r) => r.category === 'Security accuracy').length;
+
+/** What to have in your head, rather than what to do. */
+const BRIEFING = [
+  ['What it is',
+   `A rule engine in one HTML file. <b>${ALL_RULES.length} checks</b> across <b>${familyCount} families</b>, `
+   + `split <b>${bySeverity.blocker} blocker, ${bySeverity.major} major, ${bySeverity.minor} minor, `
+   + `${bySeverity.nit} nit</b>.`],
+  ['Why rules, not AI',
+   'Because a QA tool has to be trusted before it is clever. A rule either matched or it did not, '
+   + 'so every finding traces back to a named check and the same draft checked twice gives the same '
+   + 'answer. That is what lets someone argue with it.'],
+  ['How it stays offline',
+   'No upload, no server, no account, no telemetry. The build <b>refuses to produce the file</b> if '
+   + 'it contains a network call or a link to anything outside itself. Unplug the network and it '
+   + 'behaves identically.'],
+  ['What it reads',
+   '<b>.pptx</b> — slides, speaker notes, comments, tables, layouts and masters. '
+   + '<b>.docx</b> — text, tracked changes, comments, highlighting, headers, footers, properties. '
+   + 'Also .md and .html. It refuses .pdf on purpose, because text pulled out of a PDF garbles and '
+   + 'it would invent faults.'],
+  ['The one sentence',
+   'If they remember nothing else: <b>it clears the mechanical faults so the read you do next is '
+   + 'spent on the argument.</b> A clean result is not sign-off.'],
+];
+
 const PREFLIGHT = [
   ['<code>report-qa.html</code> open in Edge or Chrome, on a clean page',
    'No file loaded yet, and Engagement settings left blank. You fill them in during the demo.'],
@@ -66,239 +95,189 @@ const PREFLIGHT = [
 ];
 
 /**
- * DO is the action, SAY is the line, SEE is what the screen will show, WATCH is
- * what to do when it does not.
- */
-const BRIEFING = [
-  ['What it is',
-   'A rule engine in a single HTML file. <b>__CHECKS__ checks</b> in <b>__FAMILIES__ families</b>, '
-   + 'split <b>__BLOCKERS__ blocker, __MAJORS__ major, __MINORS__ minor, __NITS__ nit</b>. Rules, not AI - '
-   + 'it gives the same answer twice and can tell you which rule fired.'],
-  ['Why rules',
-   'Because a QA tool has to be trusted more than it has to be clever. A rule either matched or it '
-   + 'did not, so a finding can always be traced to a named check, and the same draft checked twice '
-   + 'gives the same answer. That is what lets you argue with it.'],
-  ['How it stays offline',
-   'No upload, no server, no account, no telemetry. The build script <b>refuses to emit a file</b> '
-   + 'containing a network call, an external script or a link to anything outside itself - so the '
-   + 'guarantee is enforced rather than promised. Unplug the network and it behaves identically.'],
-  ['What it reads',
-   '<b>.pptx</b> including speaker notes, comments, tables, slide layouts and masters. '
-   + '<b>.docx</b> including tracked changes, comments, highlighting, headers, footers and document '
-   + 'properties. Also .md and .html. It refuses .pdf on purpose.'],
-  ['Where it came from',
-   'Manual QA was a read-through, then comments typed into the deck by hand. The mechanical half of '
-   + 'that is what a rule can do perfectly and a tired reader cannot. The judgement half is what '
-   + 'stays with us.'],
-  ['The one sentence',
-   'If they remember one thing: <b>it clears the mechanical faults so the read you do next is spent '
-   + 'on the argument.</b> A clean result is not sign-off.'],
-];
-
-/**
- * DO is the action, SAY is the line, WHY is the reasoning behind it to draw on
- * or answer with, SEE is what the screen will show, WATCH is what to do when
- * it does not.
+ * Each beat is a run of blocks read top to bottom. `act` is something you do,
+ * `say` is something you say, `aside` and `trouble` are small notes to the
+ * side, `pause` is a reminder to stop talking. No labels and no columns: a
+ * presenter cannot decode a table while they are speaking.
  */
 const BEATS = [
   {
-    title: 'Frame it before you touch anything',
+    title: 'Open on the problem, not the tool',
     mins: 1,
-    lines: [
-      ['say', 'Before any draft goes to a client, someone reads it. That read is doing two jobs at '
-        + 'once — checking the argument holds, and catching typos, spacing, a wrong client name. '
-        + 'The second job is the one that goes badly at five o\'clock on a Friday, and it is the '
-        + 'one a machine can do perfectly.'],
-      ['say', 'So this runs first. It is one file, it installs nothing, and <em>nothing about the draft '
-        + 'leaves your machine</em>. It is the first of two stages, and I will come back to the '
-        + 'second at the end because it is the important half.'],
-      ['do', 'Point at the address bar so they can see the <code>file://</code> path.'],
-      ['why', 'That path is the proof. A local file has no server behind it. If anyone asks later '
-        + 'whether client material is being sent anywhere, this is the answer you point at — '
-        + 'and the build refuses to produce a file containing a network call at all.'],
+    script: [
+      ['say', 'Every draft we send gets read before it goes out. That read is doing two jobs at '
+        + 'once. Is the argument right, and is the document clean. The second job is the one that '
+        + 'goes badly at five o\'clock on a Friday, and it is the one a machine can do perfectly '
+        + 'every single time.'],
+      ['say', 'So we run this first, and then you read it. One file. Nothing to install, nothing to '
+        + 'log into, and nothing about the draft goes anywhere.'],
+      ['act', 'Point at the address bar.'],
+      ['say', 'That is a file path, not a web address. There is no server behind this. If anyone '
+        + 'asks you later whether client material is being sent somewhere — that is your answer. '
+        + 'And it is not just a promise: the thing that builds this file refuses to produce it at '
+        + 'all if it contains a single network call.'],
     ],
   },
   {
-    title: 'Drop the draft in, settings still blank',
+    title: 'Drop the draft in and let it talk',
     mins: 1,
-    lines: [
-      ['do', 'Drag the demo draft onto the drop zone. Do not fill in anything first.'],
-      ['see', `Verdict reads <b>Do not send this yet</b>, with ${n(blank.stats.bySeverity.blocker)} blockers `
-        + `and ${n(blank.stats.total)} findings in total.`],
-      ['say', 'Four slides, and in under a second it has read every slide, every speaker note, the '
-        + 'tables, the slide layouts, the master behind them, and the file\'s own document '
-        + `properties. It has found ${blank.stats.bySeverity.blocker} things that must not reach a client.`],
-      ['why', 'Worth naming what it just read, because the non-obvious places are where the damaging '
-        + 'things hide. Nobody proofreads a slide master. The verdict line is deliberately blunt — '
-        + '<b>Do not send this yet</b> — because the one thing a reviewer needs in the first second '
-        + 'is whether this is a go or a no-go.'],
-      ['watch', 'If nothing happens, the file is probably still downloading. Check the status line under the drop zone.'],
+    script: [
+      ['act', 'Drag the demo draft onto the page. Do not fill anything in first.'],
+      ['say', 'Four slides. In about a second it has read every slide, every speaker note, the '
+        + 'tables, the slide layouts, the master behind them, and the file\'s own properties. '
+        + `And it says do not send it — ${blank.stats.bySeverity.blocker} things here must not reach a client.`],
+      ['say', 'Worth noticing where it just looked. Nobody proofreads a slide master. That is '
+        + 'exactly where the worst thing in this deck is hiding, and I will come back to it.'],
+      ['aside', `You will see <b>Do not send this yet</b>, ${blank.stats.bySeverity.blocker} blockers, `
+        + `${blank.stats.total} findings.`],
+      ['trouble', 'Nothing happened? The file is probably still downloading. Check the status line '
+        + 'under the drop zone.'],
     ],
   },
   {
-    title: 'The one nobody sees: speaker notes',
+    title: 'The one nobody ever sees',
     mins: 2,
-    lines: [
-      ['do', 'In the Blocker section, open <b>Internal remarks in the speaker notes</b>.'],
-      ['see', `Rows on Slide 1 notes and Slide 2 notes, flagging ${lit("Don't mention")}, `
-        + `${lit('day rate')} and ${lit('push them for more')}.`],
+    script: [
+      ['act', 'Open <b>Internal remarks in the speaker notes</b>.'],
       ['say', 'These are in the speaker notes. Nobody put them on a slide, so nobody finds them by '
-        + 'flicking through the deck — but they travel inside the file. Send this and the client '
-        + 'opens it and can read every one.'],
-      ['say', 'And notice what it is actually matching. Not swear words — commercial phrasing. '
-        + '<em>Day rate. Push them for more. Guesstimate. Chargeable.</em> The things we write to '
-        + 'each other that read very differently to the person paying the invoice.'],
-      ['why', 'This is the beat that lands, so give it room. Two things worth adding if they engage: '
-        + 'exporting to PDF drops the notes, but we rarely send PDFs; and the tool reports the notes '
-        + 'separately as a Major even when the content is harmless, because <b>notes shipping at all</b> '
-        + 'is usually not intended.'],
-      ['do', 'Pause here. Let it sit before moving on.'],
+        + 'flicking through the deck. But they travel inside the file. You send this, the client '
+        + 'opens it, and they can read every one of them.'],
+      ['say', 'And look at what it is matching. Not swearing. Commercial phrasing. '
+        + '<em>Day rate. Push them for more. Guesstimate.</em> The things we write to each other, '
+        + 'which read very differently to the person paying the invoice.'],
+      ['say', 'Exporting to PDF would strip these out. We almost never send PDFs.'],
+      ['pause', 'Stop talking here. Let them read it.'],
     ],
   },
   {
-    title: 'The one that reads as wrong: a score against its own label',
+    title: 'A number arguing with itself',
     mins: 1,
-    lines: [
-      ['do', 'Open <b>CVSS score problem</b> in the Blocker section.'],
-      ['see', 'Slide 2 — <span class="lit">CVSS 9.1 is "Critical" (9-10), but the text nearby says "Medium"</span>.'],
-      ['say', 'The deck says the score is 9.1 and calls it Medium. One of those is wrong. A client '
-        + 'who checks will find it before we do, and then every other number in the report is in question.'],
-      ['why', 'It is reading the score, looking up the CVSS v3.1 band that score falls in, and '
-        + 'comparing it to the severity word nearby. The same family checks CVE identifiers, '
-        + 'MITRE ATT&amp;CK technique IDs, NIST CSF subcategories, and whether a framework version '
-        + 'you cite is still current. That is <b>__SECURITY__ checks</b> on security accuracy alone.'],
+    script: [
+      ['act', 'Open <b>CVSS score problem</b>.'],
+      ['say', 'The deck says the score is 9.1 and calls it Medium. One of those is wrong. It is '
+        + 'reading the score, looking up which band 9.1 actually falls in, and comparing that to '
+        + 'the severity word sitting next to it.'],
+      ['say', 'This is the kind of thing that does real damage, because it is not a typo. A client '
+        + 'who checks one number and finds it wrong now has a reason to check all of them. '
+        + `There are ${n(securityChecks)} checks like this one — CVE formats, ATT&CK technique IDs, `
+        + 'NIST CSF identifiers, and whether the framework version you are citing is still current.'],
     ],
   },
   {
-    title: 'Now fill in the engagement — this is the one to watch',
-    mins: 2,
-    lines: [
-      ['do', 'Open <b>Engagement settings</b>. Fill in: client <code>Northwind Trading</code>, '
-        + 'other clients <code>Contoso, Initech</code>, marking <code>CONFIDENTIAL</code>.'],
+    title: 'Four boxes, and the finding nobody could have caught',
+    mins: 3,
+    script: [
+      ['act', 'Open <b>Engagement settings</b>. Put in <code>Northwind Trading</code>, then '
+        + '<code>Contoso, Initech</code>, then <code>CONFIDENTIAL</code>.'],
       ['say', 'These four describe the engagement rather than the file. They are remembered on your '
-        + 'machine and apply to every draft until you change them. Watch what they unlock.'],
-      ['do', 'Drop the same draft on again.'],
-      ['see', `Now ${n(filled.stats.total)} findings and ${n(filled.stats.bySeverity.blocker)} blockers — `
-        + `${n(unlocked.length)} more than before. The new blocker is: `
-        + `<span class="lit">${escape(leak.message)}</span>`],
-      ['say', 'That name is in the slide master — the template behind the slides. You will not find '
-        + 'it by reading the deck, scrolling the deck, or printing the deck. It is the previous '
-        + 'client, sitting in the file we copied to make this one.'],
-      ['say', 'This is the one I would not have caught by eye. It is also the single most damaging '
-        + 'thing on the list, because it is not a typo — it is evidence to one client that we reuse '
-        + 'another client\'s material. Which is why those four boxes are worth thirty seconds.'],
-      ['why', 'How it happens: someone opens last quarter\'s deck, saves as, replaces the slides. '
-        + 'The master keeps whatever was in it. The tool reads the layouts and masters as well as '
-        + 'the slides, which is why it sees what a reader cannot. The second thing the settings '
-        + 'unlocked is the missing <b>CONFIDENTIAL</b> marking — same principle, it cannot check '
-        + 'a marking you have not told it to expect.'],
-      ['watch', 'If the count does not change, the settings did not save. Re-open the panel and check the '
-        + 'button now reads "for Northwind Trading".'],
+        + 'machine and they apply to everything you check until you change them.'],
+      ['act', 'Drop the same file on again.'],
+      ['say', `Same deck. Now it is ${filled.stats.total} findings and `
+        + `${filled.stats.bySeverity.blocker} blockers, and the new one is this.`],
+      ['say', '<em>Contoso appears in the deck\'s slide masters.</em> That name is in the template '
+        + 'behind the slides. You will not find it by reading the deck, scrolling the deck, or '
+        + 'printing the deck. It is the previous client, sitting in the file somebody copied to '
+        + 'make this one.'],
+      ['say', 'Which is how it always happens. You open last quarter\'s deck, save as, replace the '
+        + 'slides. The master keeps whatever was in it.'],
+      ['say', 'This is the one I would not have caught by eye. It is also the most damaging thing on '
+        + 'the list, because it is not a mistake in the writing — it is evidence to one client that '
+        + 'we recycle another client\'s material.'],
+      ['say', 'That is what those four boxes buy you. Thirty seconds.'],
+      ['aside', `The settings also unlocked the missing <b>CONFIDENTIAL</b> marking. Same principle — `
+        + 'it cannot check a marking you have not told it to expect.'],
+      ['trouble', 'Count did not change? The settings did not save. Re-open the panel and check the '
+        + 'button now reads <b>for Northwind Trading</b>.'],
     ],
   },
   {
-    title: 'What a finding actually gives you',
+    title: 'What a finding actually hands you',
     mins: 1,
-    lines: [
-      ['do', 'Scroll to a Major with a highlighted word, such as the American spellings on Slide 2.'],
-      ['say', 'Every finding quotes your own words back with the problem highlighted, and the '
+    script: [
+      ['act', 'Scroll to one of the spelling findings on slide 2.'],
+      ['say', 'It quotes your own sentence back with the problem highlighted, and puts the '
         + 'replacement on the right. Not a line number and a rule name to go hunting with — the '
-        + 'actual sentence, so you can match it to what is on your screen.'],
-      ['say', 'It highlights whitespace too. A highlighted blank is the only way you can see a '
-        + 'double space at all.'],
-      ['why', 'This was the biggest change made to the tool. It used to report the rule and roughly '
-        + 'where. People then had to go and find the thing, which is the slow part of acting on a '
-        + 'QA report. Findings are also grouped by check, so one rule firing eight times is one row '
-        + 'with a count and a preview, not eight rows repeating themselves.'],
+        + 'actual words, so you can match it to what is on your screen in front of you.'],
+      ['say', 'It highlights spaces too. A highlighted blank is the only way you can see a double '
+        + 'space at all.'],
+      ['say', 'And it groups them. One check firing eight times is one row with a count and a '
+        + 'preview of the words, not eight rows saying the same thing.'],
     ],
   },
   {
     title: 'You get the last word',
     mins: 1,
-    lines: [
-      ['do', 'Hover any check and click <b>Ignore check</b>. Then scroll to the bottom.'],
-      ['see', 'An <b>Ignored</b> section appears with a Restore on each, and the count under the '
-        + 'verdict says how many you set aside.'],
-      ['say', 'No rule set is right about everything. When it is wrong you set it aside — and the '
-        + 'important part is that it is never silently gone. It is counted, it is listed, and every '
-        + 'format you copy out says how many were left out.'],
-      ['say', 'Please do not change good writing to satisfy a rule. If a check is wrong often, tell '
-        + 'me and I will fix the check.'],
-      ['why', 'A QA pass whose exclusions are invisible is one nobody can audit — including you, six '
-        + 'months later, when someone asks why a finding was not actioned. Two design notes if asked: '
-        + 'decisions survive re-checking the same draft after edits, because they are keyed to the '
-        + 'flagged words rather than a line number; and they are <b>deliberately not saved to disk</b>, '
-        + 'because the keys would write client text into browser storage.'],
-      ['do', 'Click <b>Restore all</b> before moving on.'],
+    script: [
+      ['act', 'Hover a check and click <b>Ignore check</b>, then scroll to the bottom.'],
+      ['say', 'No rule set is right about everything. When it is wrong, you set it aside. The '
+        + 'important part is that it never just disappears — it is counted, it is listed down here '
+        + 'with a Restore next to it, and every format you copy out says how many were left out.'],
+      ['say', 'Because a QA pass whose exclusions are invisible is one nobody can check. Including '
+        + 'you, six months later, when someone asks why a finding was not actioned.'],
+      ['say', 'And please do not change good writing to satisfy a rule. If a check is wrong often, '
+        + 'tell me and I will fix the check.'],
+      ['act', 'Click <b>Restore all</b> before you move on.'],
     ],
   },
   {
-    title: 'Getting it back to the author',
+    title: 'Getting it back to whoever wrote it',
     mins: 1,
-    lines: [
-      ['do', 'Click <b>For comments</b> on the Copy row, then paste into anything — Notepad is fine.'],
-      ['say', 'One block per finding: where it is, what is wrong, the exact words, and the fix. That '
-        + 'is what goes into a comment beside the slide it belongs to.'],
-      ['do', 'Point at Summary and Blocker list without clicking them.'],
-      ['say', 'Summary is one line per finding with blockers first — that is the mail back to the '
-        + 'consultant. Blocker list is only what stops the draft going out, which is the go/no-go '
-        + 'note. Full report is the lot, in Markdown, for a review thread.'],
-      ['why', 'All four quote the flagged text, for the same reason as the last beat: '
-        + '<b>"line 42 has an American spelling"</b> sends the author hunting, and '
-        + '<b>Found: "color"</b> does not. Anything you set aside is excluded from all four, and '
-        + 'each one states the number it left out.'],
+    script: [
+      ['act', 'Click <b>For comments</b>, then paste into anything. Notepad is fine.'],
+      ['say', 'One block per finding. Where it is, what is wrong, the exact words, and the fix. '
+        + 'That is what goes into a comment next to the slide it belongs to.'],
+      ['act', 'Point at <b>Summary</b> and <b>Blocker list</b> without clicking.'],
+      ['say', 'Summary is one line per finding with the blockers first — that is your mail back to '
+        + 'the consultant. Blocker list is only what stops it going out, which is the go/no-go note. '
+        + 'All of them quote the words, because <em>line 42 has an American spelling</em> sends '
+        + 'somebody hunting and <em>found: color</em> does not.'],
     ],
   },
   {
-    title: 'The closer: comments written into the deck',
+    title: 'The bit that used to take an hour',
     mins: 2,
-    lines: [
-      ['do', 'Click <b>Download deck with comments</b>. Open the downloaded file in PowerPoint and '
-        + 'show the comment pane on slide 1.'],
-      ['see', `A copy named <code>… (QA comments).pptx</code> carrying ${n(filled.findings.length)} real `
-        + 'PowerPoint comments, on the slides they came from.'],
-      ['say', 'This is the part that used to cost the most time — reading a QA report and retyping '
-        + 'every point into the deck as a comment. The consultant opens this, works the comment '
-        + 'pane, resolves each one as they go.'],
+    script: [
+      ['act', 'Click <b>Download deck with comments</b>, then open the downloaded file in PowerPoint.'],
+      ['say', `A copy of the deck, carrying ${filled.findings.length} real PowerPoint comments, each one on `
+        + 'the slide it came from. The consultant opens this, works down the comment pane, and '
+        + 'resolves them as they go.'],
+      ['say', 'This is the part that used to cost the most time — reading a QA report on one screen '
+        + 'and retyping every point into the deck on the other.'],
       ['say', 'And it is a copy. The file you dropped in is read and never written to. Comments '
         + 'already in the deck are kept, with whoever wrote them. Run it twice and the second pass '
-        + 'adds rather than replaces.'],
-      ['why', 'It works for PowerPoint because a PowerPoint comment is anchored to a slide, and the '
-        + 'tool already knows which slide a finding came from. Word anchors comments to exact runs '
-        + 'of text inside the document, which is a harder problem and is not done yet — so for Word '
-        + 'you use the Copy formats. The slides themselves are copied across byte for byte, so '
-        + 'nothing is re-encoded behind the author\'s back.'],
-      ['watch', 'If PowerPoint offers to repair the file, do not fight it on stage — close it, say the '
-        + 'annotated copy is the newest part of the tool, and carry on with the Copy formats. '
-        + 'Tell Rajan afterwards.'],
+        + 'adds to the first rather than replacing it.'],
+      ['aside', 'Word does not do this yet. Word anchors comments to exact runs of text rather than '
+        + 'to a page, which is a harder problem. For Word, use the copy formats.'],
+      ['trouble', 'PowerPoint offers to repair the file? Do not fight it in front of people. Close '
+        + 'it, say the annotated copy is the newest part of the tool, carry on with the copy '
+        + 'formats, and tell Rajan afterwards.'],
     ],
   },
   {
-    title: 'What it cannot do — do not skip this',
-    mins: 1,
-    lines: [
-      ['say', 'Everything you have seen is mechanical. It cannot tell you whether a finding is right, '
-        + 'whether a severity is justified, or whether the remediation advice would actually work. '
-        + 'It cannot read a screenshot or a diagram. It has no idea who the client is, what we '
-        + 'promised them, or what the politics of the engagement are.'],
-      ['say', 'So a clean result is <em>not</em> sign-off. What it does is clear the noise, so the read '
-        + 'you do next is spent on the argument instead of on typos. That read is still yours, and '
-        + 'it is the half that actually protects the client.'],
-      ['why', 'Say this slowly, and say it even if you are short on time. The failure mode for a tool '
-        + 'like this is people trusting it to have checked things it never looked at. It is also the '
-        + 'honest answer to anyone who thinks it is here to replace the review.'],
+    title: 'What it cannot do, and why that matters',
+    mins: 1.5,
+    script: [
+      ['say', 'Everything you have just seen is mechanical. It cannot tell you whether a finding is '
+        + 'right. It cannot tell you whether a severity is justified, or whether the remediation '
+        + 'advice would actually work. It cannot read a screenshot or a diagram. It has no idea who '
+        + 'the client is, what we promised them, or what the politics of the engagement are.'],
+      ['say', 'So a clean result is <em>not</em> sign-off. What it does is clear the noise, so that '
+        + 'the read you do next is spent on the argument instead of on typos. That read is still '
+        + 'yours, and it is the half that actually protects the client.'],
+      ['pause', 'Say this one slowly, and say it even if you are running short. It is the thing you '
+        + 'most want them to leave with.'],
     ],
   },
   {
     title: 'Where to get it',
     mins: 0.5,
-    lines: [
-      ['do', 'Show the footer of the tool with its version stamp.'],
-      ['say', 'It is on SharePoint beside the handbook. Save the file and open it whenever you like. '
-        + 'When I update the checks I replace that one file, and you pick it up next time you open '
-        + 'it — the version is printed at the bottom so you can see which copy you have.'],
-      ['say', 'The handbook next to it explains every check and what the four levels mean. Anything '
-        + 'that looks wrong, send it to me.'],
+    script: [
+      ['act', 'Show the version stamp at the foot of the tool.'],
+      ['say', 'It is on SharePoint next to the handbook. Save the file, open it whenever. When I '
+        + 'update the checks I replace that one file and you pick it up next time you open it — the '
+        + 'version is printed at the bottom so you can tell which copy you have.'],
+      ['say', 'The handbook explains every check and what the four levels mean. Anything that looks '
+        + 'wrong to you, send it to me.'],
     ],
   },
 ];
@@ -344,10 +323,12 @@ function briefing() {
 
 function beats() {
   return BEATS.map((beat, i) => {
-    const lines = beat.lines.map(([kind, body]) => {
-      const tag = { do: 'Do', say: 'Say', why: 'Why', see: 'See', watch: 'If not' }[kind];
-      return `
-        <div class="line ${kind}"><span class="tag">${tag}</span><div class="body">${body}</div></div>`;
+    const body = beat.script.map(([kind, text]) => {
+      if (kind === 'act') return `\n        <p class="act">${text}</p>`;
+      if (kind === 'aside') return `\n        <p class="aside">${text}</p>`;
+      if (kind === 'trouble') return `\n        <p class="aside trouble"><b>If it goes wrong.</b> ${text}</p>`;
+      if (kind === 'pause') return `\n        <p class="pause">${text}</p>`;
+      return `\n        <p>${text}</p>`;
     }).join('');
     return `
     <article class="beat">
@@ -355,7 +336,9 @@ function beats() {
         <span class="n">${String(i + 1).padStart(2, '0')}</span>
         <h3>${beat.title}</h3>
         <span class="mins">${beat.mins < 1 ? '30 sec' : `${beat.mins} min`}</span>
-      </div>${lines}
+      </div>
+      <div class="script">${body}
+      </div>
     </article>`;
   }).join('');
 }
@@ -364,11 +347,6 @@ function questions() {
   return QA.map(([q, a]) => `
     <details class="qa"><summary>${q}</summary><div class="a">${a}</div></details>`).join('');
 }
-
-const bySeverity = { blocker: 0, major: 0, minor: 0, nit: 0 };
-for (const rule of ALL_RULES) bySeverity[rule.severity] += 1;
-const familyCount = new Set(ALL_RULES.map((r) => r.category)).size;
-const securityChecks = ALL_RULES.filter((r) => r.category === 'Security accuracy').length;
 
 const date = new Date().toISOString().slice(0, 10);
 let commit = 'local';
