@@ -31,6 +31,9 @@ const SEVERITY_BLURB = {
   nit: 'A preference, not a fault. Fix if you have the time.',
 };
 
+/** Read before the words, so the verdict registers without being read. */
+const VERDICT_MARK = { stop: '\u2715', warn: '\u0021', ok: '\u2713' };
+
 const STORAGE_KEY = 'report-qa.settings.v1';
 
 const el = (id) => document.getElementById(id);
@@ -235,10 +238,11 @@ function verdictFor(stats) {
     };
   }
   if (stats.bySeverity.major) {
+    const n = stats.bySeverity.major;
     return {
       tone: 'warn',
       headline: 'Fix a few things first',
-      detail: `${stats.bySeverity.major} item${stats.bySeverity.major === 1 ? '' : 's'} are wrong or read as wrong.`,
+      detail: n === 1 ? '1 item is wrong, or reads as wrong.' : `${n} items are wrong, or read as wrong.`,
     };
   }
   if (stats.total) {
@@ -311,81 +315,131 @@ function actionButton(label, title, onClick) {
   return button;
 }
 
-/** One place the rule fired: where it is, the draft's words, the replacement. */
-function renderOccurrence(finding) {
-  const row = text('div', 'row');
-  row.append(text('span', 'where', locationLabel(finding)));
+/**
+ * One place the check fired.
+ *
+ * Laid out as a grid rather than a flex line: the quote, the replacement and
+ * the Ignore button each own their space, so a long quote can no longer push
+ * the replacement into the button beside it.
+ */
+function renderHit(finding) {
+  const hit = text('div', 'hit');
+  hit.append(text('span', 'where', locationLabel(finding)));
+  hit.append(actionButton(
+    'Ignore',
+    matchOf(finding) ? `Stop reporting "${matchOf(finding)}" for this check` : 'Stop reporting this finding',
+    () => ignored.items.add(itemKey(finding)),
+  ));
 
-  const match = matchOf(finding);
-  if (match) {
-    const parts = finding.excerptParts;
+  const parts = finding.excerptParts;
+  if (matchOf(finding)) {
     const quote = text('span', 'quote');
     if (parts.before) quote.append(text('span', 'ctx', parts.before));
     quote.append(text('mark', null, parts.match));
     if (parts.after) quote.append(text('span', 'ctx', parts.after));
-    row.append(quote);
+    hit.append(quote);
   } else {
     // Nothing to quote, so the message is the only thing that says what is wrong.
-    row.append(text('span', 'quote plain', finding.message));
+    hit.append(text('span', 'quote plain', finding.message));
   }
 
-  if (finding.suggestion) row.append(text('span', 'fix', `→ ${fixLabel(finding.suggestion)}`));
-  row.append(actionButton(
-    'Ignore',
-    match ? `Stop reporting "${match}" for this check` : 'Stop reporting this finding',
-    () => ignored.items.add(itemKey(finding)),
-  ));
-  return row;
+  if (finding.suggestion) {
+    const fix = text('p', 'fix');
+    fix.append(text('span', null, 'Change to '));
+    fix.append(text('code', null, fixLabel(finding.suggestion)));
+    hit.append(fix);
+  }
+  return hit;
+}
+
+/** Trim a preview fragment to something that fits on the summary line. */
+function shorten(value, limit = 46) {
+  const clean = String(value).replace(/\s+/g, ' ').trim();
+  return clean.length > limit ? `${clean.slice(0, limit - 1).trimEnd()}\u2026` : clean;
 }
 
 /**
- * One rule's findings. A rule that fired once is a plain block; one that fired
- * repeatedly collapses, with the flagged words on the summary line so the group
- * can often be judged without opening it.
+ * The words a closed card shows, so it can often be judged without opening.
+ *
+ * A one or two character match - a hyphen, a stray space - says nothing on its
+ * own, so those are shown with the word either side of them instead.
  */
-function renderRuleGroup(group) {
-  const many = group.items.length > 1;
-  const box = text(many ? 'details' : 'div', 'rule-group');
-  const head = text(many ? 'summary' : 'div', 'rule-head');
-
-  head.append(text('span', 'rule-title', group.title || group.rule));
-  head.append(text('span', 'count', String(group.items.length)));
-
-  if (many) {
-    const words = [];
-    for (const item of group.items) {
-      const match = matchOf(item);
-      if (match && !words.includes(match)) words.push(match);
-      if (words.length === 4) break;
+function previewOf(group) {
+  const seen = [];
+  for (const item of group.items) {
+    const match = matchOf(item);
+    let word;
+    if (match.length >= 4) {
+      word = match;
+    } else if (item.excerptParts) {
+      const parts = item.excerptParts;
+      const before = parts.before.replace(/^\.\.\./, '').trim().split(/\s+/).slice(-2).join(' ');
+      const after = parts.after.replace(/\.\.\.$/, '').trim().split(/\s+/).slice(0, 2).join(' ');
+      word = `${before} ${parts.match} ${after}`;
+    } else {
+      word = item.message;
     }
-    if (words.length) {
-      const more = words.length < group.items.length ? '…' : '';
-      head.append(text('span', 'preview', words.join(', ') + more));
-    }
+    word = shorten(word);
+    if (word && !seen.includes(word)) seen.push(word);
+    if (seen.length === 3) break;
   }
+  if (!seen.length) return shorten(group.items[0].message, 90);
+  const more = seen.length < group.items.length ? '\u2026' : '';
+  return seen.join(' \u00b7 ') + more;
+}
+
+/**
+ * One check, as one card.
+ *
+ * Every card collapses the same way, whether the check fired once or eight
+ * times, so the list has one rhythm instead of two. Blockers and majors open on
+ * arrival because they decide whether the draft can go out; the long tail opens
+ * when you ask for it.
+ */
+function renderCard(group, open) {
+  const card = text('details', 'card');
+  card.open = open;
+
+  const head = text('summary', 'card-head');
+  head.append(text('span', 'caret'));
+  head.append(text('span', 'card-title', group.title || group.rule));
+  head.append(text('span', 'card-count', String(group.items.length)));
   head.append(actionButton(
     'Ignore check',
     `Stop reporting ${group.title || group.rule} for this draft`,
     () => ignored.rules.add(group.rule),
   ));
-  box.append(head);
+  head.append(text('span', 'card-preview', previewOf(group)));
+  card.append(head);
 
-  const body = text('div', 'rule-body');
-  for (const finding of group.items) body.append(renderOccurrence(finding));
-  if (group.note) body.append(text('p', 'note', group.note));
+  const body = text('div', 'card-body');
+  for (const finding of group.items) body.append(renderHit(finding));
+  card.append(body);
 
-  // Naming the family answers "what kind of check is this?" without the reader
-  // having to decode the rule id, which is only there for `qa-disable`.
-  const footer = text('p', 'rule');
+  // The foot answers "why is this a rule?" and names the family, so the reader
+  // never has to decode the rule id - that is only there for `qa-disable`.
+  const foot = text('div', 'card-foot');
+  if (group.note) foot.append(text('p', null, group.note));
+  const provenance = text('p', 'prov');
   if (group.category) {
-    footer.append(text('span', 'rule-family', group.category));
-    footer.append(text('span', null, ' · '));
+    provenance.append(text('span', 'rule-family', group.category));
+    provenance.append(text('span', null, ' \u00b7 '));
   }
-  footer.append(text('span', 'rule-id', group.rule));
-  body.append(footer);
-  box.append(body);
+  provenance.append(text('span', 'rule-id', group.rule));
+  foot.append(provenance);
+  card.append(foot);
 
-  return box;
+  return card;
+}
+
+/** The heading over a run of cards. Static: one collapsing layer is enough. */
+function severityHead(kind, name, count, blurb, action) {
+  const head = text('div', 'sev-head');
+  head.append(text('span', `dot ${kind}`));
+  head.append(text('span', 'sev-name', name));
+  head.append(text('span', 'sev-count', String(count)));
+  if (action) head.append(action);
+  return [head, text('p', 'sev-blurb', blurb)];
 }
 
 /**
@@ -399,33 +453,33 @@ function renderIgnored() {
   const dismissed = ignoredFindings();
   if (!dismissed.length) return null;
 
-  const section = text('details', 'sev ignored');
-  const heading = text('summary', 'sev-head');
-  heading.append(text('span', 'sev-name', 'Ignored'));
-  heading.append(text('span', 'count', String(dismissed.length)));
-  heading.append(text('span', 'sev-blurb', 'Set aside by you. Not in any of the copied formats.'));
-  heading.append(actionButton('Restore all', 'Put every dismissed finding back', () => {
-    ignored.rules.clear();
-    ignored.items.clear();
-  }));
-  section.append(heading);
+  const section = text('section', 'sev ignored');
+  section.append(...severityHead(
+    'ignored',
+    'Ignored',
+    dismissed.length,
+    'Set aside by you. Left out of every format you copy, and counted so the exclusion is visible.',
+    actionButton('Restore all', 'Put every dismissed finding back', () => {
+      ignored.rules.clear();
+      ignored.items.clear();
+    }),
+  ));
 
-  const body = text('div', 'sev-body');
   for (const group of byRule(dismissed)) {
-    const wholeRule = ignored.rules.has(group.rule);
-    const box = text('div', 'rule-group');
-    const head = text('div', 'rule-head');
-    head.append(text('span', 'rule-title', group.title || group.rule));
-    head.append(text('span', 'count', String(group.items.length)));
-    head.append(text('span', 'preview', wholeRule ? 'whole check ignored' : ''));
+    const card = text('div', 'card');
+    const head = text('div', 'card-head');
+    head.append(text('span', 'caret'));
+    head.append(text('span', 'card-title', group.title || group.rule));
+    head.append(text('span', 'card-count', String(group.items.length)));
     head.append(actionButton('Restore', 'Report this again', () => {
       ignored.rules.delete(group.rule);
       for (const item of group.items) ignored.items.delete(itemKey(item));
     }));
-    box.append(head);
-    body.append(box);
+    head.append(text('span', 'card-preview',
+      ignored.rules.has(group.rule) ? 'The whole check is ignored for this draft' : previewOf(group)));
+    card.append(head);
+    section.append(card);
   }
-  section.append(body);
   return section;
 }
 
@@ -449,26 +503,36 @@ function renderList(result) {
     const group = shown.filter((f) => f.severity === severity);
     if (!group.length) continue;
 
-    const section = text('details', `sev ${severity}`);
-    // Blockers and majors decide whether the draft can go out, so they start
-    // open; the long tail starts shut or the list is a wall again.
-    section.open = view.filter !== 'all' || severity === 'blocker' || severity === 'major';
+    const section = text('section', `sev ${severity}`);
+    section.append(...severityHead(
+      severity,
+      SEVERITY_LABEL[severity],
+      group.length,
+      SEVERITY_BLURB[severity],
+    ));
 
-    const heading = text('summary', 'sev-head');
-    heading.append(text('span', `dot ${severity}`));
-    heading.append(text('span', 'sev-name', SEVERITY_LABEL[severity]));
-    heading.append(text('span', 'count', String(group.length)));
-    heading.append(text('span', 'sev-blurb', SEVERITY_BLURB[severity]));
-    section.append(heading);
-
-    const body = text('div', 'sev-body');
-    for (const ruleGroup of byRule(group)) body.append(renderRuleGroup(ruleGroup));
-    section.append(body);
+    // Blockers and majors decide whether the draft can go out, so they arrive
+    // open; the long tail arrives shut, or the list is a wall again. Filtering
+    // to one severity is a decision to read it, so those open too.
+    const open = view.filter !== 'all' || severity === 'blocker' || severity === 'major';
+    for (const ruleGroup of byRule(group)) section.append(renderCard(ruleGroup, open));
     list.append(section);
   }
 
   const dismissed = renderIgnored();
   if (dismissed) list.append(dismissed);
+
+  syncExpandLabel();
+}
+
+/** Say what the button will do next, rather than what it did last. */
+function syncExpandLabel() {
+  const cards = document.querySelectorAll('#findings details.card');
+  const anyClosed = [...cards].some((card) => !card.open);
+  const button = el('expand');
+  button.textContent = anyClosed ? 'Expand all' : 'Collapse all';
+  // Nothing to expand is nothing to offer, rather than a control that does nothing.
+  button.hidden = cards.length === 0;
 }
 
 /** The severity chips double as the filter, which is what "blockers only" means. */
@@ -504,10 +568,12 @@ function render() {
 
   const banner = el('verdict');
   banner.className = `verdict ${verdict.tone}`;
-  banner.replaceChildren(
-    text('strong', null, verdict.headline),
-    text('span', null, verdict.detail),
-  );
+  const wording = text('div', 'verdict-words');
+  wording.append(text('strong', null, verdict.headline));
+  wording.append(text('span', 'detail', verdict.detail));
+  const mark = text('span', 'mark', VERDICT_MARK[verdict.tone]);
+  mark.setAttribute('aria-hidden', 'true');
+  banner.replaceChildren(mark, wording);
 
   const dialect = stats.dialect === 'en-GB' ? 'British English'
     : stats.dialect === 'en-US' ? 'American English'
@@ -525,7 +591,7 @@ function render() {
 
   // Only a deck can carry comments, and only if anything is left to say.
   const deck = doc.format === 'pptx' && lastResult.bytes;
-  el('file-bar').hidden = !deck || !result.findings.length;
+  el('file-actions').hidden = !deck || !result.findings.length;
 
   el('results').hidden = false;
   el('error').hidden = true;
@@ -555,6 +621,10 @@ async function handleFile(file) {
     // The drop target shrinks to a line once it has done its job, so the
     // findings start near the top of the window instead of below a banner.
     document.body.classList.add('has-result');
+    // The settings have done their job by now, and four open fields above the
+    // findings is four fields between the reader and what they came for.
+    el('settings').hidden = true;
+    el('settings-toggle').setAttribute('aria-expanded', 'false');
     el('drop-title').textContent = `Checked ${file.name}`;
     el('drop-hint').textContent = 'Drop another draft, or click to choose';
     el('status').textContent = '';
@@ -702,16 +772,18 @@ function init() {
   el('download-pptx').addEventListener('click', downloadAnnotated);
 
   el('expand').addEventListener('click', () => {
-    const groups = document.querySelectorAll('#findings details');
-    const closed = [...groups].some((d) => !d.open);
-    for (const group of groups) group.open = closed;
-    el('expand').textContent = closed ? 'Collapse all' : 'Expand all';
+    const cards = document.querySelectorAll('#findings details.card');
+    const closed = [...cards].some((card) => !card.open);
+    for (const card of cards) card.open = closed;
+    syncExpandLabel();
   });
+  // A card opened or shut by hand should leave the button telling the truth.
+  el('findings').addEventListener('toggle', syncExpandLabel, true);
 
   // A collapsed group prints as its summary line only, which would silently
   // drop findings from a printed or PDF'd report.
   window.addEventListener('beforeprint', () => {
-    for (const group of document.querySelectorAll('#findings details')) group.open = true;
+    for (const card of document.querySelectorAll('#findings details.card')) card.open = true;
   });
 
   el('settings-toggle').addEventListener('click', () => {

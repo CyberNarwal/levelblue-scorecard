@@ -8,49 +8,59 @@
 <style>
 :root {
   color-scheme: light dark;
-  --bg: #ffffff;
+  /* A grey canvas with white cards on it. Both were white before, so the cards
+     were invisible and a long list read as one undifferentiated block. */
+  --canvas: #f2f5fa;
   --panel: #ffffff;
-  --ink: #0a1929;
-  --muted: #5a6c7d;
-  --line: #e0e7f1;
+  --sunk: #f7f9fc;
+  --ink: #0f1e2e;
+  --muted: #5b6b7c;
+  --faint: #8494a5;
+  --line: #e3e9f2;
+  --line-strong: #cdd8e6;
   --accent: #0052ff;
-  --accent-light: #00d9ff;
-  --accent-lime: #ccff00;
+  --accent-soft: #eef4ff;
   --blocker: #b3261e;
   --blocker-bg: #fdecea;
-  --major: #b45309;
+  --major: #9a5608;
   --major-bg: #fdf3e3;
   --minor: #0052ff;
-  --minor-bg: #f0f7ff;
-  --nit: #5a6c7d;
-  --nit-bg: #f5f7fa;
-  --ok: #1a7f52;
-  --ok-bg: #e7f5ee;
-  --mark-bg: #ffe9a8;
-  --mark-ink: #4a3300;
+  --minor-bg: #eef4ff;
+  --nit: #5b6b7c;
+  --nit-bg: #eef1f6;
+  --ok: #17724a;
+  --ok-bg: #e6f5ec;
+  --mark-bg: #ffe08a;
+  --mark-ink: #43340a;
+  --shadow: 0 1px 2px rgba(15, 30, 46, .05), 0 1px 3px rgba(15, 30, 46, .04);
+  --ring: 0 0 0 3px rgba(0, 82, 255, .22);
 }
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #0a1929;
-    --panel: #112240;
-    --ink: #e8eef7;
-    --muted: #8fa3b8;
-    --line: #1f3a5f;
-    --accent: #4da3ff;
-    --accent-light: #4dd9ff;
-    --accent-lime: #ccff00;
-    --blocker: #ff8a80;
-    --blocker-bg: #3a1f1d;
-    --major: #f0b866;
-    --major-bg: #362a17;
-    --minor: #4da3ff;
-    --minor-bg: #0f2847;
-    --nit: #8fa3b8;
-    --nit-bg: #1a2a3a;
-    --ok: #6ddba4;
-    --ok-bg: #17301f;
-    --mark-bg: #5c4400;
-    --mark-ink: #ffe08a;
+    --canvas: #081320;
+    --panel: #102030;
+    --sunk: #0c1a28;
+    --ink: #e7eef7;
+    --muted: #93a5b8;
+    --faint: #6f8399;
+    --line: #1e3348;
+    --line-strong: #2a4459;
+    --accent: #5aa6ff;
+    --accent-soft: #10263f;
+    --blocker: #ff9086;
+    --blocker-bg: #35201e;
+    --major: #edb166;
+    --major-bg: #322717;
+    --minor: #5aa6ff;
+    --minor-bg: #102640;
+    --nit: #93a5b8;
+    --nit-bg: #172735;
+    --ok: #6fd6a3;
+    --ok-bg: #12301f;
+    --mark-bg: #6a5200;
+    --mark-ink: #ffe9a8;
+    --shadow: 0 1px 2px rgba(0, 0, 0, .35);
+    --ring: 0 0 0 3px rgba(90, 166, 255, .3);
   }
 }
 * { box-sizing: border-box; }
@@ -59,111 +69,136 @@
 [hidden] { display: none !important; }
 body {
   margin: 0;
-  background: var(--bg);
+  background: var(--canvas);
   color: var(--ink);
-  font: 15px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  padding-block: 28px;
+  font: 15px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  padding-block: 32px 0;
   padding-inline: 20px;
+  -webkit-font-smoothing: antialiased;
 }
-.wrap { max-width: 860px; margin: 0 auto; }
-header { margin-bottom: 32px; }
-header .brand { font-size: 24px; font-weight: 700; color: var(--accent); margin-bottom: 12px; letter-spacing: -0.01em; }
-header h1 { font-size: 28px; margin: 0 0 6px; letter-spacing: -0.01em; font-weight: 700; color: var(--ink); }
-header p { margin: 0; color: var(--muted); font-size: 14px; }
+.wrap { max-width: 1040px; margin: 0 auto; }
+:where(button, input, select, a):focus-visible { outline: none; box-shadow: var(--ring); }
+
+/* --- masthead ------------------------------------------------------------ */
+header { margin-bottom: 20px; }
+header .brand {
+  font-size: 12px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase;
+  color: var(--accent); margin-bottom: 10px;
+}
+header h1 { font-size: 30px; margin: 0 0 4px; letter-spacing: -0.02em; font-weight: 700; }
+header p { margin: 0; color: var(--muted); font-size: 15px; }
 .offline {
   display: inline-flex; gap: 7px; align-items: center;
   background: var(--ok-bg); color: var(--ok);
-  border-radius: 999px; padding: 5px 12px; font-size: 12.5px; font-weight: 600;
-  margin-top: 2px; margin-bottom: 20px;
+  border-radius: 999px; padding: 5px 13px; font-size: 13px; font-weight: 600;
+  margin-bottom: 18px;
 }
+
+/* --- the two things you set up before checking --------------------------- */
 .dropzone {
   background: var(--panel);
-  border: 2px dashed var(--line);
+  border: 2px dashed var(--line-strong);
   border-radius: 14px;
-  padding: 44px 28px;
+  padding: 40px 28px;
   text-align: center;
   cursor: pointer;
-  transition: border-color .2s, background .2s, box-shadow .2s;
-  box-shadow: 0 1px 3px rgba(10, 25, 41, 0.08);
+  transition: border-color .15s, background .15s, box-shadow .15s;
 }
-.dropzone:hover, .dropzone:focus-visible { border-color: var(--accent); outline: none; box-shadow: 0 4px 12px rgba(0, 82, 255, 0.15); }
+.dropzone:hover, .dropzone:focus-visible { border-color: var(--accent); background: var(--accent-soft); }
+.dropzone.dragging { border-color: var(--accent); background: var(--accent-soft); }
+.dropzone strong { display: block; font-size: 17px; margin-bottom: 4px; }
+.dropzone span { color: var(--muted); font-size: 14px; }
 /* Once it has done its job the target shrinks to a line, so the findings start
    near the top of the window rather than below a banner-sized invitation. */
-.has-result .dropzone { padding: 10px 16px; display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; text-align: left; }
-.has-result .dropzone strong { font-size: 13.5px; margin: 0; }
+.has-result .dropzone {
+  padding: 11px 16px; border-style: solid; border-width: 1px;
+  display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; text-align: left;
+  box-shadow: var(--shadow);
+}
+.has-result .dropzone strong { font-size: 14px; margin: 0; }
+.has-result .dropzone span { font-size: 13px; }
 .has-result .offline { display: none; }
-.has-result header { margin-bottom: 18px; }
+.has-result header { margin-bottom: 16px; }
+.has-result header h1 { font-size: 24px; }
+.has-result header p { display: none; }
 .has-result .status { min-height: 0; margin: 0; }
-.has-result .settings-toggle { padding-block: 6px; margin-top: 2px; }
-.dropzone.dragging { border-color: var(--accent-light); background: var(--minor-bg); box-shadow: 0 4px 12px rgba(0, 217, 255, 0.16); }
-.dropzone strong { display: block; font-size: 16px; margin-bottom: 5px; }
-.dropzone span { color: var(--muted); font-size: 13.5px; }
 input[type=file] { display: none; }
 .status { text-align: center; color: var(--muted); font-size: 13.5px; min-height: 20px; margin-top: 10px; }
-/* A bare link here was missed by everyone, and the checks that depend on these
-   values then quietly never ran. It reads as an invitation instead. */
+
 .settings-toggle {
   display: block; width: 100%; text-align: left; cursor: pointer;
-  background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
-  color: var(--ink); font: inherit; padding: 11px 14px; margin-top: 12px;
-  transition: border-color .15s;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+  color: var(--ink); font: inherit; padding: 12px 15px; margin-top: 12px;
+  box-shadow: var(--shadow); transition: border-color .15s;
 }
-.settings-toggle:hover, .settings-toggle:focus-visible { border-color: var(--accent); outline: none; }
-.st-main { display: flex; align-items: center; gap: 9px; }
-.st-name { font-size: 13.5px; font-weight: 600; color: var(--accent); }
+.settings-toggle:hover { border-color: var(--accent); }
+.st-main { display: flex; align-items: center; gap: 10px; }
+.st-name { font-size: 14px; font-weight: 650; color: var(--accent); }
 .st-state {
-  font-size: 11px; font-weight: 700; border-radius: 999px; padding: 2px 8px;
+  font-size: 11.5px; font-weight: 700; border-radius: 999px; padding: 2px 9px;
   background: var(--major-bg); color: var(--major); text-transform: uppercase; letter-spacing: .04em;
 }
 .st-state.set { background: var(--ok-bg); color: var(--ok); text-transform: none; letter-spacing: 0; font-weight: 600; }
-.st-why { display: block; margin-top: 3px; font-size: 12.5px; color: var(--muted); }
+.st-why { display: block; margin-top: 4px; font-size: 13px; color: var(--muted); }
 .has-result .st-why { display: none; }
-.settings-intro { margin: 0 0 14px; font-size: 12.5px; color: var(--muted); }
 .settings {
-  background: var(--panel); border: 1px solid var(--line); border-radius: 11px;
-  padding: 18px 20px; margin-top: 8px;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+  padding: 20px 22px; margin-top: 10px; box-shadow: var(--shadow);
 }
-.settings label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 4px; }
-.settings .field { margin-bottom: 14px; }
-.settings .field:last-child { margin-bottom: 0; }
+.settings-intro { margin: 0 0 16px; font-size: 13.5px; color: var(--muted); }
+.settings-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px 20px; }
+@media (max-width: 620px) { .settings-grid { grid-template-columns: 1fr; } }
+.settings label { display: block; font-size: 13px; font-weight: 650; margin-bottom: 5px; }
 .settings input, .settings select {
-  width: 100%; padding: 9px 11px; font: inherit; font-size: 14px;
-  border: 1.5px solid var(--line); border-radius: 8px;
-  background: var(--bg); color: var(--ink); transition: border-color .15s, box-shadow .15s;
+  width: 100%; padding: 9px 12px; font: inherit; font-size: 14.5px;
+  border: 1px solid var(--line-strong); border-radius: 9px;
+  background: var(--panel); color: var(--ink); transition: border-color .15s, box-shadow .15s;
 }
-.settings input:focus, .settings select:focus {
-  outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(0, 82, 255, 0.1);
-}
-.settings .hint { color: var(--muted); font-size: 12.5px; margin: 5px 0 0; }
+.settings input:focus, .settings select:focus { border-color: var(--accent); }
+.settings .hint { color: var(--muted); font-size: 12.5px; line-height: 1.5; margin: 6px 0 0; }
 .error {
-  background: var(--blocker-bg); color: var(--blocker);
-  border-radius: 10px; padding: 14px 16px; margin-top: 20px; font-size: 14px;
+  background: var(--blocker-bg); color: var(--blocker); border: 1px solid currentColor;
+  border-radius: 12px; padding: 15px 17px; margin-top: 20px; font-size: 14.5px;
 }
+
+/* --- the verdict --------------------------------------------------------- */
 .verdict {
-  border-radius: 11px; padding: 18px 20px; margin: 24px 0 16px;
-  display: flex; flex-direction: column; gap: 4px; border-left: 4px solid;
+  border-radius: 14px; padding: 20px 22px; margin: 22px 0 10px;
+  display: flex; align-items: center; gap: 14px;
+  border: 1px solid; box-shadow: var(--shadow);
 }
-.verdict strong { font-size: 17px; font-weight: 700; }
-.verdict span { font-size: 14px; opacity: .9; }
-.verdict.stop { background: var(--blocker-bg); color: var(--blocker); border-left-color: var(--blocker); }
-.verdict.warn { background: var(--major-bg); color: var(--major); border-left-color: var(--major); }
-.verdict.ok { background: var(--ok-bg); color: var(--ok); border-left-color: var(--ok); }
+.verdict .mark { font-size: 22px; line-height: 1; flex: none; font-weight: 700; }
+.verdict-words { min-width: 0; }
+.verdict strong { display: block; font-size: 18px; font-weight: 700; letter-spacing: -0.01em; }
+.verdict span.detail { font-size: 14.5px; opacity: .92; }
+.verdict.stop { background: var(--blocker-bg); color: var(--blocker); border-color: currentColor; }
+.verdict.warn { background: var(--major-bg); color: var(--major); border-color: currentColor; }
+.verdict.ok { background: var(--ok-bg); color: var(--ok); border-color: currentColor; }
 .meta { color: var(--muted); font-size: 13px; margin: 0 0 14px; }
-/* --- controls ------------------------------------------------------------ */
-.bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 8px; }
-.bar-label {
-  flex: none; min-width: 44px; font-size: 11px; font-weight: 700;
-  color: var(--muted); text-transform: uppercase; letter-spacing: .06em;
+
+/* --- the toolbar --------------------------------------------------------- */
+/* One card, not three stacked label-and-control rows. It sticks to the top so
+   the filters stay reachable while you are a long way down the list. */
+.toolbar {
+  position: sticky; top: 0; z-index: 5;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 13px;
+  box-shadow: var(--shadow); margin-bottom: 22px; overflow: hidden;
+}
+.tool-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px 12px; }
+.tool-row + .tool-row { border-top: 1px solid var(--line); background: var(--sunk); }
+.tool-label {
+  flex: none; font-size: 11px; font-weight: 700; color: var(--faint);
+  text-transform: uppercase; letter-spacing: .07em; margin-right: 2px;
 }
 .counts, .actions { display: flex; flex-wrap: wrap; gap: 6px; }
 .chip {
-  display: flex; align-items: baseline; gap: 6px; font: inherit; font-size: 13px;
-  border: 1.5px solid transparent; border-radius: 8px; padding: 5px 10px;
+  display: inline-flex; align-items: baseline; gap: 7px; font: inherit; font-size: 13.5px;
+  border: 1px solid transparent; border-radius: 9px; padding: 6px 12px;
   cursor: pointer; transition: border-color .15s, opacity .15s;
 }
-.chip:disabled { cursor: default; opacity: .35; }
+.chip:disabled { cursor: default; opacity: .4; }
 .chip:not(:disabled):hover { border-color: currentColor; }
-.chip.on { border-color: currentColor; font-weight: 700; }
+.chip.on { border-color: currentColor; box-shadow: inset 0 0 0 1px currentColor; font-weight: 650; }
 .chip-n { font-weight: 700; font-size: 15px; font-variant-numeric: tabular-nums; }
 .chip.all { background: var(--nit-bg); color: var(--ink); }
 .chip.blocker { background: var(--blocker-bg); color: var(--blocker); }
@@ -171,26 +206,26 @@ input[type=file] { display: none; }
 .chip.minor { background: var(--minor-bg); color: var(--minor); }
 .chip.nit { background: var(--nit-bg); color: var(--nit); }
 .actions button, .ghost {
-  font: inherit; font-size: 13px; padding: 6px 12px;
-  border: 1.5px solid var(--line); background: var(--panel); color: var(--ink);
-  border-radius: 8px; cursor: pointer; transition: border-color .15s, color .15s;
+  font: inherit; font-size: 13.5px; padding: 6px 12px;
+  border: 1px solid var(--line-strong); background: var(--panel); color: var(--ink);
+  border-radius: 9px; cursor: pointer; transition: border-color .15s, color .15s, background .15s;
 }
 .actions button:hover, .ghost:hover { border-color: var(--accent); color: var(--accent); }
-.ghost { margin-left: auto; border-color: transparent; color: var(--muted); }
-.actions button.primary { border-color: var(--accent); color: var(--accent); font-weight: 600; }
-.actions button.primary:hover { background: var(--minor-bg); }
-.bar-note { font-size: 12px; color: var(--muted); }
-.legend { flex: 1 1 100%; font-size: 12.5px; }
+.ghost { margin-left: auto; border-color: transparent; color: var(--muted); background: none; }
+.actions button.primary { border-color: var(--accent); color: var(--accent); font-weight: 650; }
+.actions button.primary:hover { background: var(--accent-soft); }
+.tool-note { font-size: 12.5px; color: var(--muted); }
+.legend { flex: 1 1 100%; font-size: 13px; }
 .legend > summary {
   display: inline-block; cursor: pointer; color: var(--accent);
-  padding: 2px 0; list-style: none;
+  padding: 2px 0; list-style: none; font-size: 12.5px;
 }
 .legend > summary::-webkit-details-marker { display: none; }
 .legend > summary::before { content: '? '; font-weight: 700; }
 .legend dl {
-  display: grid; grid-template-columns: max-content 1fr; gap: 5px 12px;
-  margin: 8px 0 0; padding: 12px 14px;
-  background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+  display: grid; grid-template-columns: max-content 1fr; gap: 7px 14px;
+  margin: 10px 0 2px; padding: 14px 16px;
+  background: var(--sunk); border: 1px solid var(--line); border-radius: 10px;
 }
 .legend dt { font-weight: 700; }
 .legend dt.blocker { color: var(--blocker); }
@@ -198,121 +233,155 @@ input[type=file] { display: none; }
 .legend dt.minor { color: var(--minor); }
 .legend dt.nit { color: var(--nit); }
 .legend dd { margin: 0; color: var(--muted); }
-.legend > p { margin: 8px 0 0; color: var(--muted); }
+.legend > p { margin: 10px 0 2px; color: var(--muted); }
 @media (max-width: 560px) {
   .legend dl { grid-template-columns: 1fr; gap: 2px; }
-  .legend dd { margin-bottom: 7px; }
+  .legend dd { margin-bottom: 8px; }
 }
 
-/* --- severity sections --------------------------------------------------- */
-.sev { margin-top: 18px; }
-.sev-head {
-  display: flex; align-items: center; gap: 8px; cursor: pointer;
-  padding: 6px 0; font-size: 15px; font-weight: 700;
-  border-bottom: 1.5px solid var(--line); list-style: none;
-}
-.sev-head::-webkit-details-marker { display: none; }
-/* The triangle is drawn rather than relying on the platform marker, so the
-   affordance looks the same in every browser the team might open this in. */
-.sev-head::before,
-.rule-head::before {
-  content: ''; flex: none; width: 0; height: 0; margin-right: 1px;
-  border-left: 5px solid currentColor; border-top: 4px solid transparent;
-  border-bottom: 4px solid transparent; opacity: .55; transition: transform .15s;
-}
-details[open] > .sev-head::before,
-details[open] > .rule-head::before { transform: rotate(90deg); }
-.rule-group:not(details) > .rule-head::before { visibility: hidden; }
+/* --- a severity run ------------------------------------------------------ */
+/* Not a third collapsing layer: a plain heading over the cards that follow it.
+   Two levels of nesting was one too many to hold in your head. */
+.sev + .sev { margin-top: 30px; }
+.sev-head { display: flex; align-items: center; gap: 9px; margin-bottom: 3px; }
+.sev-name { font-size: 12px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; }
+.sev.blocker .sev-name { color: var(--blocker); }
+.sev.major .sev-name { color: var(--major); }
+.sev.minor .sev-name { color: var(--minor); }
+.sev.nit .sev-name { color: var(--nit); }
+.sev.ignored .sev-name { color: var(--faint); }
 .dot { width: 9px; height: 9px; border-radius: 50%; flex: none; }
 .dot.blocker { background: var(--blocker); }
 .dot.major { background: var(--major); }
 .dot.minor { background: var(--minor); }
 .dot.nit { background: var(--nit); }
-.sev-blurb { font-size: 12.5px; font-weight: 400; color: var(--muted); }
-.count {
-  flex: none; font-size: 11.5px; font-weight: 700; font-variant-numeric: tabular-nums;
-  background: var(--nit-bg); color: var(--muted); border-radius: 999px; padding: 1px 7px;
+.dot.ignored { background: var(--faint); }
+.sev-count {
+  font-size: 11.5px; font-weight: 700; font-variant-numeric: tabular-nums;
+  background: var(--nit-bg); color: var(--muted); border-radius: 999px; padding: 1px 8px;
 }
+.sev-blurb { font-size: 13px; color: var(--muted); margin: 0 0 12px; }
+.sev-head .act { margin-left: auto; }
 
-/* --- one rule ------------------------------------------------------------ */
-.rule-group { border-bottom: 1px solid var(--line); }
-.rule-group:last-child { border-bottom: 0; }
-.rule-head {
-  display: flex; align-items: center; gap: 8px; cursor: pointer;
-  padding: 8px 2px; font-size: 13.5px; font-weight: 600; list-style: none;
+/* --- one check, one card ------------------------------------------------- */
+.card {
+  background: var(--panel); border: 1px solid var(--line); border-left: 3px solid var(--line-strong);
+  border-radius: 11px; box-shadow: var(--shadow); margin-bottom: 10px; overflow: hidden;
+  /* Clear of the sticky toolbar, so a card scrolled to is not hidden by it. */
+  scroll-margin-top: 108px;
 }
-.rule-group:not(details) > .rule-head { cursor: default; }
-.rule-head::-webkit-details-marker { display: none; }
-.rule-head:hover { color: var(--accent); }
-.rule-group:not(details) > .rule-head:hover { color: inherit; }
-.preview {
-  flex: 1 1 200px; min-width: 0; font-weight: 400; color: var(--muted);
-  font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+.sev.blocker .card { border-left-color: var(--blocker); }
+.sev.major .card { border-left-color: var(--major); }
+.sev.minor .card { border-left-color: var(--minor); }
+.sev.nit .card { border-left-color: var(--nit); }
+.card-head {
+  display: grid; grid-template-columns: 11px minmax(0, 1fr) auto auto;
+  align-items: center; gap: 4px 11px;
+  padding: 11px 15px; cursor: pointer; list-style: none;
 }
-.rule-body { padding: 0 0 8px 16px; }
+details.card[open] > .card-head { padding-bottom: 9px; }
+/* When the card is open the flagged words are right below it, so the preview
+   would only say the same thing twice. */
+details.card[open] > .card-head .card-preview { display: none; }
+details.card > .card-head:hover .card-title { color: var(--accent); }
+.card-head::-webkit-details-marker { display: none; }
+div.card > .card-head { cursor: default; }
+/* The triangle is drawn rather than relying on the platform marker, so the
+   affordance looks the same in every browser the team might open this in. */
+.caret {
+  width: 0; height: 0; justify-self: center;
+  border-left: 6px solid currentColor; border-top: 5px solid transparent;
+  border-bottom: 5px solid transparent; color: var(--faint); transition: transform .15s;
+}
+details.card[open] > .card-head .caret { transform: rotate(90deg); }
+div.card > .card-head .caret { visibility: hidden; }
+.card-title { font-size: 15.5px; font-weight: 650; letter-spacing: -0.01em; }
+.card-count {
+  font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums;
+  background: var(--nit-bg); color: var(--muted); border-radius: 999px; padding: 2px 9px;
+}
+/* On its own line under the title, never squeezed against it. */
+.card-preview {
+  grid-column: 2 / -1; font-size: 13px; color: var(--muted);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.card-body { padding: 0 15px 3px; }
+.card-foot {
+  background: var(--sunk); border-top: 1px solid var(--line);
+  padding: 9px 15px; font-size: 13px; color: var(--muted);
+}
+.card-foot p { margin: 0 0 5px; }
+.card-foot .prov { font-size: 11.5px; color: var(--faint); }
+.rule-family { font-weight: 700; letter-spacing: .05em; text-transform: uppercase; }
+.rule-id { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
 
-/* --- one place it fired -------------------------------------------------- */
-.row { display: flex; flex-wrap: wrap; align-items: baseline; gap: 3px 9px; padding: 3px 0; }
+/* --- one place a check fired --------------------------------------------- */
+/* A grid, so the quote, the replacement and the Ignore button each have their
+   own space. They shared a flex line before and ran into one another. */
+.hit {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto;
+  gap: 3px 12px; padding: 9px 0;
+}
+.hit + .hit { border-top: 1px solid var(--line); }
 .where {
-  flex: none; min-width: 66px; text-align: right;
-  font-variant-numeric: tabular-nums; font-size: 11.5px; font-weight: 600;
-  color: var(--muted); white-space: nowrap;
+  font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--faint); font-variant-numeric: tabular-nums;
 }
 .quote {
-  flex: 1 1 320px;
-  font: 13px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  white-space: pre-wrap; word-break: break-word;
+  grid-column: 1 / -1;
+  font: 14px/1.65 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  white-space: pre-wrap; overflow-wrap: anywhere;
 }
-.quote.plain { font-family: inherit; font-size: 13.5px; }
-.ctx { color: var(--muted); }
+.quote.plain { font-family: inherit; font-size: 14.5px; line-height: 1.55; }
+.ctx { color: var(--faint); }
 /* The highlight is the point of the row: it marks the exact characters the rule
    objected to, including a stray space, which is otherwise invisible. */
 mark {
   background: var(--mark-bg); color: var(--mark-ink);
-  border-radius: 3px; padding: 0 2px; font-weight: 600;
+  border-radius: 3px; padding: 0 3px; font-weight: 700;
   -webkit-box-decoration-break: clone; box-decoration-break: clone;
 }
-/* Pushed right so the replacements line up as a column; a long one that wraps
-   onto its own line stays on that column rather than jumping to the margin. */
-.fix { flex: 0 1 auto; margin-left: auto; font-size: 13px; font-weight: 600; color: var(--ok); text-align: right; }
-/* --- ignoring ------------------------------------------------------------ */
-/* Faint at rest rather than hidden: a control nobody can see is a control
-   nobody uses, and this one has to be found without reading any documentation. */
+.fix { grid-column: 1 / -1; font-size: 13.5px; color: var(--muted); }
+.fix b { color: var(--ok); font-weight: 650; }
+.fix code {
+  font: 13px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  background: var(--ok-bg); color: var(--ok); border-radius: 4px; padding: 1px 5px; font-weight: 600;
+}
+
+/* --- setting something aside --------------------------------------------- */
+/* Quiet, but never invisible: a control nobody can see is a control nobody
+   uses, and this one has to be found without reading any documentation. */
 .act {
-  flex: none; font: inherit; font-size: 11.5px; padding: 2px 8px;
+  align-self: start; justify-self: end;
+  font: inherit; font-size: 12px; padding: 3px 10px;
   border: 1px solid var(--line); border-radius: 999px;
-  background: var(--bg); color: var(--muted); cursor: pointer;
-  opacity: .4; transition: opacity .12s, color .12s, border-color .12s;
+  background: var(--panel); color: var(--muted); cursor: pointer; white-space: nowrap;
+  transition: color .12s, border-color .12s, background .12s;
 }
-.row:hover .act, .rule-head:hover .act, .sev-head:hover .act,
-.act:focus-visible, .act:hover { opacity: 1; }
-.act:hover { color: var(--accent); border-color: var(--accent); }
-/* All of them line up on the right, clear of the text they act on. */
-.rule-head > .act, .sev-head > .act { margin-left: auto; }
-.sev.ignored { opacity: .75; }
-.sev.ignored .sev-head { font-weight: 600; }
-.sev.ignored .rule-title { font-weight: 500; }
-.sev.ignored .act { opacity: 1; }
-@media (hover: none) {
-  .act { opacity: 1; }
+.act:hover { color: var(--accent); border-color: var(--accent); background: var(--accent-soft); }
+.sev.ignored .card { opacity: .82; border-left-color: var(--line-strong); }
+.sev.ignored .card:hover { opacity: 1; }
+.empty {
+  background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+  padding: 22px; color: var(--muted); text-align: center; box-shadow: var(--shadow);
 }
-.note { margin: 4px 0 0 75px; font-size: 12px; color: var(--muted); }
-.rule { margin: 2px 0 0 75px; font-size: 10.5px; color: var(--muted); opacity: .75; }
-.rule .rule-id { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; opacity: .8; }
-.rule-family { font-weight: 600; letter-spacing: .03em; text-transform: uppercase; }
 @media (max-width: 560px) {
-  .where { min-width: 0; text-align: left; }
-  .note, .rule { margin-left: 0; }
-  .rule-body { padding-left: 6px; }
+  body { padding-inline: 14px; }
+  .card-head { grid-template-columns: 11px minmax(0, 1fr) auto; gap: 6px 9px; }
+  .card-head .act { grid-column: 2 / -1; justify-self: start; }
 }
-.empty { color: var(--muted); }
-.version { margin: 0 0 8px; font-variant-numeric: tabular-nums; opacity: .8; }
-footer { margin-top: 48px; padding-top: 20px; border-top: 1px solid var(--line); color: var(--muted); font-size: 12.5px; line-height: 1.6; }
+
+footer {
+  margin-top: 48px; padding: 20px 0 32px; border-top: 1px solid var(--line);
+  color: var(--muted); font-size: 13px; line-height: 1.65;
+}
 footer p { margin: 0 0 8px; }
+.version { font-variant-numeric: tabular-nums; }
 @media print {
-  body { background: #fff; }
-  .dropzone, .settings, .settings-toggle, .bar, .offline, footer { display: none; }
-  .sev, .rule-group { break-inside: avoid; }
+  body { background: #fff; padding: 0; }
+  .dropzone, .settings, .settings-toggle, .toolbar, .offline, footer, .act { display: none !important; }
+  .card, .verdict { box-shadow: none; break-inside: avoid; }
+  .sev { break-inside: auto; }
 }
 </style>
 </head>
@@ -343,84 +412,85 @@ footer p { margin: 0 0 8px; }
   <div class="settings" id="settings" hidden>
     <p class="settings-intro">These describe the engagement, not the file. They are remembered on this
       computer and apply to every draft you check until you change them.</p>
-    <div class="field">
-      <label for="dialect">English</label>
-      <select id="dialect">
-        <option value="auto">Work it out from the draft</option>
-        <option value="en-GB">British</option>
-        <option value="en-US">American</option>
-      </select>
-    </div>
-    <div class="field">
-      <label for="clientName">This client's name</label>
-      <input type="text" id="clientName" placeholder="Northwind Trading" autocomplete="off">
-      <p class="hint">Warns you if the draft never names them - a sign a template field was missed.</p>
-    </div>
-    <div class="field">
-      <label for="otherClients">Other clients' names</label>
-      <input type="text" id="otherClients" placeholder="Contoso, Initech" autocomplete="off">
-      <p class="hint">Separate with commas. If the draft was copied from another client's report, this catches their name surviving in it.</p>
-    </div>
-    <div class="field">
-      <label for="classification">Required marking</label>
-      <input type="text" id="classification" placeholder="CONFIDENTIAL" autocomplete="off">
-      <p class="hint">Leave blank to skip. Checks the body, headers and footers.</p>
+    <div class="settings-grid">
+      <div class="field">
+        <label for="dialect">English</label>
+        <select id="dialect">
+          <option value="auto">Work it out from the draft</option>
+          <option value="en-GB">British</option>
+          <option value="en-US">American</option>
+        </select>
+        <p class="hint">Which spelling the draft should be consistent with.</p>
+      </div>
+      <div class="field">
+        <label for="clientName">This client's name</label>
+        <input type="text" id="clientName" placeholder="Northwind Trading" autocomplete="off">
+        <p class="hint">Warns you if the draft never names them - a sign a template field was missed.</p>
+      </div>
+      <div class="field">
+        <label for="otherClients">Other clients' names</label>
+        <input type="text" id="otherClients" placeholder="Contoso, Initech" autocomplete="off">
+        <p class="hint">Separate with commas. If the draft was copied from another client's report, this catches their name surviving in it.</p>
+      </div>
+      <div class="field">
+        <label for="classification">Required marking</label>
+        <input type="text" id="classification" placeholder="CONFIDENTIAL" autocomplete="off">
+        <p class="hint">Leave blank to skip. Checks the body, headers and footers.</p>
+      </div>
     </div>
   </div>
 
   <p class="error" id="error" hidden></p>
 
   <div id="results" hidden>
-    <div class="verdict" id="verdict"></div>
+    <div class="verdict" id="verdict" role="status" aria-live="polite"></div>
     <p class="meta" id="meta"></p>
 
-    <div class="bar">
-      <span class="bar-label">Show</span>
-      <div class="counts" id="counts"></div>
-      <details class="legend">
-        <summary>What do these mean?</summary>
-        <dl>
-          <dt class="blocker">Blocker</dt>
-          <dd>Must not reach a client at all: a credential, another client's name,
-            an unresolved comment, a tracked change. Fix before the draft leaves the building.</dd>
-          <dt class="major">Major</dt>
-          <dd>Wrong, or reads as wrong to the client: a missing section, a cross-reference
-            that goes nowhere, a CVSS score that contradicts its own label.</dd>
-          <dt class="minor">Minor</dt>
-          <dd>The draft disagrees with itself on spelling, capitalisation, dashes or spacing.
-            Each one is small; together they are what makes a report look unchecked.</dd>
-          <dt class="nit">Nit</dt>
-          <dd>A preference rather than a fault - wordiness, hedging, passive voice.
-            Fix if you have the time, ignore it if you do not.</dd>
-        </dl>
-        <p>Each finding also names the family of check it came from - Confidentiality,
-          Structure, Terminology and so on - under the group it belongs to.</p>
-      </details>
-    </div>
-
-    <div class="bar">
-      <span class="bar-label">Copy</span>
-      <div class="actions">
-        <button type="button" id="copy-comments" title="One block per finding, to paste into the comment on that slide or paragraph">For comments</button>
-        <button type="button" id="copy-summary" title="One line per finding, blockers first, to attach to the mail back to the author">Summary</button>
-        <button type="button" id="copy-blockers" title="Only what stops the draft being issued">Blocker list</button>
-        <button type="button" id="copy-report" title="The full markdown report, for a review thread">Full report</button>
+    <div class="toolbar">
+      <div class="tool-row">
+        <span class="tool-label">Show</span>
+        <div class="counts" id="counts"></div>
+        <button type="button" id="expand" class="ghost">Expand all</button>
+        <details class="legend">
+          <summary>What do these mean?</summary>
+          <dl>
+            <dt class="blocker">Blocker</dt>
+            <dd>Must not reach a client at all: a credential, another client's name,
+              an unresolved comment, a tracked change. Fix before the draft leaves the building.</dd>
+            <dt class="major">Major</dt>
+            <dd>Wrong, or reads as wrong to the client: a missing section, a cross-reference
+              that goes nowhere, a CVSS score that contradicts its own label.</dd>
+            <dt class="minor">Minor</dt>
+            <dd>The draft disagrees with itself on spelling, capitalisation, dashes or spacing.
+              Each one is small; together they are what makes a report look unchecked.</dd>
+            <dt class="nit">Nit</dt>
+            <dd>A preference rather than a fault - wordiness, hedging, passive voice.
+              Fix if you have the time, ignore it if you do not.</dd>
+          </dl>
+          <p>Each card also names the family of check it came from - Confidentiality,
+            Structure, Terminology and so on - along its foot.</p>
+        </details>
       </div>
-      <button type="button" id="expand" class="ghost">Expand all</button>
-    </div>
 
-    <div class="bar" id="file-bar" hidden>
-      <span class="bar-label">File</span>
-      <div class="actions">
-        <button type="button" id="download-pptx" class="primary"
-          title="Save a copy of the deck with every finding written in as a PowerPoint comment">
-          Download deck with comments
-        </button>
+      <div class="tool-row">
+        <span class="tool-label">Copy</span>
+        <div class="actions">
+          <button type="button" id="copy-comments" title="One block per finding, to paste into the comment on that slide or paragraph">For comments</button>
+          <button type="button" id="copy-summary" title="One line per finding, blockers first, to attach to the mail back to the author">Summary</button>
+          <button type="button" id="copy-blockers" title="Only what stops the draft being issued">Blocker list</button>
+          <button type="button" id="copy-report" title="The full markdown report, for a review thread">Full report</button>
+        </div>
+        <span id="file-actions" class="actions" hidden>
+          <button type="button" id="download-pptx" class="primary"
+            title="Save a copy of the deck with every finding written in as a PowerPoint comment">
+            Download deck with comments
+          </button>
+          <span class="tool-note">Writes a copy. Your original is never changed.</span>
+        </span>
       </div>
-      <span class="bar-note">Writes a copy. Your original file is never changed.</span>
     </div>
 
-    <div id="findings"></div>
+    <div id="findings" aria-label="Findings"></div>
   </div>
 
   <footer>

@@ -89,20 +89,18 @@ await page.waitForTimeout(350);
 sizes.push(await shotSpan('verdict', '#verdict', '.counts'));
 
 // 3. a real finding, with the flagged words highlighted in context
-sizes.push(await shot('finding', '.sev.blocker .rule-group', 6));
+sizes.push(await shot('finding', '.sev.blocker .card', 6));
 
 // 4. a repeated check collapsed to one row, with its preview of flagged words
-const collapsed = 'details.rule-group:not([open])';
+const collapsed = 'details.card:not([open])';
 sizes.push(await shot('grouped', collapsed, 6));
 
 // 5. the copy row and the deck download, side by side as they appear
-sizes.push(await shotSpan('handoff', '.bar:has(#copy-comments)', '#file-bar'));
+sizes.push(await shot('handoff', '.tool-row:has(#copy-comments)'));
 
 // 6. the ignored section, which is the part people do not expect
-await page.locator('.sev.blocker .rule-group').first().locator('.rule-head .act').click();
+await page.locator('.sev.blocker .card').first().locator('.card-head .act').click();
 await page.waitForTimeout(250);
-await page.locator('.sev.ignored').evaluate((el) => { el.open = true; });
-await page.waitForTimeout(200);
 sizes.push(await shot('ignored', '.sev.ignored', 6));
 
 if (errors.length) throw new Error(`the tool errored while being photographed: ${errors.join('; ')}`);
