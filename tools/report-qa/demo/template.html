@@ -66,6 +66,16 @@ h2 {
   font-size: 12px; font-weight: 700; letter-spacing: .13em; text-transform: uppercase;
   color: var(--muted); margin: 34px 0 12px;
 }
+.brief { display: grid; gap: 2px; margin-bottom: 8px; }
+.brief div {
+  display: grid; grid-template-columns: 148px 1fr; gap: 12px;
+  padding: 10px 12px; background: var(--panel);
+  border: 1px solid var(--line); border-radius: 8px; font-size: 14.5px;
+}
+.brief dt { font-weight: 700; color: var(--do); }
+.brief dd { margin: 0; color: var(--muted); }
+.brief dd b { color: var(--ink); font-weight: 600; }
+@media (max-width: 460px) { .brief div { grid-template-columns: 1fr; gap: 3px; } }
 .check { display: grid; gap: 2px; }
 .check label {
   display: grid; grid-template-columns: 22px 1fr; gap: 10px; align-items: start;
@@ -103,6 +113,7 @@ h2 {
 .say .tag { color: var(--muted); }
 .see .tag { color: var(--see); }
 .watch .tag { color: var(--warn); }
+.why .tag { color: var(--dim); }
 
 .do .body { font-size: 15px; }
 .say .body { font: 400 17px/1.55 var(--read); color: var(--ink); }
@@ -114,6 +125,13 @@ h2 {
   font-size: 14px; color: var(--warn);
   background: var(--warn-soft); border-radius: 8px; padding: 9px 12px;
 }
+/* The reasoning behind a line, to draw on if there is time or if asked. Set
+   quieter than the line itself so the eye finds what to say first. */
+.why .body {
+  font-size: 14px; line-height: 1.5; color: var(--muted);
+  border-left: 2px solid var(--line); padding-left: 12px;
+}
+.why .body b { color: var(--ink); font-weight: 600; }
 kbd {
   font: 600 12px/1 var(--mono); background: var(--panel-2); border: 1px solid var(--line);
   border-radius: 5px; padding: 3px 6px; color: var(--ink);
@@ -160,6 +178,11 @@ footer { margin-top: 36px; padding-top: 18px; border-top: 1px solid var(--line);
     <p class="verified">Every figure below was verified against build __COMMIT__ on __DATE__. If a number on
       screen differs, the tool has changed — say so and carry on; it does not affect the point.</p>
   </header>
+
+  <h2>What to have in your head</h2>
+  <div class="brief">
+    __BRIEFING__
+  </div>
 
   <h2>Before you start</h2>
   <div class="check">
