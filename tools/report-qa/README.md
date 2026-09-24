@@ -183,6 +183,28 @@ and never goes to a client.
 needs LibreOffice. It reports shapes off the slide, shapes inside the 0.5"
 margin, overlapping text boxes, and text estimated to overflow its box.
 
+## The live demo
+
+A demo of the tool in motion lands better than the deck does, so there is a run
+sheet for it and a draft to run it on:
+
+```bash
+npm run qa:demo      # writes the demo draft and report-qa-demo-script.html
+```
+
+`Northwind Trading - Security Assessment (DEMO DRAFT).pptx` is a fictional draft
+with planted faults - internal remarks in the speaker notes, a CVSS score that
+contradicts its own label, a retired PCI DSS version, a control identifier off
+the end of its framework, and the previous client's name left in the slide
+master. `report-qa-demo-script.html` is the presenter's sheet: a pre-flight
+checklist, eleven beats of what to do, what to say and what will appear, what to
+do when it does not, and the questions that get asked.
+
+The figures in the sheet are produced by checking the draft at build time, once
+with the engagement settings blank and once filled in, so the sheet states what
+the tool will really say. A run sheet that disagrees with the screen goes wrong
+in front of an audience.
+
 ## Where the framework data comes from
 
 The canonical names, current versions and control-identifier shapes are taken
