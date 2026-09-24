@@ -7,6 +7,7 @@
  * draft assembled from several authors almost never does.
  */
 
+import { LOWERCASE_NAMES } from '../data/terms.mjs';
 import { splitSentences } from '../text.mjs';
 
 const PROSE = ['paragraph', 'listItem', 'caption'];
@@ -444,16 +445,28 @@ export const rules = [
     title: 'Sentence starts with a lower-case letter',
     category: 'Grammar',
     severity: 'major',
+    note: 'Only sentences that follow another sentence in the same paragraph are '
+      + 'checked. A paragraph that opens in lower case is usually a bullet, a cell '
+      + 'or a slide text box rather than a mistake, and reporting those buried the '
+      + 'real ones.',
     check(doc) {
       const findings = [];
       for (const block of doc.blocks) {
         if (block.type !== 'paragraph') continue;
-        for (const sentence of splitSentences(block.text, block.start)) {
-          const first = sentence.text[0];
-          if (!/[a-z]/.test(first)) continue;
+        const sentences = splitSentences(block.text, block.start);
+        for (let i = 0; i < sentences.length; i += 1) {
+          // The first sentence of a paragraph is not evidence of anything. A
+          // slide text box, a hand-typed bullet and a layout table's cell all
+          // arrive as paragraphs, and all of them legitimately open mid-thought.
+          // A sentence that follows a full stop in the same paragraph is the
+          // case where a missing capital is genuinely a missing capital.
+          if (i === 0) continue;
+          const sentence = sentences[i];
+          if (!/[a-z]/.test(sentence.text[0])) continue;
           // Product names and identifiers legitimately start lower case.
           const word = (sentence.text.match(/^\S+/) || [''])[0];
           if (/[A-Z0-9_/\\.-]/.test(word.slice(1))) continue;
+          if (LOWERCASE_NAMES.has(word.replace(/[^A-Za-z-]/g, '').toLowerCase())) continue;
           if (doc.isOpaque(sentence.start)) continue;
           findings.push({
             start: sentence.start,

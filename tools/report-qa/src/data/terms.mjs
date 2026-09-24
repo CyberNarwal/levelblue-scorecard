@@ -82,6 +82,19 @@ export const CANONICAL_TERMS = [
  * Acronyms an advisory report may use without expansion, because the audience
  * is assumed to know them. Everything else should be expanded on first use.
  */
+/**
+ * Tools and services whose own name is lower case. Starting a sentence with one
+ * is a house-style argument, not a typo, so the capitalisation check leaves them
+ * alone rather than telling someone to write "Nginx".
+ */
+export const LOWERCASE_NAMES = new Set([
+  'awk', 'bash', 'cron', 'crontab', 'curl', 'ffuf', 'gcc', 'git', 'grep',
+  'gzip', 'hashcat', 'iptables', 'journald', 'kubectl', 'mimikatz', 'nmap',
+  'nftables', 'nginx', 'npm', 'openssl', 'pip', 'rsync', 'rsyslog', 'scp',
+  'sed', 'sqlmap', 'ssh', 'sshd', 'sudo', 'syslog', 'systemd', 'tcpdump',
+  'wget', 'wireshark', 'zsh',
+]);
+
 export const COMMON_ACRONYMS = new Set([
   // General business and office vocabulary
   'IT', 'OT', 'HR', 'CEO', 'CTO', 'CFO', 'COO', 'CIO', 'CISO', 'UK', 'US',

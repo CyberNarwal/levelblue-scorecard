@@ -164,6 +164,32 @@ test('"rather than" is a comparison, not an intensifier', () => {
   assert.ok(findingsFor(real, 'language/empty-intensifier').length >= 1, 'a real intensifier still fires');
 });
 
+const LOWER_START = 'punctuation/lowercase-sentence-start';
+
+test('a missing capital mid-paragraph is reported', () => {
+  const result = check('The firewall was reviewed in March. the rule base is unchanged since 2022.');
+  assert.equal(findingsFor(result, LOWER_START).length, 1);
+  const question = check('Was the account disabled? no evidence was provided by the team.');
+  assert.equal(findingsFor(question, LOWER_START).length, 1, 'a question mark ends a sentence too');
+});
+
+test('a paragraph that opens in lower case is not a missing capital', () => {
+  // Slide text boxes, hand-typed bullets and table cells all arrive as
+  // paragraphs and legitimately open mid-thought. Reporting them buried the
+  // real ones under a finding for every fragment in the deck.
+  const fragments = check('Key risks\n\nunpatched Log4j on three hosts\n\nno MFA for administrators\n');
+  assert.deepEqual(findingsFor(fragments, LOWER_START), []);
+  const list = check('We recommend that the client:\n\n- enforce MFA for administrators.\n- retire the shared account.\n');
+  assert.deepEqual(findingsFor(list, LOWER_START), []);
+});
+
+test('a tool whose own name is lower case is left alone', () => {
+  const result = check('The host was scanned in March. nginx was the affected service.');
+  assert.deepEqual(findingsFor(result, LOWER_START), []);
+  const version = check('The scanner is Nessus 10.7. v10.8 was released in June.');
+  assert.deepEqual(findingsFor(version, LOWER_START), []);
+});
+
 test('a retired framework version is reported against the current one', () => {
   const result = check(
     'The assessment covered PCI DSS v3.2.1 and NIST CSF 1.1 across the estate.\n\n'

@@ -73,7 +73,9 @@ export function analyse(doc, { config, now = new Date() } = {}) {
         confidence: raw.confidence || 'high',
         message: raw.message,
         suggestion: raw.suggestion,
-        note: raw.note,
+        // A rule may carry a standing note about its own scope; a finding may
+        // override it with something specific to where it fired.
+        note: raw.note ?? rule.note,
         line: position.line,
         column: position.column,
         slide: raw.documentLevel ? undefined : block?.slide,
