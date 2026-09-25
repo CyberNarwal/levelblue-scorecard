@@ -213,10 +213,15 @@ export const rules = [
     check(doc, ctx) {
       const findings = [];
       const meta = doc.meta;
-      if (!meta || doc.format !== 'docx') return findings;
+      // A deck carries the same properties a document does, and the field that
+      // leaks most often is the author - the last person to save the file it
+      // was copied from. Reading only a .docx, and only its title, left the
+      // most likely leak of all unchecked.
+      if (!meta || (doc.format !== 'docx' && doc.format !== 'pptx')) return findings;
 
       const forbidden = ctx.config.forbiddenClientNames || [];
-      for (const field of ['title', 'subject', 'category', 'keywords']) {
+      const FIELDS = ['title', 'subject', 'category', 'keywords', 'author', 'lastModifiedBy'];
+      for (const field of FIELDS) {
         const value = meta[field];
         if (!value) continue;
         const leak = forbidden.find((name) => new RegExp(`\\b${escapeRegExp(name)}\\b`, 'i').test(value));
@@ -225,7 +230,8 @@ export const rules = [
             start: 0,
             end: Math.min(1, doc.text.length),
             message: `Document property "${field}" still reads "${value}" - it names ${leak}, not this engagement.`,
-            severity: 'major',
+            note: 'File properties travel with the file. In PowerPoint: File, Info, Properties.',
+            severity: 'blocker',
             documentLevel: true,
           });
         }

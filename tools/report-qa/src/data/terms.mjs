@@ -191,6 +191,37 @@ export const RETIRED_VERSIONS = [
 ];
 
 /** Identifier formats seen in vulnerability and threat reporting. */
+/**
+ * Spans that look like a numeric range but are a name: CVE-2021-44228,
+ * NIST SP 800-53, MS17-010. Without these, the dash rule fires on every
+ * vulnerability reference in the report and offers to rewrite its digits.
+ */
+export const IDENTIFIER_SPANS = [
+  /\bCVE[-\u2010-\u2015 ]?\d{4}[-\u2010-\u2015 ]?\d{4,7}\b/gi,
+  /\bCWE[-\u2010-\u2015 ]?\d{1,4}\b/gi,
+  /\bCAPEC[-\u2010-\u2015 ]?\d{1,4}\b/gi,
+  /\b(?:SP\s*)?800[-\u2010-\u2015]\d{1,3}[A-Za-z]?\b/g,          // NIST SP 800-53, 800-171
+  /\bISO(?:\/IEC)?\s*\d{4,5}(?:[-\u2010-\u2015]\d{1,2})?\b/gi,  // ISO/IEC 27001-1
+  /\bMS\d{2}[-\u2010-\u2015]\d{3}\b/gi,                          // MS17-010
+  /\bKB\d{6,8}\b/gi,
+  /\b(?:GV|ID|PR|DE|RS|RC)\.[A-Z]{2}[-\u2010-\u2015]\d{2}\b/g,   // NIST CSF subcategories
+  /\b(?:AC|AT|AU|CA|CM|CP|IA|IR|MA|MP|PE|PL|PM|PS|PT|RA|SA|SC|SI|SR)[-\u2010-\u2015]\d{1,2}\b/g,
+  /\bRFC\s?\d{3,5}\b/gi,
+  /\b\d{4}[-\u2010-\u2015]\d{1,2}[-\u2010-\u2015]\d{1,2}\b/g,  // ISO dates
+  /\b\d{1,2}[-\u2010-\u2015]\d{1,2}[-\u2010-\u2015]\d{4}\b/g,
+];
+
+/** Every span in `text` that IDENTIFIER_SPANS matches, as [start, end) pairs. */
+export function identifierSpans(text) {
+  const spans = [];
+  for (const pattern of IDENTIFIER_SPANS) {
+    const re = new RegExp(pattern.source, pattern.flags);
+    let match;
+    while ((match = re.exec(text)) !== null) spans.push([match.index, match.index + match[0].length]);
+  }
+  return spans;
+}
+
 export const IDENTIFIERS = {
   cve: /\bCVE[-‐-― ]?(\d{4})[-‐-― ]?(\d{4,7})\b/gi,
   cweId: /\bCWE[-‐-― ]?(\d{1,4})\b/gi,

@@ -71,7 +71,10 @@ export function analyse(doc, { config, now = new Date() } = {}) {
         category: rule.category,
         severity,
         confidence: raw.confidence || 'high',
-        message: raw.message,
+        // A message quotes the draft's own words, and those words may have had
+        // a line break in the middle of them. One line, always: these are read
+        // in a list, pasted into a comment and mailed back to the author.
+        message: String(raw.message).replace(/\s+/g, ' ').trim(),
         suggestion: raw.suggestion,
         // A rule may carry a standing note about its own scope; a finding may
         // override it with something specific to where it fired.

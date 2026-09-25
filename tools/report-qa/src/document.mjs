@@ -153,6 +153,20 @@ const TABLE_DIVIDER = /^\s*\|[\s:|-]+\|\s*$/;
 const CAPTION = /^\s*(?:figure|fig\.|table|exhibit|chart|diagram)\s*\d+[.:)]?\s+\S/i;
 
 /**
+ * True when a line carries on the list item above it rather than starting
+ * something new. Anything that opens a block of its own ends the item.
+ */
+function isContinuation(line) {
+  if (!line.trim()) return false;
+  return !LIST_ITEM.test(line)
+    && !ATX_HEADING.test(line)
+    && !TABLE_ROW.test(line)
+    && !CAPTION.test(line)
+    && !/^\s*(?:```+|~~~+)/.test(line)
+    && !/^\s*(?:={3,}|-{3,})\s*$/.test(line);
+}
+
+/**
  * Parse markdown or plain text into blocks. Plain text simply produces
  * paragraphs and whatever headings look unambiguous.
  */
@@ -256,12 +270,24 @@ export function parseMarkdown(raw, { source = 'draft', format = 'markdown' } = {
     if (item) {
       flush();
       const body = item[3];
+      const itemStart = lineStart + line.indexOf(body, item[1].length + item[2].length);
+      const itemLine = i + 1;
+      // A wrapped bullet is still one bullet. Without this its second line
+      // became a paragraph of its own, which cut the item's sentence in half
+      // and left the bullet looking unterminated to every rule that reads one.
+      const parts = [body];
+      let itemEnd = lineStart + line.trimEnd().length;
+      while (i + 1 < lines.length && isContinuation(lines[i + 1])) {
+        i += 1;
+        parts.push(lines[i]);
+        itemEnd = lineStarts[i] + lines[i].trimEnd().length;
+      }
       blocks.push({
         type: 'listItem',
-        text: body,
-        start: lineStart + line.indexOf(body, item[1].length + item[2].length),
-        end: lineStart + line.trimEnd().length,
-        line: i + 1,
+        text: parts.join('\n'),
+        start: itemStart,
+        end: itemEnd,
+        line: itemLine,
         marker: item[2],
         indent: item[1].length,
         ordered: /\d|[a-z]/.test(item[2][0]),

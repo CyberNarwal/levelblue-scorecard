@@ -3,9 +3,24 @@
  * and internal consistency in how the report refers to the same thing twice.
  */
 
-import { ACRONYM_EXPANSIONS, CANONICAL_TERMS, COMMON_ACRONYMS } from '../data/terms.mjs';
+import { ACRONYM_EXPANSIONS, CANONICAL_TERMS, COMMON_ACRONYMS, identifierSpans } from '../data/terms.mjs';
 
 const SCOPE = ['paragraph', 'listItem', 'heading', 'caption', 'tableRow'];
+
+/**
+ * True when the text before a word is a position that forces a capital: the
+ * start of the block, the end of a sentence, a table cell boundary, a bullet
+ * marker or a colon.
+ */
+function opensAClause(before) {
+  const trimmed = before.replace(/\s+$/, '');
+  if (!trimmed) return true;
+  if (/[.!?:|\u2022]$/.test(trimmed)) return true;
+  return /^\s*(?:[-*\u2022]|\d+[.)]|[a-z][.)])$/.test(trimmed);
+}
+
+/** Framework terms whose second word is capitalised because it is a name. */
+const NAMED_TERM = /\b(?:CIS|PCI\s?DSS|ISO(?:\/IEC)?|NIST|SOC\s?2|Annex)\s+[A-Z][a-z]+$/;
 
 export const rules = [
   {
@@ -126,7 +141,10 @@ export const rules = [
       for (const { match, start, end } of doc.scan(/\(\s*([A-Z]{2,6})\s*\)/g, { types: SCOPE })) {
         const acronym = match[1];
         const uses = (doc.text.match(new RegExp(`\\b${acronym}\\b`, 'g')) || []).length;
-        if (uses > 2) continue; // the definition itself counts twice (expansion + parentheses)
+        // The definition contributes one occurrence, not two: the expansion
+        // beside it is words, not the letters. Counting it twice meant an
+        // acronym defined and then used once was reported as never used.
+        if (uses > 1) continue;
         findings.push({
           start,
           end,
@@ -174,15 +192,22 @@ export const rules = [
     severity: 'minor',
     check(doc) {
       const variants = new Map();
+      const names = identifierSpans(doc.text);
+      const insideName = (from, to) => names.some(([s, e]) => from < e && to > s);
       for (const { match, start, end, block } of doc.scan(/\b[A-Za-z][A-Za-z-]{4,24}\b/g, { types: SCOPE })) {
         const word = match[0];
         const key = word.toLowerCase();
         if (!variants.has(key)) variants.set(key, new Map());
         const forms = variants.get(key);
-        // Sentence-initial capitals are not evidence of a capitalisation choice.
-        const isSentenceStart = match.index === 0 || /[.!?]\s+$/.test(block.text.slice(Math.max(0, match.index - 3), match.index));
-        if (isSentenceStart && /^[A-Z][a-z]+$/.test(word)) continue;
+        // A capital forced by its position says nothing about house style. That
+        // is not only the start of a sentence: a table cell, a bullet and the
+        // text after a colon all open with one too, and reading those as a
+        // choice reported every heading-style table cell in the report.
+        if (opensAClause(block.text.slice(0, match.index)) && /^[A-Z][a-z]+$/.test(word)) continue;
         if (block.type === 'heading') continue;
+        // "CIS Control 11" and "PCI DSS 8.4" are names, not capitalisation.
+        if (insideName(start, end)) continue;
+        if (NAMED_TERM.test(block.text.slice(Math.max(0, match.index - 14), end - block.start))) continue;
         if (!forms.has(word)) forms.set(word, { count: 0, start, end });
         forms.get(word).count += 1;
       }

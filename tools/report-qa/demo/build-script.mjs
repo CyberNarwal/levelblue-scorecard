@@ -184,8 +184,9 @@ const BEATS = [
         + 'the list, because it is not a mistake in the writing — it is evidence to one client that '
         + 'we recycle another client\'s material.'],
       ['say', 'That is what those four boxes buy you. Thirty seconds.'],
-      ['aside', `The settings also unlocked the missing <b>CONFIDENTIAL</b> marking. Same principle — `
-        + 'it cannot check a marking you have not told it to expect.'],
+      ['aside', 'The settings also unlocked two more: the missing <b>CONFIDENTIAL</b> marking, and the '
+        + "deck's own author property, which still reads <b>Contoso Financial Services</b>. Same "
+        + 'principle — it cannot check a name you have not told it to watch for.'],
       ['trouble', 'Count did not change? The settings did not save. Re-open the panel and check the '
         + 'button now reads <b>for Northwind Trading</b>.'],
     ],

@@ -218,7 +218,7 @@ export const rules = [
         findings.push({
           start,
           end,
-          message: `"${match[0].trim()}" is in the future but the surrounding text is past tense.`,
+          message: `"${match[0].replace(/\s+/g, ' ').trim()}" is in the future but the surrounding text is past tense.`,
           note: `Checked against ${now.toISOString().slice(0, 10)}. Override with --now=YYYY-MM-DD if the report is dated differently.`,
           confidence: 'medium',
         });

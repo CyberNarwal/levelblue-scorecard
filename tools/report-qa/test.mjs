@@ -13,7 +13,7 @@ import test from 'node:test';
 
 import { DEFAULT_CONFIG } from './src/config.mjs';
 import { loadConfig } from './src/config-node.mjs';
-import { parseMarkdown } from './src/document.mjs';
+import { documentFromParagraphs, parseMarkdown } from './src/document.mjs';
 import { ALL_RULES, analyse } from './src/engine.mjs';
 import { extractDocx } from './src/extract/docx.mjs';
 import { extractPptx } from './src/extract/pptx.mjs';
@@ -162,6 +162,162 @@ test('"rather than" is a comparison, not an intensifier', () => {
   assert.deepEqual(findingsFor(result, 'language/empty-intensifier'), []);
   const real = check('The control is rather weak and the exposure is very significant.');
   assert.ok(findingsFor(real, 'language/empty-intensifier').length >= 1, 'a real intensifier still fires');
+});
+
+/**
+ * The false-positive fixture.
+ *
+ * samples/clean-report.md is a short report written the way we want them
+ * written: British English, house style, all four required sections, real
+ * framework references and real scores. Every finding the rule set raises on
+ * it has to be one a reviewer would agree with, because a tool that reports
+ * faults in correct prose is one nobody runs twice. Adding a rule that fires
+ * here fails this test, which is the point.
+ */
+test('the whole rule set stays quiet on a well-written report', () => {
+  const draft = readFileSync(join(here, 'samples', 'clean-report.md'), 'utf8');
+  const config = { ...structuredClone(DEFAULT_CONFIG), ...loadConfig(join(here, '..', '..')).config };
+  const doc = parseMarkdown(draft, { source: 'clean-report.md' });
+  // After the dates the report itself quotes, or its own past tense reads as
+  // a claim about the future.
+  const result = analyse(doc, { config, now: new Date('2026-09-25T12:00:00Z') });
+
+  assert.equal(result.stats.bySeverity.blocker, 0, 'nothing in a clean report may block it');
+
+  // Each of these is a judgement a reviewer could reasonably disagree with,
+  // not a fault in the prose. Nothing else is allowed.
+  const ACCEPTED = new Set([
+    'terminology/acronym-not-expanded',     // CVSS: expand it, or add it to knownAcronyms
+    'punctuation/dash-style',               // the title uses a hyphen where house style wants an en dash
+    'cyber/risk-without-impact',            // a mitigating sentence that mentions exposure
+    'cyber/recommendation-not-actionable',  // two recommendations carry no date
+    'structure/levelblue-logo-suggestion',  // a standing reminder on every document
+  ]);
+  const unexpected = result.findings.filter((f) => !ACCEPTED.has(f.rule));
+  assert.deepEqual(
+    unexpected.map((f) => `${f.rule}: ${f.message}`),
+    [],
+    'a rule fired on correct prose',
+  );
+  assert.ok(result.stats.total <= 8, `expected a handful of findings, got ${result.stats.total}`);
+});
+
+/** Analyse a deck's worth of paragraphs the way the pptx extractor hands them over. */
+function checkSlides(paragraphs, { meta = {}, ...overrides } = {}) {
+  const config = { ...structuredClone(DEFAULT_CONFIG), ...overrides };
+  const doc = documentFromParagraphs(paragraphs, {
+    source: 'deck.pptx',
+    format: 'pptx',
+    meta: { slideCount: 2, slides: [], notes: [], comments: [], templateText: [], ...meta },
+  });
+  return { doc, ...analyse(doc, { config, now: NOW }) };
+}
+
+test('a wrapped bullet is one bullet, not a bullet and a paragraph', () => {
+  // Its second line used to become a paragraph of its own, which cut the
+  // sentence in half and left the bullet looking unterminated.
+  const doc = parseMarkdown(
+    '# Recommendations\n\n'
+    + '1. Enforce MFA on every administrative account, starting with the four\n'
+    + '   domain administrators. This needs no new licensing.\n'
+    + '2. Restore the payment database in a test environment.\n',
+    { source: 'test.md' },
+  );
+  const items = doc.blocks.filter((b) => b.type === 'listItem');
+  assert.equal(items.length, 2);
+  assert.match(items[0].text, /no new licensing\.$/);
+  for (const block of doc.blocks) {
+    assert.equal(doc.text.slice(block.start, block.end), block.text, `${block.type} offsets`);
+  }
+});
+
+test("a wrapped bullet's indentation is not a double space", () => {
+  const result = check('- Enforce MFA on every administrative account, starting with the four\n  domain administrators.\n');
+  assert.deepEqual(findingsFor(result, 'whitespace/double-space'), []);
+  const real = check('The control  was reviewed in August against the agreed scope of work.');
+  assert.equal(findingsFor(real, 'whitespace/double-space').length, 1, 'a real double space still fires');
+});
+
+test('a hyphen inside an identifier is not a numeric range', () => {
+  const result = check(
+    'Three hosts are vulnerable to CVE-2021-44228 and the estate was mapped to\n'
+    + 'NIST SP 800-53 and MS17-010 was patched in 2026-08-03.\n',
+  );
+  assert.deepEqual(findingsFor(result, 'punctuation/dash-style'), []);
+  const range = check('The review covered pages 10-12 of the policy and the whole of section four.');
+  assert.equal(findingsFor(range, 'punctuation/dash-style').length, 1, 'a real range still fires');
+});
+
+test('a capital forced by its position is not a capitalisation choice', () => {
+  // A table cell, a bullet and the text after a colon all open with a capital.
+  const result = check(
+    'The administrator accounts were reviewed and the administrator inventory was checked.\n\n'
+    + '| Finding | Owner |\n|---|---|\n| Administrator accounts lack MFA | IT |\n',
+  );
+  assert.deepEqual(findingsFor(result, 'terminology/inconsistent-capitalisation'), []);
+});
+
+test('one comma before "and" is a compound sentence, not a serial comma', () => {
+  const result = check(
+    'MFA is not enforced, and the backup process is untested across the estate.\n\n'
+    + 'We tested the hosts, the payment platform and the directory that supports them.\n',
+    { houseStyle: { ...DEFAULT_CONFIG.houseStyle, oxfordComma: false } },
+  );
+  assert.deepEqual(findingsFor(result, 'punctuation/oxford-comma'), []);
+  const serial = check('We tested the hosts, the platform, and the directory that supports them.',
+    { houseStyle: { ...DEFAULT_CONFIG.houseStyle, oxfordComma: false } });
+  assert.equal(findingsFor(serial, 'punctuation/oxford-comma').length, 1, 'a real serial comma still fires');
+});
+
+test('a CVSS version stated once covers every score in the report', () => {
+  const stated = check(
+    '# Findings\n\nSeverity ratings follow CVSS v3.1 throughout this report.\n\n'
+    + 'The first issue is High (CVSS 8.1).\n\nThe second issue is Medium (CVSS 5.3).\n',
+  );
+  assert.deepEqual(findingsFor(stated, 'cyber/cvss-score'), []);
+  const silent = check('The first issue is High (CVSS 8.1).\n\nThe second issue is Medium (CVSS 5.3).\n');
+  const reported = findingsFor(silent, 'cyber/cvss-score');
+  assert.equal(reported.length, 1, 'a report that never states a version is told once, not per score');
+  assert.equal(reported[0].occurrences, 2);
+});
+
+test('a recommendation that states its cadence has a timeframe', () => {
+  const result = check(
+    '## Recommendations\n\n'
+    + '- Restore the payment database in a test environment every six months.\n'
+    + '- Review the administrative account inventory each quarter.\n',
+  );
+  assert.deepEqual(findingsFor(result, 'cyber/recommendation-not-actionable'), []);
+  const neither = check('## Recommendations\n\n- Improve the patching process across the estate.\n');
+  assert.equal(findingsFor(neither, 'cyber/recommendation-not-actionable').length, 1);
+});
+
+test("a deck's own properties are read for another client's name", () => {
+  const result = checkSlides(
+    [{ text: 'Findings', slide: 1, type: 'heading', level: 1 }, { text: 'The estate was reviewed.', slide: 1 }],
+    { forbiddenClientNames: ['Contoso'], meta: { author: 'Contoso Financial Services' } },
+  );
+  const found = findingsFor(result, 'confidentiality/document-metadata');
+  assert.equal(found.length, 1);
+  assert.equal(found[0].severity, 'blocker');
+  assert.match(found[0].message, /author/);
+});
+
+test('a slide title is not missing a blank line above it', () => {
+  const result = checkSlides([
+    { text: 'Scope', slide: 1, type: 'heading', level: 1 },
+    { text: 'The estate was reviewed in August.', slide: 1 },
+    { text: 'Findings', slide: 2, type: 'heading', level: 1 },
+    { text: 'Two findings need attention.', slide: 2 },
+  ]);
+  assert.deepEqual(findingsFor(result, 'whitespace/heading-spacing'), []);
+});
+
+test('an acronym used once after its definition is not unused', () => {
+  const used = check('Multi-factor authentication (MFA) is missing. Enforce MFA on every account.');
+  assert.deepEqual(findingsFor(used, 'terminology/acronym-defined-unused'), []);
+  const unused = check('Common Vulnerabilities and Exposures (CVE) are catalogued by MITRE for reference.');
+  assert.equal(findingsFor(unused, 'terminology/acronym-defined-unused').length, 1);
 });
 
 const LOWER_START = 'punctuation/lowercase-sentence-start';

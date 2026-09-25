@@ -81,6 +81,11 @@ export const rules = [
       // Tolerates "CVSS 9.8", "CVSS v3.1 9.1", "CVSS v3.1 base score of 9.8",
       // "CVSS score: 7.5" - all of which appear in real vulnerability write-ups.
       const pattern = /\bCVSS\s*(?:v\.?\s?([234](?:\.\d)?))?\s*(?:base\s+)?(?:score)?\s*(?:of|is|[:=])?\s*(\d{1,2}(?:\.\d)?)\b/gi;
+      // A report that states its CVSS version once, in the methodology or in a
+      // vector string, has said it. Repeating the demand beside every score
+      // turned one editorial point into a finding per vulnerability.
+      const versionStated = /\bCVSS[\s:]*v?\.?\s?[234](?:\.\d)?\b/i.test(doc.text);
+      const unversioned = [];
       for (const { match, start, end, block } of doc.scan(pattern, { types: SCOPE, skipOpaque: false })) {
         const version = match[1];
         const score = Number(match[2]);
@@ -93,15 +98,7 @@ export const rules = [
           });
           continue;
         }
-        if (!version) {
-          findings.push({
-            start,
-            end,
-            message: `CVSS score ${score} is quoted without a version. v3.1 and v4.0 scores are not interchangeable.`,
-            suggestion: `CVSS v3.1 base score ${score.toFixed(1)}`,
-            severity: 'minor',
-          });
-        }
+        if (!version && !versionStated) unversioned.push({ start, end, score });
         if (!/\./.test(match[2])) {
           findings.push({
             start,
@@ -129,6 +126,20 @@ export const rules = [
             });
           }
         }
+      }
+      if (unversioned.length) {
+        const first = unversioned[0];
+        findings.push({
+          start: first.start,
+          end: first.end,
+          message: `CVSS score${unversioned.length === 1 ? ' is' : 's are'} quoted without a version anywhere in the report. `
+            + 'v3.1 and v4.0 scores are not interchangeable.',
+          suggestion: `CVSS v3.1 base score ${first.score.toFixed(1)}`,
+          severity: 'minor',
+          aggregate: unversioned.length > 1,
+          occurrences: unversioned.length,
+          note: 'Stating the version once, in the methodology, is enough.',
+        });
       }
       return findings;
     },
@@ -336,16 +347,26 @@ export const rules = [
         if (text.length < 20) continue;
 
         const hasOwner = /\b(?:owner|responsible|accountable|assigned to|IT team|security team|[A-Z][a-z]+\s[A-Z][a-z]+)\b/.test(text);
-        const hasTimeframe = /\b(?:\d+\s*(?:day|week|month|hour)s?|Q[1-4]|immediately|within|by\s+\d|by\s+(?:January|February|March|April|May|June|July|August|September|October|November|December)|short[- ]term|medium[- ]term|long[- ]term)\b/i.test(text);
-        const missing = [];
-        if (!hasOwner) missing.push('no owner');
-        if (!hasTimeframe) missing.push('no timeframe');
-        if (!missing.length) continue;
+        // Report writers say "every six months" and "each quarter" far more
+        // often than "within 30 days", and reading only the digits made the
+        // rule fire on recommendations that state their cadence plainly.
+        const cadence = 'daily|weekly|fortnightly|monthly|quarterly|bi-annually|biannually|annually|yearly';
+        const counted = '(?:\\d+|one|two|three|four|five|six|seven|eight|nine|ten|twelve)\\s*(?:hour|day|week|month|quarter|year)s?';
+        const hasTimeframe = new RegExp(
+          `\\b(?:${counted}|${cadence}|Q[1-4]\\b|immediately|urgently|within\\b|by\\s+\\d|`
+          + 'by\\s+(?:the\\s+)?(?:end|next|start|January|February|March|April|May|June|July|August|September|October|November|December)|'
+          + '(?:each|every)\\s+(?:day|week|month|quarter|year)|before\\s+(?:the\\s+)?(?:next|end|go[- ]live|issue|audit|renewal)|'
+          + 'prior\\s+to|short[- ]term|medium[- ]term|long[- ]term)', 'i',
+        ).test(text);
+        // Only when it gives neither. A consultant rarely knows the client's
+        // org chart, so a recommendation with a timescale and no named owner is
+        // ordinary; one with neither is the one nobody can schedule.
+        if (hasOwner || hasTimeframe) continue;
         findings.push({
           start: block.start,
           end: block.end,
-          message: `Recommendation names ${missing.join(' and ')}. A client cannot schedule this.`,
-          suggestion: 'Name who does it and by when.',
+          message: 'Recommendation names neither an owner nor a timeframe. A client cannot schedule this.',
+          suggestion: 'Say who does it, or by when.',
           confidence: 'medium',
         });
       }

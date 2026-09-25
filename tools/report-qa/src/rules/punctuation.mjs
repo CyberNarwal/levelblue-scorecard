@@ -7,7 +7,7 @@
  * draft assembled from several authors almost never does.
  */
 
-import { LOWERCASE_NAMES } from '../data/terms.mjs';
+import { identifierSpans, LOWERCASE_NAMES } from '../data/terms.mjs';
 import { splitSentences } from '../text.mjs';
 
 const PROSE = ['paragraph', 'listItem', 'caption'];
@@ -101,16 +101,16 @@ export const rules = [
         });
       }
 
-      // A written-out date is not a range, and an advisory report is full of
-      // them - every ISO date would otherwise be reported twice, once for
-      // year-month and once for month-day.
-      const dates = [...doc.text.matchAll(/\b\d{4}-\d{1,2}-\d{1,2}\b|\b\d{1,2}-\d{1,2}-\d{4}\b/g)]
-        .map((m) => [m.index, m.index + m[0].length]);
-      const insideDate = (from, to) => dates.some(([s, e]) => from >= s && to <= e);
+      // A CVE number, a NIST SP reference and a written-out date all contain a
+      // hyphen between digits and none of them is a range. An advisory report
+      // is made of them, so without this the rule fires on every vulnerability
+      // it cites and offers to rewrite the identifier.
+      const names = identifierSpans(doc.text);
+      const insideName = (from, to) => names.some(([s, e]) => from >= s && to <= e);
 
       // Number ranges take an en dash, not a hyphen.
       for (const { match, start, end } of doc.scan(/(\d)\s?-\s?(\d)/g, { types: PROSE_AND_HEADINGS })) {
-        if (insideDate(start, end)) continue;
+        if (insideName(start, end)) continue;
         findings.push({
           start,
           end,
@@ -249,7 +249,10 @@ export const rules = [
       for (const sentence of doc.sentences()) {
         const text = sentence.text;
         if (!/,/.test(text)) continue;
-        if (/,\s+(?:and|or)\s+\S/.test(text)) {
+        // A serial comma needs a serial list: "A, B, and C". One comma before
+        // "and" is usually joining two clauses, and counting those made every
+        // compound sentence in the report look like a house-style breach.
+        if (/[^,]+,[^,]+,\s+(?:and|or)\s+\S/.test(text)) {
           withComma.push(sentence);
         } else if (/\w,\s+[^,]{2,60}?\s+(?:and|or)\s+\w/.test(text)) {
           withoutComma.push(sentence);
@@ -321,7 +324,7 @@ export const rules = [
         findings.push({
           start: offenders[0].start,
           end: offenders[0].end,
-          message: `Within one list, ${ended.length} bullet${ended.length === 1 ? '' : 's'} end with a full stop and ${bare.length} do not. House style: ${target === 'period' ? 'end every bullet with a full stop' : 'no terminal punctuation on bullets'}.`,
+          message: `Within one list, ${ended.length} bullet${ended.length === 1 ? ' ends' : 's end'} with a full stop and ${bare.length} ${bare.length === 1 ? 'does' : 'do'} not. House style: ${target === 'period' ? 'end every bullet with a full stop' : 'no terminal punctuation on bullets'}.`,
           aggregate: true,
           occurrences: offenders.length,
         });

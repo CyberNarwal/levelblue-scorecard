@@ -21,8 +21,10 @@ export const rules = [
       const findings = [];
       const allowTwoAfterSentence = ctx.config.houseStyle.sentenceSpacing === 2;
       for (const { match, start, end, block } of doc.scan(/ {2,}/g, { types: PROSE })) {
-        // Leading indentation on a continuation line is not a double space.
-        if (/^\s*$/.test(block.text.slice(0, match.index))) continue;
+        // A line's own indentation is not a double space, whether that line
+        // opens the block or carries on a wrapped bullet inside it.
+        const lineHead = block.text.lastIndexOf('\n', match.index - 1) + 1;
+        if (!block.text.slice(lineHead, match.index).trim()) continue;
         const before = block.text[match.index - 1];
         if (allowTwoAfterSentence && match[0].length === 2 && /[.!?]/.test(before || '')) continue;
         findings.push({
@@ -257,7 +259,10 @@ export const rules = [
     category: 'Spacing',
     severity: 'nit',
     check(doc) {
-      if (doc.format === 'docx') return [];
+      // Blank lines are a markdown and plain-text idea. A deck and a Word file
+      // arrive as one paragraph per line, so every slide title has the previous
+      // slide's last bullet directly above it and this fired on all of them.
+      if (doc.format === 'docx' || doc.format === 'pptx') return [];
       const findings = [];
       for (const heading of doc.headings()) {
         const lineAbove = doc.lines[heading.line - 2];
