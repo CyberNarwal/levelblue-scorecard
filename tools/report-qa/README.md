@@ -185,25 +185,28 @@ margin, overlapping text boxes, and text estimated to overflow its box.
 
 ## The live demo
 
-A demo of the tool in motion lands better than the deck does, so there is a run
-sheet for it and a draft to run it on:
+A demo of the tool in motion lands better than the deck does, so there is a
+script for it and a draft to run it on:
 
 ```bash
-npm run qa:demo      # writes the demo draft and report-qa-demo-script.html
+npm run qa:demo      # writes the demo draft and "Report QA - demo script.docx"
 ```
 
 `Northwind Trading - Security Assessment (DEMO DRAFT).pptx` is a fictional draft
 with planted faults - internal remarks in the speaker notes, a CVSS score that
 contradicts its own label, a retired PCI DSS version, a control identifier off
-the end of its framework, and the previous client's name left in the slide
-master. `report-qa-demo-script.html` is the presenter's sheet: a pre-flight
-checklist, eleven beats of what to do, what to say and what will appear, what to
-do when it does not, and the questions that get asked.
+the end of its framework, the previous client's name left in the slide master,
+and that client still named in the file's own author property.
 
-The figures in the sheet are produced by checking the draft at build time, once
-with the engagement settings blank and once filled in, so the sheet states what
-the tool will really say. A run sheet that disagrees with the screen goes wrong
-in front of an audience.
+`Report QA - demo script.docx` is the presenter's script: what to have ready,
+eleven steps of what to do and what to say, notes on what to do when it does not
+work, and the questions that get asked. Bold is something you do; everything
+else is something you say, written the way you would say it.
+
+The figures in the script are produced by checking the draft at build time, once
+with the engagement settings blank and once filled in, so the script states what
+the tool will really say. A script that disagrees with the screen goes wrong in
+front of an audience.
 
 ## Where the framework data comes from
 

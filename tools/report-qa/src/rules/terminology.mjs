@@ -204,6 +204,9 @@ export const rules = [
         // text after a colon all open with one too, and reading those as a
         // choice reported every heading-style table cell in the report.
         if (opensAClause(block.text.slice(0, match.index)) && /^[A-Z][a-z]+$/.test(word)) continue;
+        // An ALL-CAPS form is a marking, a file name or an acronym - DEMO DRAFT
+        // beside "draft" - not a decision about how to capitalise the word.
+        if (word === word.toUpperCase()) continue;
         if (block.type === 'heading') continue;
         // "CIS Control 11" and "PCI DSS 8.4" are names, not capitalisation.
         if (insideName(start, end)) continue;

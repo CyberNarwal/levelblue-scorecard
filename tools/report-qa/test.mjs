@@ -248,6 +248,14 @@ test('a hyphen inside an identifier is not a numeric range', () => {
   assert.equal(findingsFor(range, 'punctuation/dash-style').length, 1, 'a real range still fires');
 });
 
+test('an ALL-CAPS form is a marking, not a capitalisation choice', () => {
+  const result = check(
+    'The draft was reviewed in August. A second draft followed in September.\n\n'
+    + 'The file is marked DEMO DRAFT in three places, and the third draft is marked DEMO DRAFT too.\n',
+  );
+  assert.deepEqual(findingsFor(result, 'terminology/inconsistent-capitalisation'), []);
+});
+
 test('a capital forced by its position is not a capitalisation choice', () => {
   // A table cell, a bullet and the text after a colon all open with a capital.
   const result = check(
